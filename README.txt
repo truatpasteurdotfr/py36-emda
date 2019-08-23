@@ -1,9 +1,8 @@
-EMDA version 1.1
+EMDA version 1.1.0
 ===================
 
-EMDA is a Python and Fortran based module for Electron Microscopy map and model
-manipulations. EMDA was developed in Python3 environment, but it should run in Python2 as 
-well.
+EMDA is a Python library for Electron Microscopy map and model
+manipulations. EMDA was developed in Python3 environment, but it also supports Python2.
 
 
 Dependencies
@@ -15,55 +14,45 @@ pandas
 gemmi
 mrcfile
 matplotlib
-All these dependencies will be automatically checked and installed, if necessary during
+All dependencies will be automatically checked and installed, if necessary during
 EMDA installation.
 
 
-Installing EMDA version 1.1  
+Installing EMDA version 1.1.0  
 ===============================
 
 For installation you may need administrator permissions, 
 please consult your system administrator if needed.
 
 
-Installing from binaries:
------------------------------------------
-EMDA can be easily installed using the Python package manager (pip) by executing
-pip install emda==1.1
-however, installing from binaries is discouraged because this may lead to missing some
-important shared libraries depending on the targeted hardware and operating systems.
-
-
 Installing from source
 --------------------------------------------
 This is the recommended method of installation of EMDA. 
-If you downloaded EMDA tar file from xxx, 
-follow these steps:
- - uncompress the emda-1.1.tar.gz file 
- - go to emda-1.1 directory 
- - type 'python setup.py bdist_wheel' 
- - type 'pip install dist/emda-1.1-xxx.whl'
+Type 'pip install emda'
+That's it. You are ready to go.
 
-All necessary files will be installed under pythonx.x/site-packages/
-e.g.: /Users/ranganaw/anaconda3/lib/python3.6/site-packages
+After installation, you may check the installation by typing
+'emda_test' on your terminal. All tests must pass.
 
 
 License
 =======
 
-EMDA-1.1 comes under Mozilla Public License Version 2.0 licence.
-Please look LICENSE.txt for more details.
+EMDA-1.1.0 comes under Mozilla Public License Version 2.0 licence.
+Please look at LICENSE.txt for more details.
 
 
 Citations
 =========
 
-Please cite EMDA original publication. Will be available soon.
+Please contact authors: ranganaw@mrc-lmb.cam.ac.uk,
+garib@mrc-lmb.cam.ac.uk
+
 
 Acknowledgments
 ===============
 
-Wellcome Trust- Validation tools for Cryo EM grant (xxxxx)
+Wellcome Trust- Validation tools for Cryo EM grant (208398/Z/17/Z)
 
-This README file was last time modified on 19.08.2019
+This README file was last time modified on 23.08.2019
 

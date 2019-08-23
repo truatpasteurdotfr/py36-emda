@@ -1,7 +1,18 @@
+"""
+Author: "Rangana Warshamanage, Garib N. Murshudov"
+MRC Laboratory of Molecular Biology
+    
+This software is released under the
+Mozilla Public License, version 2.0; see LICENSE.
+"""
+
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import numpy as np
 from emda.config import *
+
+def test():
+    print('iotools test ... Passed')
 
 def read_map(mapname11):
     # Reading .map/mrc file into a numpy 3d array

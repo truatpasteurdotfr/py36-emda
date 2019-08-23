@@ -1,3 +1,11 @@
+"""
+Author: "Rangana Warshamanage, Garib N. Murshudov"
+MRC Laboratory of Molecular Biology
+    
+This software is released under the
+Mozilla Public License, version 2.0; see LICENSE.
+"""
+
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import numpy as np
@@ -33,7 +41,7 @@ def cc_twosimilarmaps(ccmap12,ccmap1,ccmap2,uc,origin):
     ccmap12_ma = ma.masked_less_equal(ccmap12,0.0)
     cc12_ma = ccmap12_ma * np.sqrt(ccmap1_ma) * np.sqrt(ccmap2_ma)
     cc12 = cc12_ma.filled(0.0)
-    write_mrc(cc12 * cc_mask,'map12_realspacecc.mrc',uc,origin)
+    #write_mrc(cc12 * cc_mask,'map12_realspacecc.mrc',uc,origin)
     return cc12
 
 def truemap_model_cc(mapmodelcc,fullmapcc):

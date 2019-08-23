@@ -1,3 +1,11 @@
+"""
+Author: "Rangana Warshamanage, Garib N. Murshudov"
+MRC Laboratory of Molecular Biology
+    
+This software is released under the
+Mozilla Public License, version 2.0; see LICENSE.
+"""
+
 from __future__ import absolute_import,division,print_function,unicode_literals
 import numpy as np
 from timeit import default_timer as timer
@@ -148,9 +156,9 @@ class emFit:
                 if i == 0 or i == ncycles-1: 
                     fsc_lst.append(self.fsc)
 
-                #if i == ncycles-1:
+                if i == ncycles-1:
                     # output maps
-                    #self.output_rotated_maps(ifit,t_accum,q_accum)
+                    self.output_rotated_maps(ifit,t_accum,q_accum)
 
                 self.step,self.grad,self.e1 = derivatives(self.e0,self.ert,
                                                     self.w_grid,self.w2_grid,

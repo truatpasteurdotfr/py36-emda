@@ -1,3 +1,11 @@
+"""
+Author: "Rangana Warshamanage, Garib N. Murshudov"
+MRC Laboratory of Molecular Biology
+    
+This software is released under the
+Mozilla Public License, version 2.0; see LICENSE.
+"""
+
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import numpy as np
@@ -45,7 +53,7 @@ def create_kernel(fResArr, smax):
 def create_soft_edged_kernel(fResArr,smax):
     # Create soft-edged-kernel. smax is resolution to which the kernel size
     # is defined
-    mask = creat_kernel(fResArr,smax)
+    mask = create_kernel(fResArr,smax)
     kern_sphere = mask/np.sum(mask) # Normalized mask
     #norm = 1/np.sum(mask)
     print('Number of data points inside kernel: ', np.count_nonzero(mask))

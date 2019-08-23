@@ -1,3 +1,7 @@
+subroutine test()
+  print*, 'fcodes test ... Passed'
+end subroutine test
+
 subroutine resolution_grid(uc,mode,maxbin,nx,ny,nz,nbin,res_arr,bin_idx)
   implicit none
   real*8,    parameter :: PI = 3.14159

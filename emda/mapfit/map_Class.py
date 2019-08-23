@@ -1,3 +1,11 @@
+"""
+Author: "Rangana Warshamanage, Garib N. Murshudov"
+MRC Laboratory of Molecular Biology
+    
+This software is released under the
+Mozilla Public License, version 2.0; see LICENSE.
+"""
+
 import numpy as np
 from timeit import default_timer as timer
 import numpy as np
