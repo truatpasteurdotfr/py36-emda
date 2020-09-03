@@ -1,8 +1,18 @@
 EMDA version 1.1.3
 ===================
 
-EMDA is a Python library for Electron Microscopy map and model
-manipulations. EMDA was developed in Python3 environment.
+EMDA is an importable Python library for Electron Microscopy map and model manipulations written in Python3.
+EMDA comes under MPL-2.0 license. 
+
+A selected set of EMDA’s core functionalities include:
+
+- Map input/output and format conversion
+- Resolution related functionalities
+- Map statistics calculation in Image and Fourier space
+- Likelihood based map fitting and Bayesian map averaging
+- Likelihood based magnification refinement
+- Local correlation map calculation for map and model validation
+- FSC based map-model validation
 
 
 Dependencies
