@@ -633,8 +633,8 @@ def singlemap_fsc(map1name, knl=3):
     print("Resolution bin     FSC")
     for i in range(len(res_arr)):
         print("{:.2f} {:.4f}".format(res_arr[i], bin_fsc[i]))
-    dist143 = np.sqrt((bin_fsc - 0.143) ** 2)
-    map_resol = res_arr[np.argmin(dist143)]
+    dist05 = np.sqrt((bin_fsc - 0.5) ** 2)
+    map_resol = res_arr[np.argmin(dist05)]
     print("Map resolution (A): ", map_resol)
     return res_arr, bin_fsc
 
