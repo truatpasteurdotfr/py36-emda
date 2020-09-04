@@ -636,7 +636,7 @@ def singlemap_fsc(map1name, knl=3):
     dist05 = np.sqrt((bin_fsc - 0.5) ** 2)
     map_resol = res_arr[np.argmin(dist05)]
     print("Map resolution (A): ", map_resol)
-    return res_arr, bin_fsc
+    return res_arr, bin_fsc, map_resol
 
 
 def mask_from_halfmaps(uc, half1, half2, radius=9, norm=False, iter=1, thresh=None):
