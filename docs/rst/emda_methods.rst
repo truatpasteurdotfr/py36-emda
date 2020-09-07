@@ -1,5 +1,5 @@
-emda\_methods
-=============
+emda\_methods module
+====================
 
 .. automodule:: emda_methods
    :members:

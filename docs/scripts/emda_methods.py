@@ -633,10 +633,12 @@ def singlemap_fsc(map1name, knl=3):
     print("Resolution bin     FSC")
     for i in range(len(res_arr)):
         print("{:.2f} {:.4f}".format(res_arr[i], bin_fsc[i]))
-    dist143 = np.sqrt((bin_fsc - 0.143) ** 2)
-    map_resol = res_arr[np.argmin(dist143)]
+    # deciding resolution
+    nbin4 = nbin // 4
+    dist05 = np.sqrt((bin_fsc[nbin4:] - 0.5) ** 2)
+    map_resol = res_arr[nbin4:][np.argmin(dist05)]
     print("Map resolution (A): ", map_resol)
-    return res_arr, bin_fsc
+    return res_arr, bin_fsc, map_resol
 
 
 def mask_from_halfmaps(uc, half1, half2, radius=9, norm=False, iter=1, thresh=None):

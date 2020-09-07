@@ -12,14 +12,14 @@
 #
 import os
 import sys
-sys.path.append('/Users/ranganaw/MRC/emda_document/sphinx/scripts/')
+sys.path.append('./scripts/')
 # sys.path.insert(0, os.path.abspath('.'))
 
 
 # -- Project information -----------------------------------------------------
 
 project = 'EMDA'
-copyright = '2020, Rangana Warshamanage'
+copyright = '2020, Rangana Warshamanage, Garib N. Murshudov'
 author = 'Rangana Warshamanage'
 
 # The full version, including alpha/beta/rc tags
@@ -31,7 +31,7 @@ release = '1.1.3'
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['sphinx.ext.autodoc'
+extensions = ['sphinx.ext.autodoc', 'sphinxarg.ext'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
