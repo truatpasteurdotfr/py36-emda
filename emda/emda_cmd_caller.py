@@ -25,11 +25,11 @@ cmdl_parser.add_argument(
 
 subparsers = cmdl_parser.add_subparsers(dest="command")
 
-mapinfo = subparsers.add_parser("info", description="Output basic information of map")
+mapinfo = subparsers.add_parser("info", description="Output basic information about the map.")
 mapinfo.add_argument("--map", required=True, help="input map")
 
 halffsc = subparsers.add_parser(
-    "halffsc", description="Calculates FSC between half-maps"
+    "halffsc", description="Calculates FSC between half-maps."
 )
 halffsc.add_argument("--h1", required=True, help="input map1 map")
 halffsc.add_argument("--h2", required=True, help="input map2 map")
@@ -40,84 +40,87 @@ halffsc.add_argument(
     "--out", required=False, default="table_variances.txt", help="output data table"
 )
 
-anyfsc = subparsers.add_parser("fsc", description="Calculates FSC")
+anyfsc = subparsers.add_parser("fsc", description="Calculates FSC between two maps.")
 anyfsc.add_argument("--map1", required=True, help="input map1 map")
 anyfsc.add_argument("--map2", required=True, help="input map2 map")
 
 singlemapfsc = subparsers.add_parser(
-    "singlemapfsc", description="Calculates FSC using neighbour average"
+    "singlemapfsc", description="Calculates FSC using neighbour average."
 )
 singlemapfsc.add_argument("--h1", required=True, help="input map1 map")
+singlemapfsc.add_argument(
+    "--knl", required=False, type=int, default=3, help="kernel radius in voxels"
+)
 
 ccmask = subparsers.add_parser(
-    "ccmask", description="Generates mask based on halfmaps correlation"
+    "ccmask", description="Generates mask based on halfmaps correlation."
 )
 ccmask.add_argument("--h1", required=True, help="input halfmap1 map")
 ccmask.add_argument("--h2", required=True, help="input halfmap2 map")
 ccmask.add_argument(
-    "--knl", required=False, type=int, default=10, help="Kernel size (pixels)"
+    "--knl", required=False, type=int, default=10, help="kernel radius in voxels"
 )
 ccmask.add_argument("--nrm", action="store_true", help="if True use normalized maps")
-ccmask.add_argument("--itr", required=False, type=int, default=1, help="# dilations")
+ccmask.add_argument("--itr", required=False, type=int, default=1, help="number of dilation cycles")
 ccmask.add_argument("--thr", required=False, type=float, help="cc threshold")
 
-map_mask = subparsers.add_parser("mapmask", description="Generate mask from map")
+map_mask = subparsers.add_parser("mapmask", description="Generate a mask from a map.")
 map_mask.add_argument("--map", required=True, help="input map")
 map_mask.add_argument(
-    "--knl", required=False, type=int, default=5, help="Kernel size [5] (pixels)"
+    "--knl", required=False, type=int, default=5, help="kernel radius in voxels"
 )
 map_mask.add_argument(
     "--prb",
     required=False,
     type=float,
     default=0.99,
-    help="density cutoff probability in CDF [0.99]",
+    help="density cutoff probability in cumulative density function",
 )
 map_mask.add_argument(
-    "--itr", required=False, type=int, default=3, help="# dilate iterations [3]"
+    "--itr", required=False, type=int, default=3, help="number of dilate iterations"
 )
 map_mask.add_argument(
-    "--res", required=False, type=float, default=15.0, help="lowpass resolution (A)"
+    "--res", required=False, type=float, default=15.0, help="lowpass resolution in Angstroms"
 )
 map_mask.add_argument(
     "--fil",
     required=False,
     type=str,
     default="butterworth",
-    help="filter to use: [ideal], butterworth",
+    help="filter type to use: ideal or butterworth"
 )
 
 lowpass = subparsers.add_parser(
-    "lowpass", description="lowpass filter to specified resolution"
+    "lowpass", description="Lowpass filter to specified resolution."
 )
 lowpass.add_argument("--map", required=True, help="input map (mrc/map)")
-lowpass.add_argument("--res", required=True, type=float, help="lowpass resolution (A)")
+lowpass.add_argument("--res", required=True, type=float, help="lowpass resolution in Angstrom")
 lowpass.add_argument(
     "--fil",
     required=False,
     type=str,
     default="ideal",
-    help="filter to use: [ideal], butterworth",
+    help="filter type to use: ideal or butterworth",
 )
 
-power = subparsers.add_parser("power", description="calculates power spectrum")
+power = subparsers.add_parser("power", description="Calculates power spectrum.")
 power.add_argument("--map", required=True, help="input map (mrc/map)")
 
-applybfac = subparsers.add_parser("bfac", description="apply a B-factor to map")
+applybfac = subparsers.add_parser("bfac", description="Apply a B-factor on the map.")
 applybfac.add_argument("--map", required=True, help="input map (mrc/map)")
 applybfac.add_argument(
     "--bfc", required=True, nargs="+", type=float, help="bfactor(s) to apply"
 )
-applybfac.add_argument("--out", action="store_true", help="write out map")
+applybfac.add_argument("--out", action="store_true", help="if use, writes out map")
 
 map_resol = subparsers.add_parser(
-    "resol", description="estimates map resolution based on FSC"
+    "resol", description="Estimates map resolution based on FSC."
 )
 map_resol.add_argument("--h1", required=True, help="input halfmap1 map")
 map_resol.add_argument("--h2", required=True, help="input halfmap2 map")
 
 half2full = subparsers.add_parser(
-    "half2full", description="combine two halfmaps to give fullmap"
+    "half2full", description="Combine two halfmaps to make the fullmap."
 )
 half2full.add_argument("--h1", required=True, help="input halfmap1 map")
 half2full.add_argument("--h2", required=True, help="input halfmap2 map")
@@ -125,14 +128,14 @@ half2full.add_argument(
     "--out", required=False, default="fullmap.mrc", help="output map (mrc/map)"
 )
 
-conv_map2mtz = subparsers.add_parser("map2mtz", description="MRC/MAP to MTZ conversion")
+conv_map2mtz = subparsers.add_parser("map2mtz", description="Convert MRC/MAP to MTZ.")
 conv_map2mtz.add_argument("--map", required=True, help="input map (mrc/map)")
 conv_map2mtz.add_argument(
     "--out", required=False, default="map2mtz.mtz", help="output map (mtz)"
 )
 
 conv_map2mtzful = subparsers.add_parser(
-    "map2mtzfull", description="MRC/MAP to MTZ conversion"
+    "map2mtzfull", description="Convert MRC/MAP to MTZ using half maps."
 )
 conv_map2mtzful.add_argument("--h1", required=True, help="input hfmap1 (mrc/map)")
 conv_map2mtzful.add_argument("--h2", required=True, help="input hfmap2 (mrc/map)")
@@ -141,7 +144,7 @@ conv_map2mtzful.add_argument(
 )
 
 transform_map = subparsers.add_parser(
-    "transform", description="apply a transformation to the map"
+    "transform", description="Apply a transformation on the map."
 )
 transform_map.add_argument("--map", required=True, help="input map (mrc/map)")
 transform_map.add_argument(
@@ -153,7 +156,7 @@ transform_map.add_argument(
     help="translation vec. in Angstrom. eg 1.0 0.0 0.0",
 )
 transform_map.add_argument(
-    "--rot", required=False, default=0.0, type=float, help="rotation in deg"
+    "--rot", required=False, default=0.0, type=float, help="rotation in degree"
 )
 transform_map.add_argument(
     "--axr",
@@ -167,12 +170,12 @@ transform_map.add_argument(
     "--out", required=False, default="transformed.mrc", help="output map (mrc/map)"
 )
 
-conv_mtz2map = subparsers.add_parser("mtz2map", description="MTZ to MRC/MAP conversion")
+conv_mtz2map = subparsers.add_parser("mtz2map", description="Convert MTZ to MRC/MAP.")
 conv_mtz2map.add_argument("--mtz", required=True, help="input map (mtz)")
 conv_mtz2map.add_argument("--map", required=True, help="input map (mrc/map)")
 conv_mtz2map.add_argument("--out", required=True, help="output map (mrc/map)")
 
-resample_d = subparsers.add_parser("resample", description="resample map")
+resample_d = subparsers.add_parser("resample", description="Resample a map in Fourier space.")
 resample_d.add_argument("--map", required=True, help="input map (mrc/map)")
 resample_d.add_argument(
     "--pix", required=True, type=float, help="target pixel size (A)"
@@ -183,16 +186,16 @@ resample_d.add_argument(
     default=None,
     nargs="+",
     type=np.int,
-    help="target map dim ",
+    help="target map dimensions. e.g. 100 100 100 ",
 )
 resample_d.add_argument(
-    "--cel", required=False, default=None, nargs="+", type=np.float, help="target cell "
+    "--cel", required=False, default=None, nargs="+", type=np.float, help="target cell. e.g. a b c 90 90 90"
 )
 resample_d.add_argument(
     "--out", required=False, default="resampled.mrc", help="output map name"
 )
 
-resample_m = subparsers.add_parser("resamplemap2map", description="resample map")
+resample_m = subparsers.add_parser("resamplemap2map", description="Resample map2 on map1.")
 resample_m.add_argument("--map1", required=True, help="static map (mrc/map)")
 resample_m.add_argument("--map2", required=True, help="map to resample (mrc/map)")
 resample_m.add_argument(
@@ -538,7 +541,7 @@ def halfmap_fsc(args):
 def singlemap_fsc(args):
     from emda.emda_methods import singlemap_fsc as sfsc
 
-    res_arr, bin_fsc = sfsc(args.h1)
+    res_arr, bin_fsc, _ = sfsc(map1name=args.h1, knl=args.knl)
     plotter.plot_nlines(res_arr, [bin_fsc], "map_fsc.eps", curve_label=["map_fsc"])
 
 
