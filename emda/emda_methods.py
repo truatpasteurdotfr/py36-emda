@@ -621,7 +621,9 @@ def singlemap_fsc(map1name, knl=3):
                 Linear array of FSC in each resolution bin.
             Outputs reconstituted map as 'fakehalf.mrc'
     """
+    from scipy import interpolate
     from emda.ext import fakehalf
+    from emda.ext.mapfit.mapaverage import set_array
 
     uc, arr1, origin = iotools.read_map(map1name)
     f1 = np.fft.fftshift(np.fft.fftn(np.fft.fftshift(arr1)))
@@ -631,12 +633,26 @@ def singlemap_fsc(map1name, knl=3):
     nbin, res_arr, bin_idx = restools.get_resolution_array(uc, f1)
     bin_fsc, _, _, _, _, _ = fsc.halfmaps_fsc_variance(f1, f2, bin_idx, nbin)
     print("Resolution bin     FSC")
-    for i in range(len(res_arr)):
+    for i, _ in enumerate(res_arr):
         print("{:.2f} {:.4f}".format(res_arr[i], bin_fsc[i]))
     # deciding resolution
-    nbin4 = nbin // 4
-    dist05 = np.sqrt((bin_fsc[nbin4:] - 0.5) ** 2)
-    map_resol = res_arr[nbin4:][np.argmin(dist05)]
+    bin_fsc_trunc = set_array(bin_fsc, thresh=0.15)
+    dist05 = np.sqrt((bin_fsc_trunc - 0.5) ** 2)
+    indx = fakehalf.get_index(dist05)
+    lim1 = bin_fsc[indx]
+    res1 = res_arr[indx]
+    if lim1 > 0.5:
+        lim2 = bin_fsc[indx + 1]
+        res2 = res_arr[indx + 1]
+        fsc_seq = [lim1, lim2]
+        res_seq = [res1, res2]
+    elif lim1 < 0.5:
+        lim2 = bin_fsc[indx - 1]
+        res2 = res_arr[indx - 1]
+        fsc_seq = [lim2, lim1]
+        res_seq = [res2, res1]
+    f = interpolate.interp1d(fsc_seq, res_seq)
+    map_resol = f(0.5)
     print("Map resolution (A): ", map_resol)
     return res_arr, bin_fsc, map_resol
 
