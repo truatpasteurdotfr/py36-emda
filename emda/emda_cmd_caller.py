@@ -245,6 +245,9 @@ fourierspc.add_argument("--h2", required=True, help="input halfmap2 map")
 fourierspc.add_argument(
     "--knl", required=False, type=int, default=5, help="Kernel size (pixels)"
 )
+fourierspc.add_argument(
+    "--msk", required=False, default=None, type=str, help="input mask (mrc/map)"
+)
 
 mapmodelfsc = subparsers.add_parser("mapmodelfsc", description="map-model correlation")
 mapmodelfsc.add_argument("--h1", required=True, help="input halfmap1 map")
@@ -720,8 +723,8 @@ def mmrealsp_corr(args):
 
 def fouriersp_corr(args):
     from emda.emda_methods import fouriersp_correlation
-
-    fouriersp_correlation(args.h1, args.h2, args.knl)
+    # half1_map, half2_map, kernel_size=5, mask=None
+    fouriersp_correlation(half1_map=args.h1, half2_map=args.h2, kernel_size=args.knl, mask=args.msk)
 
 
 def map_model_fsc(args):
