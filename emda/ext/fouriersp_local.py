@@ -61,9 +61,13 @@ def get_3d_fouriercorrelation(hf1, hf2, kern_sphere):
     return f_halfmaps_corr, f_fullmap_corr, np.sqrt(f_fullmap_corr)
 
 
-def fcc(half1_map, half2_map, kernel_size):
+def fcc(half1_map, half2_map, kernel_size, maskmap=None):
     uc, half1, origin = core.iotools.read_map(half1_map)
     uc, half2, origin = core.iotools.read_map(half2_map)
+    if maskmap is not None:
+        _, mask, _ = core.iotools.read_map(maskmap)
+        half1 = half1 * mask
+        half2 = half2 * mask
     nx, ny, nz = half1.shape
     fResArr = core.restools.get_resArr(uc, nx)
     cut_mask = core.restools.remove_edge(fResArr, fResArr[-1])
