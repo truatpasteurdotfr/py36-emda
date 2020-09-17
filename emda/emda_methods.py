@@ -932,7 +932,7 @@ def realsp_correlation(
             half1map: string
                 Name of half map 2.
             kernel_size: integer, optional
-                Radius of integration kernal. Default is 5.
+                Radius of integration kernal in pixels. Default is 5.
             norm: bool, optional
                 If True, correlation will be carried out on normalized maps.
                 Default is False.
@@ -997,7 +997,7 @@ def realsp_correlation_mapmodel(
                 An argument for model based map calculation using REFMAC.
                 Resolution to calculate model based map.
             kernel_size: integer, optional
-                Radius of integration kernal. Default is 5.
+                Radius of integration kernal in pixels. Default is 5.
             mask_map: string, optional
                 Mask file to apply on correlation maps. If not given, a spherical mask
                 will be employed. Default radius = (map.shape[0] // 2) - trimpx
@@ -1031,7 +1031,7 @@ def realsp_correlation_mapmodel(
     )
 
 
-def fouriersp_correlation(half1_map, half2_map, kernel_size):
+def fouriersp_correlation(half1_map, half2_map, kernel_size=5, mask=None):
     """Calculates Fourier space local correlation using half maps.
 
     Arguments:
@@ -1054,7 +1054,7 @@ def fouriersp_correlation(half1_map, half2_map, kernel_size):
     from emda.ext import fouriersp_local
 
     fouriersp_local.fcc(
-        half1_map=half1_map, half2_map=half2_map, kernel_size=kernel_size
+        half1_map=half1_map, half2_map=half2_map, kernel_size=kernel_size, maskmap=mask
     )
 
 
