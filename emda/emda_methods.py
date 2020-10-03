@@ -1394,6 +1394,21 @@ def prepare_refmac_data(
 def overall_cc(map1name, map2name, space="real", maskname=None):
     from emda.ext import cc
 
+    data_found = False
+    if map1name.endswith((".mrc", ".map")):
+        uc, arr1, origin = iotools.read_map(map1name)
+        if map2name.endswith((".mrc", ".map")):
+            uc, arr2, origin = iotools.read_map(map2name)
+        elif map2name.endswith((".pdb", ".ent", ".cif")):
+            arr2 = model2map(modelxyz=map2name, dim=arr1.shape, resol=7, cell=uc, bfac=0.0, lig=False, ligfile=None)
+        data_found = True
+    if map2name.endswith((".mrc", ".map")):
+        uc, arr2, origin = iotools.read_map(map2name)
+        if map2name.endswith((".mrc", ".map")):
+            uc, arr1, origin = iotools.read_map(map1name)
+        elif map2name.endswith((".pdb", ".ent", ".cif")):
+            arr1 = model2map(modelxyz=map1name, dim=arr2.shape, resol=7, cell=uc, bfac=0.0, lig=False, ligfile=None)
+
     uc, arr1, origin = iotools.read_map(map1name)
     uc, arr2, origin = iotools.read_map(map2name)
     if maskname is not None:
@@ -1474,3 +1489,52 @@ def mapmagnification(maplist, rmap):
     # magnification refinement
     maplist.append(rmap)
     magnification.main(maplist=maplist)
+
+def set_dim_even(x):
+    """Sets all dimentions even
+
+    This function accepts 3D numpy array and sets its all 3 dims even
+
+        Arguments:
+        Inputs:
+            x: 3D numpy array
+
+        Outputs:
+            x: 3D numpy array with all dims are even
+    """
+    if x.shape[0] % 2 != 0:
+        xshape = list(x.shape)
+        xshape[0] = xshape[0] + 1
+        xshape[1] = xshape[1] + 1
+        xshape[2] = xshape[2] + 1
+        temp = np.zeros(xshape, x.dtype)
+        temp[:-1, :-1, :-1] = x
+        x = temp
+    return x
+
+
+def set_dim_equal(x):
+    """Sets all dimentions equal and even
+
+    This function accepts 3D numpy array and sets its all 3 dims even and equal
+
+        Arguments:
+        Inputs:
+            x: 3D numpy array
+
+        Outputs:
+            x: 3D numpy array with all dims are even and equal
+    """
+    xshape = list(x.shape)
+
+    if xshape[0] != xshape[1] != xshape[2]:
+        maxdim = max(xshape)
+    else:
+        maxdim = xshape[0]
+
+    if maxdim % 2 != 0:
+        maxdim = maxdim + 1
+    temp = np.zeros((maxdim, maxdim, maxdim), dtype=x.dtype)
+    temp[0:nx, 0:ny, 0:nz] = x
+    x = temp
+    return x
