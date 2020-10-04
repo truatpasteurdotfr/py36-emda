@@ -1594,20 +1594,30 @@ def shift_density(arr, shift):
     return ndimage.interpolation.shift(arr, shift)
 
 
-def rotate_density(arr, rotmat):
+def rotate_density(arr, rotmat, interp="linear"):
     """Returns a rotated array of density
 
-    Rotates the array of density using trilinear inperpolation.
+    Rotates the array of density using inperpolation.
 
     Arguments:
         Inputs:
             arr: density as 3D numpy array
             rotmat: 3 x 3 rotation matrix as 2D numpy array.
+            interp: string. 
+                    Type of interpolation to use: cubic or linear.
+                    Default is linear
 
         Outputs:
             rotated_arr: ndarray. Rotated array.
     """
-    import fcodes_fast as focdes
+    import fcodes_fast as fcodes
 
     nx, ny, nz = arr.shape
-    return fcodes.trilinear_map(rotmat.transpose(), shifted_arr2, nx, ny, nz)
+    if interp == "cubic":
+        arr = arr.transpose()
+        if arr.ndim == 3:
+            arr = np.expand_dims(arr, axis=3)
+            arr2 = fcodes.tricubic_map(rotmat.transpose(), arr, 1, 1, nx, ny, nz)[:, :, :, 0]
+        return arr2
+    else:
+        return fcodes.trilinear_map(rotmat.transpose(), arr, nx, ny, nz)
