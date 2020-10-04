@@ -1400,14 +1400,30 @@ def overall_cc(map1name, map2name, space="real", maskname=None):
         if map2name.endswith((".mrc", ".map")):
             uc, arr2, origin = iotools.read_map(map2name)
         elif map2name.endswith((".pdb", ".ent", ".cif")):
-            arr2 = model2map(modelxyz=map2name, dim=arr1.shape, resol=7, cell=uc, bfac=0.0, lig=False, ligfile=None)
+            arr2 = model2map(
+                modelxyz=map2name,
+                dim=arr1.shape,
+                resol=7,
+                cell=uc,
+                bfac=0.0,
+                lig=False,
+                ligfile=None,
+            )
         data_found = True
     if map2name.endswith((".mrc", ".map")):
         uc, arr2, origin = iotools.read_map(map2name)
         if map2name.endswith((".mrc", ".map")):
             uc, arr1, origin = iotools.read_map(map1name)
         elif map2name.endswith((".pdb", ".ent", ".cif")):
-            arr1 = model2map(modelxyz=map1name, dim=arr2.shape, resol=7, cell=uc, bfac=0.0, lig=False, ligfile=None)
+            arr1 = model2map(
+                modelxyz=map1name,
+                dim=arr2.shape,
+                resol=7,
+                cell=uc,
+                bfac=0.0,
+                lig=False,
+                ligfile=None,
+            )
 
     uc, arr1, origin = iotools.read_map(map1name)
     uc, arr2, origin = iotools.read_map(map2name)
@@ -1490,12 +1506,13 @@ def mapmagnification(maplist, rmap):
     maplist.append(rmap)
     magnification.main(maplist=maplist)
 
+
 def set_dim_even(x):
     """Sets all dimentions even
 
     This function accepts 3D numpy array and sets its all 3 dims even
 
-        Arguments:
+    Arguments:
         Inputs:
             x: 3D numpy array
 
@@ -1518,7 +1535,7 @@ def set_dim_equal(x):
 
     This function accepts 3D numpy array and sets its all 3 dims even and equal
 
-        Arguments:
+    Arguments:
         Inputs:
             x: 3D numpy array
 
@@ -1535,6 +1552,62 @@ def set_dim_equal(x):
     if maxdim % 2 != 0:
         maxdim = maxdim + 1
     temp = np.zeros((maxdim, maxdim, maxdim), dtype=x.dtype)
-    temp[0:nx, 0:ny, 0:nz] = x
+    temp[0 : xshape[0], 0 : xshape[1], 0 : xshape[2]] = x
     x = temp
     return x
+
+
+def center_of_mass_density(arr):
+    """Returns the center of mass of 3D density array.
+
+    This function accepts density as 3D numpy array and caclulates the
+    center-of-mass.
+
+    Arguments:
+        Inputs:
+            arr: density as 3D numpy array
+
+        Outputs:
+            com: tuple, center-of-mass (x, y, z)
+    """
+    from scipy import ndimage
+
+    return ndimage.measurements.center_of_mass(arr)
+
+
+def shift_density(arr, shift):
+    """Returns a shifted copy of the input array.
+
+    Shift the array using spline interpolation (order=3). Same as Scipy
+    implementation.
+
+    Arguments:
+        Inputs:
+            arr: density as 3D numpy array
+            shift: sequence. The shifts along the axes.
+
+        Outputs:
+            shifted_arr: ndarray. Shifted array
+    """
+    from scipy import ndimage
+
+    return ndimage.interpolation.shift(arr, shift)
+
+
+def rotate_density(arr, rotmat):
+    """Returns a rotated array of density
+
+    Rotates the array of density using trilinear inperpolation.
+
+    Arguments:
+        Inputs:
+            arr: density as 3D numpy array
+            rotmat: 3 x 3 rotation matrix as 2D numpy array.
+
+        Outputs:
+            rotated_arr: ndarray. Rotated array.
+    """
+    import fcodes_fast as focdes
+
+    nx, ny, nz = arr.shape
+    return fcodes.trilinear_map(rotmat.transpose(), shifted_arr2, nx, ny, nz)
