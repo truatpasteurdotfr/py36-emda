@@ -1060,9 +1060,9 @@ subroutine tricubic(RM,F,FRS,nc,mode,nx,ny,nz)
   do l = zmin, zmax
      do k = ymin, ymax
         do h = xmin, 0!xmax
-           s(1) = h
-           s(2) = k
-           s(3) = l
+           s(1) = real(h)
+           s(2) = real(k)
+           s(3) = real(l)
            x = matmul(transpose(RM),s)
            do i = 1, 3
               x1(i,0) = floor(x(i))
@@ -1527,10 +1527,10 @@ subroutine trilinear_map(RM,arr1,arr2,nx,ny,nz)
   implicit none
   real*8,dimension(3,3),intent(in):: RM
   integer,intent(in):: nx,ny,nz
-  !real*8,dimension(0:nx-1,0:ny-1,0:nz-1),intent(in):: arr1
-  !real*8,dimension(0:nx-1,0:ny-1,0:nz-1),intent(out):: arr2
-  real*8,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in):: arr1
-  real*8,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out):: arr2
+  !real*8,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in):: arr1
+  !real*8,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out):: arr2
+  real*8,dimension(-nz/2:(nz-2)/2,-ny/2:(ny-2)/2,-nx/2:(nx-2)/2),intent(in):: arr1
+  real*8,dimension(-nz/2:(nz-2)/2,-ny/2:(ny-2)/2,-nx/2:(nx-2)/2),intent(out):: arr2
   ! locals
   integer :: x0(3),x1(3)
   integer :: nxyz(3),nxyzmn(3),nxyzmx(3)
@@ -1581,14 +1581,22 @@ subroutine trilinear_map(RM,arr1,arr2,nx,ny,nz)
               x1(i) = min(nxyzmx(i),max(nxyzmn(i),x1(i)))
            enddo
            !if(k==65) print*, h, k, l, x0, x1
-           c000 = arr1(x0(1),x0(2),x0(3))
-           c001 = arr1(x0(1),x0(2),x1(3))
-           c010 = arr1(x0(1),x1(2),x0(3))
-           c011 = arr1(x0(1),x1(2),x1(3))
-           c100 = arr1(x1(1),x0(2),x0(3))
-           c101 = arr1(x1(1),x0(2),x1(3))
-           c110 = arr1(x1(1),x1(2),x0(3))
-           c111 = arr1(x1(1),x1(2),x1(3))
+           !c000 = arr1(x0(1),x0(2),x0(3))
+           !c001 = arr1(x0(1),x0(2),x1(3))
+           !c010 = arr1(x0(1),x1(2),x0(3))
+           !c011 = arr1(x0(1),x1(2),x1(3))
+           !c100 = arr1(x1(1),x0(2),x0(3))
+           !c101 = arr1(x1(1),x0(2),x1(3))
+           !c110 = arr1(x1(1),x1(2),x0(3))
+           !c111 = arr1(x1(1),x1(2),x1(3))
+           c000 = arr1(x0(3),x0(2),x0(1))
+           c001 = arr1(x1(3),x0(2),x0(1))
+           c010 = arr1(x0(3),x1(2),x0(1))
+           c011 = arr1(x1(3),x1(2),x0(1))
+           c100 = arr1(x0(3),x0(2),x1(1))
+           c101 = arr1(x1(3),x0(2),x1(1))
+           c110 = arr1(x0(3),x1(2),x1(1))
+           c111 = arr1(x1(3),x1(2),x1(1))
            ! Interpolation along x direction
            c00 = c000*(1.0d0-xd(1)) + c100*xd(1)
            c01 = c001*(1.0d0-xd(1)) + c101*xd(1)
@@ -1599,7 +1607,8 @@ subroutine trilinear_map(RM,arr1,arr2,nx,ny,nz)
            c1 = c01*(1.0d0-xd(2)) + c11*xd(2)
            ! Interpolation along z direction
            c = c0*(1.0d0-xd(3)) + c1*xd(3)
-           arr2(h,k,l) = c
+           !arr2(h,k,l) = c
+           arr2(l,k,h) = c ! 16.09.2020
            !print*, h, k, l, arr1(h,k,l), arr2(h,k,l)
         end do outer
      end do
@@ -1607,17 +1616,16 @@ subroutine trilinear_map(RM,arr1,arr2,nx,ny,nz)
   return
 end subroutine trilinear_map
 
-subroutine tricubic_map(RM,F,FRS,ncopies,mode,nx,ny,nz)
+subroutine tricubic_map(RM,arr1,arr2,ncopies,mode,nx,ny,nz)
   implicit none
   real*8,dimension(3,3),intent(in):: RM
   integer,intent(in):: nx,ny,nz,mode,ncopies
-  real*8,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2,ncopies),intent(in):: F
-  real*8,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2,ncopies),intent(out):: FRS
+  real*8,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2,ncopies),intent(in):: arr1
+  real*8,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2,ncopies),intent(out):: arr2
   integer :: x1(3,-1:2)
   real*8 :: x(3),xd(3),s(3)
   real*8 :: ul,ul2
   real*8 :: vl(4)
-  !real :: high_res,resol
   integer :: i,j,h,k,l,nmin
   logical :: debug
   integer :: nxyz(3),nxyzmn(3),nxyzmx(3)
@@ -1627,7 +1635,13 @@ subroutine tricubic_map(RM,F,FRS,ncopies,mode,nx,ny,nz)
   !
   debug = .FALSE.
   if(mode == 1) debug = .TRUE.
-  FRS = 0.0d0
+  arr2 = 0.0d0
+  fl = 0.0d0
+  esz = 0.0d0
+  esyz = 0.0d0
+  esxyz = 0.0d0
+  x1 = 0
+  x = 0.0d0; xd = 0.0d0; s = 0.0d0; vl = 0.0d0
   !   Body
   nxyz(1) = nx; nxyz(2) = ny; nxyz(3) =nz
   nxyzmn(1) = -nx/2; nxyzmn(2) = -ny/2; nxyzmn(3) = -nz/2
@@ -1642,10 +1656,10 @@ subroutine tricubic_map(RM,F,FRS,ncopies,mode,nx,ny,nz)
 
   do l = zmin, zmax
      do k = ymin, ymax
-        do h = xmin, xmax
-           s(1) = h
-           s(2) = k
-           s(3) = l
+        outer: do h = xmin, xmax
+           s(1) = real(h)
+           s(2) = real(k)
+           s(3) = real(l)
            x = matmul(transpose(RM),s)
            do i = 1, 3
               x1(i,0) = floor(x(i))
@@ -1657,16 +1671,23 @@ subroutine tricubic_map(RM,F,FRS,ncopies,mode,nx,ny,nz)
               x1(i,1)  = x1(i,0) + 1
               x1(i,2)  = x1(i,0) + 2
               x1(i,-1) = x1(i,0) - 1
+              if((nxyzmx(i) < x1(i,0)) .or. (x1(i,0) < nxyzmn(i)) &
+                   .or. (nxyzmx(i) < x1(i,1)) .or. (x1(i,1) < nxyzmn(i)) &
+                   .or. (nxyzmx(i) < x1(i,2)) .or. (x1(i,2) < nxyzmn(i)) &
+                   .or. (nxyzmx(i) < x1(i,-1)) .or. (x1(i,-1) < nxyzmn(i)))then
+                 cycle outer
+              end if
            end do
            !
            !  Careful here: we may get to the outside of the array
-           do i = 1,3
-              do j= -1,2
-                 x1(i,j) = min(nxyzmx(i),max(nxyzmn(i),x1(i,j)))
-              enddo
-           enddo
+           !do i = 1,3
+           !   do j= -1,2
+           !      x1(i,j) = min(nxyzmx(i),max(nxyzmn(i),x1(i,j)))
+           !   enddo
+           !enddo
            do ic=1, ncopies
-              fl(-1:2,-1:2,-1:2,ic) = F(x1(1,-1:2),x1(2,-1:2),x1(3,-1:2),ic)
+              fl(-1:2,-1:2,-1:2,ic) = arr1(x1(1,-1:2),x1(2,-1:2),x1(3,-1:2),ic)
+              !fl(-1:2,-1:2,-1:2,ic) = arr1(x1(3,-1:2),x1(2,-1:2),x1(1,-1:2),ic)
            end do
 
            !
@@ -1707,9 +1728,10 @@ subroutine tricubic_map(RM,F,FRS,ncopies,mode,nx,ny,nz)
            vl = 0.5d0*vl
            do ic=1,ncopies
               esxyz(ic) =  dot_product(vl,esyz(-1:2,ic))
-              FRS(h,k,l,ic) = esxyz(ic)
+              !arr2(h,k,l,ic) = esxyz(ic)
+              arr2(l,k,h,ic) = esxyz(ic)
            end do
-        end do
+        end do outer
      end do
   end do
   return
