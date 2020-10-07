@@ -18,11 +18,11 @@ def calc_fsc_mrc(hf1, hf2, bin_idx, nbin):
     return bin_fsc
 
 
-def calculate_modelmap(uc, model, dim, resol, bfac=0.0, lig=False, lgf=None):
+def calculate_modelmap(uc, model, dim, resol, bfac=0.0, lig=False, lgf=None, maporigin=None):
     import emda.emda_methods as em
 
     modelmap = em.model2map(
-        modelxyz=model, dim=dim, resol=resol, cell=uc, lig=lig, ligfile=lgf, bfac=bfac
+        modelxyz=model, dim=dim, resol=resol, cell=uc, lig=lig, ligfile=lgf, bfac=bfac, maporigin=maporigin
     )
     f_model = np.fft.fftshift(np.fft.fftn(modelmap))
     return f_model
@@ -46,6 +46,8 @@ def map_model_fsc(
     model_resol=None,
     lgf=None
 ):
+    from emda.ext import maskmap_class
+
     fsc_list = []
     if model1_pdb is not None:
         model_list = [modelf_pdb, model1_pdb]
@@ -54,12 +56,14 @@ def map_model_fsc(
 
     # if maps are in MRC format
     if half1_map.endswith((".mrc", ".mrcs", ".map")):
-        uc, arr1, _ = core.iotools.read_map(half1_map)
+        uc, arr1, origin = core.iotools.read_map(half1_map)
         uc, arr2, _ = core.iotools.read_map(half2_map)
     # mask taking into account
     if mask_map is not None:
         uc, msk, _ = core.iotools.read_map(mask_map)
-    if mask_map is None:
+    else:
+        msk = 1
+    """ if mask_map is None:
         if norm_mask:
             nm = ext.realsp_local.NormalizedMaps(
                 hf1=np.fft.fftshift(np.fft.fftn(arr1)),
@@ -72,10 +76,11 @@ def map_model_fsc(
             msk = obj_maskmap.mask
         else:
             # creating ccmask from half data
-            obj_maskmap = ext.maskmap_class.MaskedMaps()
+            #obj_maskmap = ext.maskmap_class.MaskedMaps()
+            obj_maskmap = maskmap_class.MaskedMaps()
             obj_maskmap.generate_mask(arr1, arr2)
             msk = obj_maskmap.mask
-        core.iotools.write_mrc(msk, "ccmask.mrc", uc)
+        core.iotools.write_mrc(msk, "ccmask.mrc", uc) """
     f_hf1 = np.fft.fftshift(np.fft.fftn(arr1 * msk))
     f_hf2 = np.fft.fftshift(np.fft.fftn(arr2 * msk))
     f_ful = (f_hf1 + f_hf2) / 2.0
@@ -97,6 +102,20 @@ def map_model_fsc(
     nbin, res_arr, bin_idx = core.restools.get_resolution_array(uc, f_hf1)
     bin_fsc, _, _, _, _, _ = core.fsc.halfmaps_fsc_variance(f_hf1, f_hf2, bin_idx, nbin)
     fsc_list.append(bin_fsc)
+    """ # phase randomization
+    full_fsc_t = 2.0*bin_fsc/(bin_fsc + 1.0)
+    hf1_randomized = get_randomized_sf(uc, half1, resol_rand)
+    hf2_randomized = get_randomized_sf(uc, half2, resol_rand)
+    # get phase randomized maps
+    randhalf1 = np.real(np.fft.ifftn(np.fft.ifftshift(hf1_randomized)))
+    randhalf2 = np.real(np.fft.ifftn(np.fft.ifftshift(hf2_randomized)))
+    rbin_fsc, _, _, _, _, _ = core.fsc.halfmaps_fsc_variance(
+        np.fft.fftshift(np.fft.fftn(randhalf1 * mask)),
+        np.fft.fftshift(np.fft.fftn(randhalf2 * mask)),
+        bin_idx,
+        nbin,
+    )
+    full_fsc_n = 2.0 * rbin_fsc / (1.0 + rbin_fsc) """
     # fullmap_fsc = 2.0*bin_fsc/(bin_fsc + 1.0)
     # fsc_list.append(fullmap_fsc)
     if model_resol is None:
@@ -118,7 +137,8 @@ def map_model_fsc(
                 resol=map_resol,
                 bfac=bfac,
                 lig=lig,
-                lgf=lgf
+                lgf=lgf,
+                maporigin=origin
             )
         else:
             raise SystemExit('Accpetable model types: .pdb, .ent, .cif')
