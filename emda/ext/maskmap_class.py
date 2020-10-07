@@ -28,10 +28,11 @@ class MaskedMaps:
         self.origin = origin
 
     def generate_mask(self, arr1, arr2, smax=9, iter=1, threshold=None):
+        from emda.ext import realsp_local
         kern = core.restools.create_soft_edged_kernel_pxl(
             smax
         )  # sphere with radius of n pixles
-        _, fullcc3d = ext.realsp_local.get_3d_realspcorrelation(arr1, arr2, kern)
+        _, fullcc3d = realsp_local.get_3d_realspcorrelation(arr1, arr2, kern)
         if threshold is None:
             cc_mask, threshold = self.histogram(fullcc3d)
         else:
