@@ -485,6 +485,9 @@ model2map.add_argument(
 model2map.add_argument(
     "--lgf", required=False, default=None, type=str, help="ligand description file"
 )
+model2map.add_argument(
+    "--org", required=False, default=None, nargs="+", type=int, help="map origin"
+)
 
 composite = subparsers.add_parser("composite", description="make composite map")
 composite.add_argument(
@@ -878,10 +881,11 @@ def modeltomap(args):
         resol=args.res,
         bfac=args.bfc,
         cell=args.cel,
+        maporigin=args.org,
         lig=args.lig,
         ligfile=args.lgf,
     )
-    write_mrc(modelmap, "modelmap.mrc", args.cel)
+    write_mrc(modelmap, "modelmap.mrc", args.cel, args.org)
 
 
 def mask4mmap(args):
