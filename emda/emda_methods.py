@@ -1451,7 +1451,9 @@ def mirror_map(mapname):
     iotools.write_mrc(data, "mirror.mrc", uc, origin)
 
 
-def model2map(modelxyz, dim, resol, cell, bfac=0.0, lig=False, ligfile=None):
+def model2map(
+    modelxyz, dim, resol, cell, bfac=0.0, lig=False, maporigin=None, ligfile=None
+):
     import gemmi as gm
 
     # check for valid sampling:
@@ -1474,6 +1476,18 @@ def model2map(modelxyz, dim, resol, cell, bfac=0.0, lig=False, ligfile=None):
     # run refmac using model.cif just created
     iotools.run_refmac_sfcalc("./model.cif", resol, bfac, lig=lig, ligfile=ligfile)
     modelmap = maptools.mtz2map("./sfcalc_from_crd.mtz", dim)
+    if maporigin is None:
+        maporigin = [0, 0, 0]
+    else:
+        shift_z = modelmap.shape[0] - abs(maporigin[2])
+        shift_y = modelmap.shape[1] - abs(maporigin[1])
+        shift_x = modelmap.shape[2] - abs(maporigin[0])
+        #print(shift_z, shift_y, shift_x)
+        modelmap = np.roll(
+            np.roll(np.roll(modelmap, -shift_z, axis=0), -shift_y, axis=1),
+            -shift_x,
+            axis=2,
+        )
     return modelmap
 
 
@@ -1543,12 +1557,7 @@ def set_dim_equal(x):
             x: 3D numpy array with all dims are even and equal
     """
     xshape = list(x.shape)
-
-    if xshape[0] != xshape[1] != xshape[2]:
-        maxdim = max(xshape)
-    else:
-        maxdim = xshape[0]
-
+    maxdim = max(xshape)
     if maxdim % 2 != 0:
         maxdim = maxdim + 1
     temp = np.zeros((maxdim, maxdim, maxdim), dtype=x.dtype)
@@ -1572,7 +1581,7 @@ def center_of_mass_density(arr):
     """
     from scipy import ndimage
 
-    return ndimage.measurements.center_of_mass(arr)
+    return ndimage.measurements.center_of_mass(arr * (arr >= 0.0))
 
 
 def shift_density(arr, shift):
@@ -1603,7 +1612,7 @@ def rotate_density(arr, rotmat, interp="linear"):
         Inputs:
             arr: density as 3D numpy array
             rotmat: 3 x 3 rotation matrix as 2D numpy array.
-            interp: string. 
+            interp: string.
                     Type of interpolation to use: cubic or linear.
                     Default is linear
 
@@ -1617,7 +1626,9 @@ def rotate_density(arr, rotmat, interp="linear"):
         arr = arr.transpose()
         if arr.ndim == 3:
             arr = np.expand_dims(arr, axis=3)
-            arr2 = fcodes.tricubic_map(rotmat.transpose(), arr, 1, 1, nx, ny, nz)[:, :, :, 0]
+            arr2 = fcodes.tricubic_map(rotmat.transpose(), arr, 1, 1, nx, ny, nz)[
+                :, :, :, 0
+            ]
         return arr2
     else:
         return fcodes.trilinear_map(rotmat.transpose(), arr, nx, ny, nz)
