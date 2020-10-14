@@ -138,3 +138,29 @@ def rotationMatrixToEulerAngles(R):
         y = math.atan2(-R[2, 0], sy)
         z = 0
     return np.array([x, y, z])
+
+
+def rotmat_from_axisangle(axis, theta):
+    """
+    Returns rotation matrix of counterclockwise rotation about axis.
+
+    Rotation matrix is obtained from expanding Rodiguez formula.
+    This requires angle in radians.
+    """
+    import math
+
+    axis = np.asarray(axis)
+    axis = axis / math.sqrt(np.dot(axis, axis))
+    x, y, z = axis
+    xx, yy, zz = x * x, y * y, z * z
+    xy, xz, yz = x * y, x * z, y * z
+    ca, sa = math.cos(theta), math.sin(theta)
+    aa = 1 - ca
+    return np.array(
+        [
+            [ca + xx * aa, xy * aa - z * sa, xz * aa + y * sa],
+            [xy * aa + z * sa, ca + yy * aa, yz * aa - x * sa],
+            [xz * aa - y * sa, yz * aa + x * sa, ca + zz * aa],
+        ],
+        dtype="float",
+    )
