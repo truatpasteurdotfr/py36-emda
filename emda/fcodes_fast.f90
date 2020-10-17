@@ -1334,14 +1334,15 @@ subroutine prepare_hkl_bfac(s_grid,f1,f2,Bfac,nx,ny,nz,nbf,mode,h,k,l,ampli,nois
   return
 end subroutine prepare_hkl_bfac
 
-subroutine add_random_phase_beyond(F_ori,F_all_random,resol_grid,resol_randomize,nx,ny,nz,F_beyond_random)
+subroutine add_random_phase_beyond(F_ori,F_all_random,bin_idx,rand_idx,nx,ny,nz,F_beyond_random)
   implicit none
   real*8,    parameter :: PI = 3.141592653589793
 
-  integer,   intent(in) :: nx,ny,nz
-  real,      intent(in) :: resol_randomize
+  integer,   intent(in) :: nx,ny,nz,rand_idx
+  !real,      intent(in) :: resol_randomize
   !real,      dimension(6),intent(in)  :: uc
-  real,dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in) :: resol_grid
+  integer,  dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in) :: bin_idx
+  !real,dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in) :: resol_grid
   complex*16, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in)  :: F_ori,F_all_random
   complex*16, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(out) :: F_beyond_random
   ! locals
@@ -1366,19 +1367,34 @@ subroutine add_random_phase_beyond(F_ori,F_all_random,resol_grid,resol_randomize
 
   call cpu_time(start)
 
+  !do i1=xyzmin(1), xyzmax(1)
+  !   do i2=xyzmin(2), xyzmax(2)
+  !      do i3=xyzmin(3), 0 !xyzmax(3)
+  !         !call get_resol(uc,real(i1),real(i2),real(i3),resol)
+  !         !if(resol >= resol_randomize)then
+  !         if(resol_grid(i1,i2,i3) >= resol_randomize)then
+  !            F_beyond_random(i1,i2,i3) = F_ori(i1,i2,i3)
+  !            if(i3 == xyzmin(3) .or. i2 == xyzmin(2) .or. i1 == xyzmin(1)) cycle
+  !            F_beyond_random(-i1,-i2,-i3) = conjg(F_ori(i1,i2,i3))
+  !         else
+  !            F_beyond_random(i1,i2,i3) = F_all_random(i1,i2,i3)
+  !            if(i3 == xyzmin(3) .or. i2 == xyzmin(2) .or. i1 == xyzmin(1)) cycle
+  !            F_beyond_random(-i1,-i2,-i3) = conjg(F_beyond_random(i1,i2,i3))
+  !         end if
+  !      end do
+  !   end do
+  !end do
   do i1=xyzmin(1), xyzmax(1)
      do i2=xyzmin(2), xyzmax(2)
-        do i3=xyzmin(3), 0 !xyzmax(3)
-           !call get_resol(uc,real(i1),real(i2),real(i3),resol)
-           !if(resol >= resol_randomize)then
-           if(resol_grid(i1,i2,i3) >= resol_randomize)then
-              F_beyond_random(i1,i2,i3) = F_ori(i1,i2,i3)
+        do i3=xyzmin(3), 0
+           if(bin_idx(i3,i2,i1) <= rand_idx)then
+              F_beyond_random(i3,i2,i1) = F_ori(i3,i2,i1)
               if(i3 == xyzmin(3) .or. i2 == xyzmin(2) .or. i1 == xyzmin(1)) cycle
-              F_beyond_random(-i1,-i2,-i3) = conjg(F_ori(i1,i2,i3))
+              F_beyond_random(-i3,-i2,-i1) = conjg(F_ori(i3,i2,i1))
            else
-              F_beyond_random(i1,i2,i3) = F_all_random(i1,i2,i3)
+              F_beyond_random(i3,i2,i1) = F_all_random(i3,i2,i1)
               if(i3 == xyzmin(3) .or. i2 == xyzmin(2) .or. i1 == xyzmin(1)) cycle
-              F_beyond_random(-i1,-i2,-i3) = conjg(F_beyond_random(i1,i2,i3))
+              F_beyond_random(-i3,-i2,-i1) = conjg(F_beyond_random(i3,i2,i1))
            end if
         end do
      end do
@@ -1523,21 +1539,25 @@ subroutine trilinear(RM,F,FRS,ncopies,mode,nx,ny,nz)
   return
 end subroutine trilinear
 
-subroutine trilinear_map(RM,arr1,arr2,nx,ny,nz)
+subroutine trilinear_map(RM,arr1,arr2,nx,ny,nz,mode)
   implicit none
   real*8,dimension(3,3),intent(in):: RM
-  integer,intent(in):: nx,ny,nz
+  integer,intent(in):: nx,ny,nz,mode
   !real*8,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in):: arr1
   !real*8,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out):: arr2
   real*8,dimension(-nz/2:(nz-2)/2,-ny/2:(ny-2)/2,-nx/2:(nx-2)/2),intent(in):: arr1
   real*8,dimension(-nz/2:(nz-2)/2,-ny/2:(ny-2)/2,-nx/2:(nx-2)/2),intent(out):: arr2
   ! locals
+  logical :: debug
   integer :: x0(3),x1(3)
   integer :: nxyz(3),nxyzmn(3),nxyzmx(3)
   real*8 :: x(3),xd(3),s(3)
   real*8 :: c000,c001,c010,c011,c100,c101,c110,c111,c00,c01,c10,c11,c0,c1,c
   integer :: h,k,l,i
   integer :: xmin,xmax,ymin,ymax,zmin,zmax
+
+  debug = .FALSE.
+  if(mode == 1) debug = .TRUE.
 
   arr2 = 0.0d0
   x = 0.0d0
@@ -1550,7 +1570,7 @@ subroutine trilinear_map(RM,arr1,arr2,nx,ny,nz)
   ymin = int(-ny/2); ymax = -(ymin+1)
   zmin = int(-nz/2); zmax = -(zmin+1)
 
-  write(*,*) nxyz,nxyzmn,nxyzmx
+  if(debug) write(*,*) nxyz,nxyzmn,nxyzmx
 
   do h = zmin, zmax
      do k = ymin, ymax
