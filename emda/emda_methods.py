@@ -51,6 +51,75 @@ def read_mtz(mtzfile):
     uc, df = iotools.read_mtz(mtzfile)
     return uc, df
 
+def get_data(struct, resol=5.0, uc=None, dim=None, maporigin=None):
+    """Returns data of a map or a model into an ndarray.
+      
+    Reads map data into an ndarray, or if the structure input is an atomic model,
+    it calculates the map from the model and returns as an ndarray.
+
+    Arguments:
+        Inputs:
+            struct: string
+                CCP4/MRC map file name or PDB/ENT/CIF file
+                resol:  float, optional
+                        resolution to calculates map from model. Default is 5.0 A.
+                uc: float, 1D array
+                    Parameter for modelmap generation. If absent, this will be 
+                    determined by dim parameter.
+                dim: sequence (integers), optional
+                    Parameter for modelmap generation. If absent, this will be
+                    determined from the size of the molecule.
+                maporigin: sequence (integers), optional
+                    Parameter for modelmap generation. If present, the calculated map
+                    will be shifted according to this information. If absent, this
+                    parameter is taken as [0, 0, 0].
+                    
+        Outputs:
+            uc: float, 1D array
+                Unit cell
+            arr: float, 3D array
+                Map values as Numpy array
+            origin: list
+                Map origin list
+    """
+
+    # read map/mrc
+    if struct.endswith((".mrc", ".map")):
+        uc, arr, orig = read_map(struct)
+
+    # read model pdb/ent/cif
+    if struct.endswith((".pdb", ".ent", ".cif")):
+        newmodel = struct
+        if uc is not None:
+            if dim is not None:
+                uc = uc
+                dim = max(dim)
+                orig = [0, 0, 0]
+            if dim is None:
+                dim = get_dim(model=struct, shiftmodel="new1.cif")
+                orig = [0, 0, 0]
+                newmodel = "new1.cif"
+        if uc is None:
+            if dim is not None:
+                dim = max(dim)
+                uc = np.array([dim, dim, dim, 90.0, 90.0, 90.0], dtype="float")
+                orig = [0, 0, 0]
+            if dim is None:
+                dim = get_dim(model=struct, shiftmodel="new1.cif")
+                uc = np.array([dim, dim, dim, 90.0, 90.0, 90.0], dtype="float")
+                orig = [-dim//2, -dim//2, -dim//2]#[0, 0, 0]
+                newmodel = "new1.cif"
+        if maporigin is None:
+            maporigin = orig
+        modelmap = model2map(
+            modelxyz=newmodel,
+            dim=[dim, dim, dim],
+            resol=resol,
+            cell=uc,
+            maporigin=maporigin,
+        )
+        arr = modelmap
+    return uc, arr, orig
 
 def write_mrc(mapdata, filename, unit_cell, map_origin=None):
     """Writes 3D Numpy array into MRC file.
@@ -657,6 +726,32 @@ def singlemap_fsc(map1name, knl=3):
     return res_arr, bin_fsc, map_resol
 
 
+def get_fsc(arr1, arr2, uc):
+    """Returns FSC as a function of resolution
+
+    Arguments:
+        Inputs:
+            arr1: float, ndarray
+                Density array 1.
+            arr2: float, ndarray
+                Density array 2.
+            uc: float, 1D array
+                Unit cell
+
+        Outputs:
+            res_arr: float, 1D array
+                Linear array of resolution in Angstrom units.
+            bin_fsc: float, 1D array
+                Linear array of FSC in each resolution bin.
+    """
+    fmap1 = np.fft.fftshift(np.fft.fftn(arr1))
+    fmap2 = np.fft.fftshift(np.fft.fftn(arr2))
+    nbin, res_arr, bin_idx = restools.get_resolution_array(uc, fmap1)
+    bin_fsc, _ = fsc.anytwomaps_fsc_covariance(fmap1, fmap2, bin_idx, nbin)
+    return res_arr, bin_fsc
+
+
+
 def mask_from_halfmaps(uc, half1, half2, radius=9, norm=False, iter=1, thresh=None):
     """Generates a mask from half maps.
 
@@ -781,6 +876,8 @@ def overlay_maps(
     tra=None,
     axr=None,
     fobj=None,
+    usemodel=False,
+    fitres=None,
 ):
     """Superimposes several maps.
 
@@ -838,6 +935,8 @@ def overlay_maps(
         fobj=fobj,
         interp=interp,
         halfmaps=hfm,
+        usemodel=usemodel,
+        fitres=fitres,
     )
 
 
@@ -1472,6 +1571,7 @@ def model2map(
     a, b, c = cell[:3]
     structure = gm.read_structure(modelxyz)
     structure.cell.set(a, b, c, 90.0, 90.0, 90.0)
+    structure.spacegroup_hm = "P 1"
     structure.make_mmcif_document().write_file("model.cif")
     # run refmac using model.cif just created
     iotools.run_refmac_sfcalc("./model.cif", resol, bfac, lig=lig, ligfile=ligfile)
@@ -1631,4 +1731,44 @@ def rotate_density(arr, rotmat, interp="linear"):
             ]
         return arr2
     else:
-        return fcodes.trilinear_map(rotmat.transpose(), arr, nx, ny, nz)
+        return fcodes.trilinear_map(rotmat.transpose(), arr, debug_mode,nx, ny, nz)
+
+
+def get_dim(model, shiftmodel="new1.cif"):
+    """Returns the box dimension to put the modelmap in.
+
+    Determines the dimension of the box for the model based map.
+
+    Arguments:
+        Inputs:
+            model:  atomic model as .pdb/.cif
+            shiftmodel: name for COM shifted model, optional.
+                    Default name - new1.cif.
+
+        Outputs:
+            dim: integer, dimension of the box.
+    """
+    import gemmi
+
+    st = gemmi.read_structure(model)
+    model = st[0]
+    com = model.calculate_center_of_mass()
+    print(com)
+    xc = []
+    yc = []
+    zc = []
+    for cra in model.all():
+        cra.atom.pos.x -= com.x
+        cra.atom.pos.y -= com.y
+        cra.atom.pos.z -= com.z
+        xc.append(cra.atom.pos.x)
+        yc.append(cra.atom.pos.y)
+        zc.append(cra.atom.pos.z)
+    st.spacegroup_hm = "P 1"
+    st.make_mmcif_document().write_file(shiftmodel)
+    xc_np = np.asarray(xc)
+    yc_np = np.asarray(yc)
+    zc_np = np.asarray(zc)
+    distances = np.sqrt(np.power(xc_np, 2) + np.power(yc_np, 2) + np.power(zc_np, 2))
+    dim1 = 2 + (int(np.max(distances)) + 1) * 2
+    return dim1
