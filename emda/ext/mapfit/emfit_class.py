@@ -24,6 +24,7 @@ class EmFit:
         self.cut_dim = mapobj.cdim
         self.ful_dim = mapobj.map_dim
         self.cell = mapobj.map_unit_cell
+        self.pixsize = mapobj.pixsize
         self.origin = mapobj.map_origin
         self.interp = interp
         self.dfs = dfs
@@ -43,7 +44,38 @@ class EmFit:
         self.w2_grid = None
         self.fsc_lst = []
 
-    def get_wght(self, e0, ert):
+    def calc_fsc(self):
+        cx, cy, cz = self.e0.shape
+        self.st, s1, s2, s3 = fcodes_fast.get_st(cx, cy, cz, self.t)
+        self.sv = np.array([s1, s2, s3])
+        self.ert = get_FRS(self.rotmat, self.e1 * self.st, interp=self.interp)[:, :, :, 0]
+        # f are used for FSC
+        """ frt = get_FRS(self.rotmat, self.f1 * self.st, interp=self.interp)[:, :, :, 0]
+        fsc, _ = core.fsc.anytwomaps_fsc_covariance(
+            self.mapobj.cfo_lst[0], frt, self.mapobj.cbin_idx, self.mapobj.cbin
+        ) """
+        fsc, _ = core.fsc.anytwomaps_fsc_covariance(
+            self.e0, self.ert, self.mapobj.cbin_idx, self.mapobj.cbin
+        )
+        return fsc
+
+    def get_wght(self):
+        cx, cy, cz = self.e0.shape
+        w_grid = fcodes_fast.read_into_grid(
+            self.mapobj.cbin_idx, self.fsc / (1 - self.fsc ** 2), self.mapobj.cbin, cx, cy, cz
+        )
+        fsc_sqd = self.fsc ** 2
+        fsc_combi = fsc_sqd / (1 - fsc_sqd)
+        w2_grid = fcodes_fast.read_into_grid(
+            self.mapobj.cbin_idx, fsc_combi, self.mapobj.cbin, cx, cy, cz
+        )
+        return w_grid, w2_grid
+
+    def functional(self):
+        fval = np.sum(self.w_grid * self.e0 * np.conjugate(self.ert))
+        return fval.real
+
+    """ def get_wght(self, e0, ert):
         cx, cy, cz = e0.shape
         start = timer()
         fsc, _ = core.fsc.anytwomaps_fsc_covariance(
@@ -78,7 +110,7 @@ class EmFit:
         end = timer()
         if timeit:
             print(" functional calc time: ", end - start)
-        return fval.real
+        return fval.real """
 
     def minimizer(self, ncycles, t_init, rotmat, smax_lf, fobj=None):
         import math
@@ -95,7 +127,8 @@ class EmFit:
         fobj.write("\n")
         fobj.write("Normalized Structure Factors are used for fitting! \n")
         xyz = create_xyz_grid(self.cell, self.cut_dim)
-        vol = self.cell[0] * self.cell[1] * self.cell[2]
+        #vol = self.cell[0] * self.cell[1] * self.cell[2]
+        vol = self.cut_dim[0] * self.cut_dim[0] * self.cut_dim[0]
         xyz_sum = get_xyz_sum(xyz)
         q_init = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
         fobj.write("\n")
@@ -107,12 +140,13 @@ class EmFit:
         print("Cycle#   ", "Func. value  ", "Rotation(degrees)  ", "Translation(A)  ")
         for ifit in range(nfit):
             self.e1 = self.mapobj.ceo_lst[ifit + 1]
+            #self.f1 = self.mapobj.cfo_lst[ifit + 1]
             for i in range(ncycles):
                 start = timer()
                 if i == 0:
-                    self.t = np.asarray(t_init)
+                    self.t = np.asarray(t_init, dtype='float')
                     t_accum = self.t
-                    t_accum_angstrom = t_accum * self.cell[:3]
+                    t_accum_angstrom = t_accum * self.pixsize#self.cell[:3]
                     translation_vec = np.sqrt(
                         np.sum(t_accum_angstrom * t_accum_angstrom)
                     )
@@ -131,8 +165,24 @@ class EmFit:
                     else:
                         self.rotmat = core.quaternions.get_RM(self.q)
 
-                fval = self.functional(self.e0, self.e1)
-                print("fval: ", fval)
+                # check FSC and return parameters accordingly  
+                self.fsc = self.calc_fsc()  
+                if np.average(self.fsc) > 0.99:
+                    fval = np.sum(self.e0 * np.conjugate(self.ert))
+                    print("fval, FSC_avg ", fval.real, np.average(self.fsc))
+                    self.rotmat = core.quaternions.get_RM(q_accum)
+                    self.t_accum = t_accum_previous  # final translation
+                    self.fsc_lst = fsc_lst
+                    t_accum_angstrom = self.t_accum * self.pixsize#self.cell[:3]
+                    translation_vec = np.sqrt(
+                        np.sum(t_accum_angstrom * t_accum_angstrom)
+                    )
+                    theta2 = np.arccos((np.trace(self.rotmat) - 1) / 2) * 180.0 / np.pi
+                    print("thets2, trans: ", theta2, translation_vec)
+                    break
+                self.w_grid, self.w2_grid = self.get_wght()
+                fval = self.functional()
+                #fval = self.functional(self.e0, self.e1)
                 if math.isnan(theta2):
                     print("Cannot find a solution! Stopping now...")
                     exit()
@@ -142,17 +192,17 @@ class EmFit:
                     fsc_lst.append(fsc)
                 if i > 0 and fval_previous < fval or i == ncycles - 1:
                     fsc = self.fsc
-                    print(i, fval_previous, fval)
-                    print(
-                        "average FSC: before after", np.mean(fsc_lst[0]), np.mean(fsc)
-                    )
+                    #print(i, fval_previous, fval)
+                    #print(
+                    #    "average FSC: before after", np.mean(fsc_lst[0]), np.mean(fsc)
+                    #)
                 if i > 0 and fval < fval_previous or i == ncycles - 1:
                     rotmat = core.quaternions.get_RM(q_accum_previous)
                     fsc_lst.append(fsc)
                     self.rotmat = rotmat  # final rotation
                     self.t_accum = t_accum_previous  # final translation
                     self.fsc_lst = fsc_lst
-                    t_accum_angstrom = self.t_accum * self.cell[:3]
+                    t_accum_angstrom = self.t_accum * self.pixsize#self.cell[:3]
                     translation_vec = np.sqrt(
                         np.sum(t_accum_angstrom * t_accum_angstrom)
                     )
@@ -207,7 +257,7 @@ class EmFit:
                 # translation
                 self.t = self.step[:3] * alpha[0]
                 t_accum = t_accum + self.t
-                t_accum_angstrom = t_accum * self.cell[:3]
+                t_accum_angstrom = t_accum * self.pixsize#self.cell[:3]
                 translation_vec = np.sqrt(np.sum(t_accum_angstrom * t_accum_angstrom))
                 # rotation
                 tmp = np.insert(self.step[3:] * alpha[1], 0, 0.0)
