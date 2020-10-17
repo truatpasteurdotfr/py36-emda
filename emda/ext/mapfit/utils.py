@@ -33,9 +33,9 @@ def get_interp(RM, data, interp):
 
 
 def create_xyz_grid(uc, nxyz):
-    x = np.fft.fftfreq(nxyz[0]) * uc[0]
-    y = np.fft.fftfreq(nxyz[1]) * uc[1]
-    z = np.fft.fftfreq(nxyz[2]) * uc[2]
+    x = np.fft.fftfreq(nxyz[0]) #* uc[0]
+    y = np.fft.fftfreq(nxyz[1]) #* uc[1]
+    z = np.fft.fftfreq(nxyz[2]) #* uc[2]
     xv, yv, zv = np.meshgrid(x, y, z)
     xyz = [yv, xv, zv]
     for i in range(3):
@@ -355,12 +355,8 @@ def get_minimum_bounding_dims(arr1):
 def realsp_map_interpolation(arr1, RM):
     from scipy import ndimage
 
-    com = ndimage.measurements.center_of_mass(arr1)
-    print(com)
-    com = (120, 120, 120)
     nx, ny, nz = arr1.shape
-    print(nx, ny, nz)
-    rotated_map = fcodes_fast.trilinear_map(RM, com, arr1, nx, ny, nz)
+    rotated_map = fcodes_fast.trilinear_map(RM, arr1, debug_mode, nx, ny, nz)
     return rotated_map
 
 
@@ -667,3 +663,30 @@ def frac2ang(t_frac, pix_size):
 def ang2frac(t_ang, pix_size):
     t_frac = np.asarray(t_ang, dtype="float") / pix_size
     return t_frac
+
+
+def get_dim(model, shiftmodel="new1.cif"):
+    import gemmi
+
+    st = gemmi.read_structure(model)
+    model = st[0]
+    com = model.calculate_center_of_mass()
+    print(com)
+    xc = []
+    yc = []
+    zc = []
+    for cra in model.all():
+        cra.atom.pos.x -= com.x
+        cra.atom.pos.y -= com.y
+        cra.atom.pos.z -= com.z
+        xc.append(cra.atom.pos.x)
+        yc.append(cra.atom.pos.y)
+        zc.append(cra.atom.pos.z)
+    st.spacegroup_hm = "P 1"
+    st.make_mmcif_document().write_file(shiftmodel)
+    xc_np = np.asarray(xc)
+    yc_np = np.asarray(yc)
+    zc_np = np.asarray(zc)
+    distances = np.sqrt(np.power(xc_np, 2) + np.power(yc_np, 2) + np.power(zc_np, 2))
+    dim1 = 2 + (int(np.max(distances)) + 1) * 2
+    return dim1
