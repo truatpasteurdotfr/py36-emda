@@ -52,7 +52,7 @@ def map_model_fsc(
     if model1_pdb is not None:
         model_list = [modelf_pdb, model1_pdb]
     else:
-        model_list = [model1_pdb]
+        model_list = [modelf_pdb]
 
     # if maps are in MRC format
     if half1_map.endswith((".mrc", ".mrcs", ".map")):
