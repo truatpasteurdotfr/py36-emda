@@ -322,13 +322,22 @@ mapoverlay.add_argument(
     help="starting fit resol. (A). default= 6 A",
 )
 mapoverlay.add_argument(
+    "--fitres",
+    required=False,
+    default=0.,
+    type=float,
+    help="final fit resol. (A). default= 0.0 A",
+)
+mapoverlay.add_argument(
     "--int",
     required=False,
     default="linear",
     type=str,
     help="interpolation method (linear/cubic). default= linear",
 )
-mapoverlay.add_argument("--hfm", action="store_true", help="if True use half maps")
+mapoverlay.add_argument("--hfm", action="store_true", help="if use employ half maps")
+mapoverlay.add_argument("--mod", action="store_true", help="if use calls model overlay")
+
 
 mapaverage = subparsers.add_parser(
     "average", description="weighted average of several maps"
@@ -760,6 +769,8 @@ def map_overlay(args, fobj):
         fobj=fobj,
         interp=args.int,
         hfm=args.hfm,
+        usemodel=args.mod,
+        fitres=args.fitres,
     )
 
 
