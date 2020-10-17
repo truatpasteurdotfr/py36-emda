@@ -12,10 +12,12 @@ import numpy as np
 import fcodes_fast
 import emda.ext.mapfit.utils as utils
 from emda import core, ext
+import emda.emda_methods as em
+from numpy.fft import fftn, fftshift
 
 
 # Overlay of several maps using maps. not use halfmaps
-class EmmapOverlay:
+""" class EmmapOverlay:
     def __init__(self, hfmap_list, mask_list=None):
         self.hfmap_list = hfmap_list
         self.mask_list = mask_list
@@ -28,6 +30,7 @@ class EmmapOverlay:
         self.cbin_idx = None
         self.cdim = None
         self.cbin = None
+        self.com = False
         self.com1 = None
         self.box_centr = None
         self.fhf_lst = None
@@ -42,7 +45,7 @@ class EmmapOverlay:
         from scipy import ndimage
         from scipy.ndimage.interpolation import shift
 
-        com = False
+        com = self.com
         cmask = False
         fhf_lst = []
         if self.mask_list is not None:
@@ -166,6 +169,241 @@ class EmmapOverlay:
             self.map_unit_cell = uc_target
             self.map_dim = target_dim
             self.fhf_lst = fhf_lst
+
+    def load_models(self):
+        import numpy as np
+        import emda.emda_methods as em
+
+        dim_list = []
+        model_list = self.hfmap_list
+        shifted_model_list = []
+        for i, model in enumerate(model_list):
+            shifted_model_list.append("shifted" + str(i) + ".cif")
+            dim_list.append(
+                em.get_dim(model=model, shiftmodel=shifted_model_list[i])
+            )
+        dim = max(dim_list)
+
+        fhf_lst = []
+        unit_cell = np.array([dim, dim, dim, 90.0, 90.0, 90.0], dtype='float')
+        for i, model in enumerate(shifted_model_list):
+            modelmap = em.model2map(
+                model,
+                dim=[dim, dim, dim],
+                resol=4,
+                cell=[float(dim), float(dim), float(dim), 90.0, 90.0, 90.0],
+            )
+            em.write_mrc(
+                np.fft.fftshift(modelmap),
+                # modelmap,
+                "modelmap_reboxed%s.mrc" % (i),
+                unit_cell=unit_cell,
+            )
+            fhf_lst.append(np.fft.fftshift(np.fft.fftn(modelmap)))
+
+        self.map_origin = [0, 0, 0]
+        self.map_unit_cell = unit_cell
+        self.map_dim = [dim, dim, dim]
+        self.fhf_lst = fhf_lst """
+
+class EmmapOverlay:
+    def __init__(self, map_list, mask_list=None):
+        self.map_list = map_list
+        self.mask_list = mask_list
+        self.map_unit_cell = None
+        self.map_origin = None
+        self.map_dim = None
+        self.pixsize = None
+        self.arr_lst = []
+        self.ceo_lst = None
+        self.cfo_lst = None
+        self.cbin_idx = None
+        self.cdim = None
+        self.cbin = None
+        self.com = True
+        self.com1 = None
+        self.box_centr = None
+        self.fhf_lst = None
+        self.nbin = None
+        self.res_arr = None
+        self.bin_idx = None
+        self.fo_lst = None
+        self.eo_lst = None
+        self.totalvar_lst = None
+
+    def load_maps(self, fobj):
+        from scipy import ndimage
+        from scipy.ndimage.interpolation import shift
+
+        com = self.com
+        cmask = False
+        fhf_lst = []
+        if self.mask_list is not None:
+            if len(self.map_list) != len(self.mask_list):
+                raise SystemExit("map_list and mask_list must have the same size!")
+            for i in range(len(self.mask_list)):
+                if i == 0:
+                    _, mask, _ = em.get_data(self.mask_list[i])
+                    mask = utils.set_dim_even(mask)
+                    uc, arr, origin = em.get_data(self.map_list[i])
+                    arr = utils.set_dim_even(arr)
+                    try:
+                        assert arr.shape == mask.shape
+                    except AssertionError:
+                        raise SystemExit("Map and Mask Dimension mismatched!")
+                    arr = arr * mask
+                    nx, ny, nz = arr.shape
+                    map_origin = origin
+                    uc_target = uc
+                    target_dim = arr.shape
+                    target_pix_size = uc_target[0] / target_dim[0]
+                    if cmask:
+                        corner_mask = utils.remove_unwanted_corners(uc, target_dim)
+                    else:
+                        corner_mask = 1.0
+                    if com:
+                        com1 = ndimage.measurements.center_of_mass(arr * (arr >= 0.0))
+                        print("COM: ", com1)
+                        box_centr = (nx // 2, ny // 2, nz // 2)
+                        self.com1, self.box_centr = com1, box_centr
+                        arr_mvd = shift(arr, np.subtract(box_centr, com1))
+                        self.arr_lst.append(arr_mvd * corner_mask)
+                        fhf_lst.append(fftshift(fftn(fftshift(arr_mvd * corner_mask))))
+                    else:
+                        fhf_lst.append(fftshift(fftn(fftshift(arr * corner_mask))))
+                else:
+                    uc, arr, origin = em.get_data(
+                        self.map_list[i],
+                        dim=target_dim,
+                        uc=uc_target,
+                        maporigin=map_origin,
+                    )
+                    arr = utils.set_dim_even(arr)
+                    print("origin: ", origin)
+                    _, mask, _ = em.get_data(self.mask_list[i])
+                    mask = utils.set_dim_even(mask)
+                    try:
+                        assert arr.shape == mask.shape
+                    except AssertionError:
+                        raise SystemExit("Map and Mask Dimension mismatched!")
+                    arr = arr * mask
+                    curnt_pix_size = uc[0] / arr.shape[0]
+                    arr = core.iotools.resample2staticmap(
+                        curnt_pix=curnt_pix_size,
+                        targt_pix=target_pix_size,
+                        targt_dim=target_dim,
+                        arr=arr,
+                    )
+                    if com:
+                        com1 = ndimage.measurements.center_of_mass(arr * (arr >= 0.0))
+                        print("COM: ", com1)
+                        arr = shift(arr, np.subtract(box_centr, com1))
+                    self.arr_lst.append(arr * corner_mask)
+                    fhf_lst.append(fftshift(fftn(fftshift(arr * corner_mask))))
+            self.pixsize = target_pix_size
+            self.map_origin = map_origin
+            self.map_unit_cell = uc_target
+            self.map_dim = target_dim
+            self.fhf_lst = fhf_lst
+        if self.mask_list is None:
+            for i in range(len(self.map_list)):
+                if i == 0:
+                    uc, arr, origin = em.get_data(self.map_list[i])
+                    arr = utils.set_dim_even(arr)
+                    print("origin: ", origin)
+                    nx, ny, nz = arr.shape
+                    map_origin = origin
+                    uc_target = uc
+                    target_dim = arr.shape
+                    target_pix_size = uc_target[0] / target_dim[0]
+                    if com:
+                        com1 = ndimage.measurements.center_of_mass(arr * (arr >= 0.0))
+                        print("COM before centering: ", com1)
+                        box_centr = (nx // 2, ny // 2, nz // 2)
+                        print("BOX center: ", box_centr)
+                        self.com1 = com1
+                        self.box_centr = box_centr
+                        arr = shift(arr, np.subtract(box_centr, com1))
+                        self.arr_lst.append(arr)
+                        core.iotools.write_mrc(
+                            arr, "static_centered.mrc", uc_target, map_origin
+                        )
+                        print(
+                            "COM after centering: ",
+                            ndimage.measurements.center_of_mass(arr * (arr >= 0.0)),
+                        )
+                    self.arr_lst.append(arr)
+                    fhf_lst.append(fftshift(fftn(fftshift(arr))))
+                else:
+                    uc, arr, origin = em.get_data(
+                        self.map_list[i],
+                        dim=target_dim,
+                        uc=uc_target,
+                        maporigin=map_origin,
+                    )
+                    arr = utils.set_dim_even(arr)
+                    em.write_mrc(arr, 'modelmap'+str(i)+'.mrc', uc, origin)
+                    print("origin: ", origin)
+                    curnt_pix_size = uc[0] / arr.shape[0]
+                    arr = core.iotools.resample2staticmap(
+                        curnt_pix=curnt_pix_size,
+                        targt_pix=target_pix_size,
+                        targt_dim=target_dim,
+                        arr=arr,
+                    )
+                    if com:
+                        com1 = ndimage.measurements.center_of_mass(arr * (arr >= 0.0))
+                        print("COM: ", com1)
+                        arr = shift(arr, np.subtract(box_centr, com1))
+                        core.iotools.write_mrc(
+                            arr, "moving_centered.mrc", uc_target, map_origin
+                        )
+                        print(
+                            "COM after centering: ",
+                            ndimage.measurements.center_of_mass(arr * (arr >= 0.0)),
+                        )
+                    self.arr_lst.append(arr)
+                    fhf_lst.append(fftshift(fftn(fftshift(arr))))
+            self.pixsize = target_pix_size
+            self.map_origin = map_origin
+            self.map_unit_cell = uc_target
+            self.map_dim = target_dim
+            self.fhf_lst = fhf_lst
+
+    def load_models(self):
+        self.com = False
+        dim_list = []
+        model_list = self.map_list
+        shifted_model_list = []
+        for i, model in enumerate(model_list):
+            shifted_model_list.append("shifted" + str(i) + ".cif")
+            dim_list.append(
+                em.get_dim(model=model, shiftmodel=shifted_model_list[i])
+            )
+        dim = max(dim_list)
+
+        fhf_lst = []
+        unit_cell = np.array([dim, dim, dim, 90.0, 90.0, 90.0], dtype='float')
+        for i, model in enumerate(shifted_model_list):
+            modelmap = em.model2map(
+                modelxyz=model,
+                dim=[dim, dim, dim],
+                resol=4,
+                cell=[float(dim), float(dim), float(dim), 90.0, 90.0, 90.0],
+            )
+            em.write_mrc(
+                np.fft.fftshift(modelmap),
+                # modelmap,
+                "modelmap_reboxed%s.mrc" % (i),
+                unit_cell=unit_cell,
+            )
+            fhf_lst.append(fftshift(fftn(modelmap)))
+        self.pixsize = unit_cell[0] / dim
+        self.map_origin = [0, 0, 0]
+        self.map_unit_cell = unit_cell
+        self.map_dim = [dim, dim, dim]
+        self.fhf_lst = fhf_lst
+
 
     def calc_fsc_from_maps(self, fobj):
         # function for only two maps fitting
