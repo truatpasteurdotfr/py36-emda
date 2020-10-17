@@ -12,6 +12,7 @@ import numpy as np
 import fcodes_fast
 from emda import core
 from emda.ext.mapfit import map_class
+from numpy.fft import fftn, ifftn, fftshift, ifftshift
 
 
 def output_rotated_maps(emmap1, r_lst, t_lst, Bf_arr=None):
@@ -20,7 +21,8 @@ def output_rotated_maps(emmap1, r_lst, t_lst, Bf_arr=None):
 
     if Bf_arr is None:
         Bf_arr = [0.0]
-    # com = emmap1.com1
+    if emmap1.com:
+        com = emmap1.com1
     fo_lst = emmap1.fo_lst
     bin_idx = emmap1.bin_idx
     nbin = emmap1.nbin
@@ -35,8 +37,9 @@ def output_rotated_maps(emmap1, r_lst, t_lst, Bf_arr=None):
     fsc12_lst_unaligned = []
     imap_f = 0
     # static map
-    data2write = np.real(np.fft.ifftshift(np.fft.ifftn(np.fft.ifftshift(fo_lst[0]))))
-    # data2write = shift(data2write, np.subtract(com,emmap1.box_centr))
+    data2write = np.real(ifftshift(ifftn(ifftshift(fo_lst[0]))))
+    if emmap1.com:
+        data2write = shift(data2write, np.subtract(com, emmap1.box_centr))
     core.iotools.write_mrc(data2write, "static_map.mrc", cell, origin)
     del data2write
     for fo, t, rotmat in zip(fo_lst[1:], t_lst, r_lst):
@@ -48,8 +51,9 @@ def output_rotated_maps(emmap1, r_lst, t_lst, Bf_arr=None):
         st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
         frt_full = utils.get_FRS(rotmat, fo * st, interp="cubic")[:, :, :, 0]
         frt_lst.append(frt_full)
-        data2write = np.real(np.fft.ifftshift(np.fft.ifftn(np.fft.ifftshift(frt_full))))
-        # data2write = shift(data2write, np.subtract(com,emmap1.box_centr))
+        data2write = np.real(ifftshift(ifftn(ifftshift(frt_full))))
+        if emmap1.com:
+            data2write = shift(data2write, np.subtract(com, emmap1.box_centr))
         core.iotools.write_mrc(
             data2write,
             "{0}_{1}.{2}".format("fitted_map", str(imap_f), "mrc"),
@@ -81,6 +85,8 @@ def main(
     interp,
     halfmaps=False,
     dfs_interp=False,
+    usemodel=False,
+    fitres=None,
 ):
     from emda.ext.mapfit import utils, run_fit, interp_derivatives
 
@@ -103,7 +109,10 @@ def main(
             print("Map overlay not using halfmaps")
             emmap1 = map_class.EmmapOverlay(maplist)
         fobj.write("Map overlay\n")
-    emmap1.load_maps(fobj)
+    if usemodel:
+        emmap1.load_models()
+    else:
+        emmap1.load_maps(fobj)
     emmap1.calc_fsc_from_maps(fobj)
     # converting theta_init to rotmat for initial iteration
     fobj.write("\n")
@@ -117,7 +126,7 @@ def main(
     fobj.write("    Rotation matrix: " + str(rotmat) + " \n")
     fobj.write("\n")
     fobj.write("    # fitting cycles: " + str(ncycles) + " \n")
-    t = t_init
+    t = [itm / emmap1.pixsize for itm in t_init]
     rotmat_lst = []
     transl_lst = []
     # resolution estimate for line-fit
@@ -135,14 +144,7 @@ def main(
             xyz = utils.create_xyz_grid(cell, emmap1.map_dim)
             vol = cell[0] * cell[1] * cell[2]
             dfs_full = interp_derivatives.dfs_fullmap(
-                np.fft.ifftshift(
-                    np.real(
-                        np.fft.ifftn(
-                            # np.fft.ifftshift(f1)))),
-                            np.fft.ifftshift(emmap1.eo_lst[ifit])
-                        )
-                    )
-                ),
+                ifftshift(np.real(ifftn(ifftshift(emmap1.eo_lst[ifit])))),
                 xyz,
                 vol,
             )
@@ -159,6 +161,7 @@ def main(
             fobj=fobj,
             interp=interp,
             dfs_full=dfs_full,
+            fitres=fitres,
         )
         rotmat_lst.append(rotmat)
         transl_lst.append(t)
