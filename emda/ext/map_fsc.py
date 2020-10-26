@@ -10,6 +10,7 @@ Mozilla Public License, version 2.0; see LICENSE.
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 import numpy as np
+import emda.emda_methods as em
 from emda import core, ext
 
 
@@ -18,11 +19,20 @@ def calc_fsc_mrc(hf1, hf2, bin_idx, nbin):
     return bin_fsc
 
 
-def calculate_modelmap(uc, model, dim, resol, bfac=0.0, lig=False, lgf=None, maporigin=None):
+def calculate_modelmap(
+    uc, model, dim, resol, bfac=0.0, lig=False, lgf=None, maporigin=None
+):
     import emda.emda_methods as em
 
     modelmap = em.model2map(
-        modelxyz=model, dim=dim, resol=resol, cell=uc, lig=lig, ligfile=lgf, bfac=bfac, maporigin=maporigin
+        modelxyz=model,
+        dim=dim,
+        resol=resol,
+        cell=uc,
+        lig=lig,
+        ligfile=lgf,
+        bfac=bfac,
+        maporigin=maporigin,
     )
     f_model = np.fft.fftshift(np.fft.fftn(modelmap))
     return f_model
@@ -44,7 +54,7 @@ def map_model_fsc(
     model1_pdb=None,
     mask_map=None,
     model_resol=None,
-    lgf=None
+    lgf=None,
 ):
     from emda.ext import maskmap_class
 
@@ -138,10 +148,10 @@ def map_model_fsc(
                 bfac=bfac,
                 lig=lig,
                 lgf=lgf,
-                maporigin=origin
+                maporigin=origin,
             )
         else:
-            raise SystemExit('Accpetable model types: .pdb, .ent, .cif')
+            raise SystemExit("Accpetable model types: .pdb, .ent, .cif")
         fmodel_list.append(f_model)
 
     if len(fmodel_list) == 2:
@@ -175,3 +185,43 @@ def map_model_fsc(
             1 / res_arr, fsc_list, "fsc_modelvsmap-2.eps", ["hf1-hf2", "fullmap-model"]
         )
     return fsc_list
+
+
+def fsc_mapmodel(
+    map1,
+    model,
+    model_resol=5.0,
+    bfac=0.0,
+    lig=False,
+    mask_map=None,
+    lgf=None,
+):
+
+    uc, arr1, orig = em.get_data(map1)
+    if mask_map is not None:
+        _, mask, _ = em.get_data(mask_map)
+    else:
+        mask = 1.0
+    f_map = np.fft.fftshift(np.fft.fftn(arr1 * mask))
+    if model.endswith((".pdb", ".ent", ".cif")):
+        f_model = calculate_modelmap(
+            uc=uc,
+            model=model,
+            dim=arr1.shape,
+            resol=model_resol,
+            bfac=bfac,
+            lig=lig,
+            lgf=lgf,
+            maporigin=orig,
+        )
+    nbin, res_arr, bin_idx = core.restools.get_resolution_array(uc, f_map)
+    bin_fsc, _ = core.fsc.anytwomaps_fsc_covariance(
+        f1=f_map, f2=f_model, bin_idx=bin_idx, nbin=nbin
+    )
+    core.plotter.plot_nlines(
+            res_arr,
+            [bin_fsc],
+            "modelmap.eps",
+            ["map-model"],
+        )
+    return res_arr, bin_fsc
