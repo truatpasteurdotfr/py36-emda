@@ -51,9 +51,10 @@ def read_mtz(mtzfile):
     uc, df = iotools.read_mtz(mtzfile)
     return uc, df
 
+
 def get_data(struct, resol=5.0, uc=None, dim=None, maporigin=None):
     """Returns data of a map or a model into an ndarray.
-      
+
     Reads map data into an ndarray, or if the structure input is an atomic model,
     it calculates the map from the model and returns as an ndarray.
 
@@ -64,7 +65,7 @@ def get_data(struct, resol=5.0, uc=None, dim=None, maporigin=None):
                 resol:  float, optional
                         resolution to calculates map from model. Default is 5.0 A.
                 uc: float, 1D array
-                    Parameter for modelmap generation. If absent, this will be 
+                    Parameter for modelmap generation. If absent, this will be
                     determined by dim parameter.
                 dim: sequence (integers), optional
                     Parameter for modelmap generation. If absent, this will be
@@ -73,7 +74,7 @@ def get_data(struct, resol=5.0, uc=None, dim=None, maporigin=None):
                     Parameter for modelmap generation. If present, the calculated map
                     will be shifted according to this information. If absent, this
                     parameter is taken as [0, 0, 0].
-                    
+
         Outputs:
             uc: float, 1D array
                 Unit cell
@@ -107,7 +108,7 @@ def get_data(struct, resol=5.0, uc=None, dim=None, maporigin=None):
             if dim is None:
                 dim = get_dim(model=struct, shiftmodel="new1.cif")
                 uc = np.array([dim, dim, dim, 90.0, 90.0, 90.0], dtype="float")
-                orig = [-dim//2, -dim//2, -dim//2]#[0, 0, 0]
+                orig = [-dim // 2, -dim // 2, -dim // 2]  # [0, 0, 0]
                 newmodel = "new1.cif"
         if maporigin is None:
             maporigin = orig
@@ -120,6 +121,7 @@ def get_data(struct, resol=5.0, uc=None, dim=None, maporigin=None):
         )
         arr = modelmap
     return uc, arr, orig
+
 
 def write_mrc(mapdata, filename, unit_cell, map_origin=None):
     """Writes 3D Numpy array into MRC file.
@@ -751,7 +753,6 @@ def get_fsc(arr1, arr2, uc):
     return res_arr, bin_fsc
 
 
-
 def mask_from_halfmaps(uc, half1, half2, radius=9, norm=False, iter=1, thresh=None):
     """Generates a mask from half maps.
 
@@ -1228,6 +1229,28 @@ def map_model_validate(
     return fsc_list
 
 
+def mapmodel_fsc(
+    map1,
+    model,
+    bfac=0.0,
+    modelresol=5.0,
+    lig=False,
+    mask=None,
+    lgf=None,
+):
+    from emda.ext import map_fsc
+
+    res_arr, bin_fsc = map_fsc.fsc_mapmodel(
+        map1=map1,
+        model=model,
+        model_resol=modelresol,
+        bfac=bfac,
+        lig=lig,
+        mask_map=mask,
+        lgf=lgf,
+    )
+    return res_arr, bin_fsc
+
 def difference_map(maplist, masklist, smax, mode="ampli"):
     """Calculates difference map.
 
@@ -1582,7 +1605,7 @@ def model2map(
         shift_z = modelmap.shape[0] - abs(maporigin[2])
         shift_y = modelmap.shape[1] - abs(maporigin[1])
         shift_x = modelmap.shape[2] - abs(maporigin[0])
-        #print(shift_z, shift_y, shift_x)
+        # print(shift_z, shift_y, shift_x)
         modelmap = np.roll(
             np.roll(np.roll(modelmap, -shift_z, axis=0), -shift_y, axis=1),
             -shift_x,
@@ -1731,7 +1754,7 @@ def rotate_density(arr, rotmat, interp="linear"):
             ]
         return arr2
     else:
-        return fcodes.trilinear_map(rotmat.transpose(), arr, debug_mode,nx, ny, nz)
+        return fcodes.trilinear_map(rotmat.transpose(), arr, debug_mode, nx, ny, nz)
 
 
 def get_dim(model, shiftmodel="new1.cif"):
