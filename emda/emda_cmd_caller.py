@@ -25,7 +25,9 @@ cmdl_parser.add_argument(
 
 subparsers = cmdl_parser.add_subparsers(dest="command")
 
-mapinfo = subparsers.add_parser("info", description="Output basic information about the map.")
+mapinfo = subparsers.add_parser(
+    "info", description="Output basic information about the map."
+)
 mapinfo.add_argument("--map", required=True, help="input map")
 
 halffsc = subparsers.add_parser(
@@ -61,7 +63,9 @@ ccmask.add_argument(
     "--knl", required=False, type=int, default=10, help="kernel radius in voxels"
 )
 ccmask.add_argument("--nrm", action="store_true", help="if True use normalized maps")
-ccmask.add_argument("--itr", required=False, type=int, default=1, help="number of dilation cycles")
+ccmask.add_argument(
+    "--itr", required=False, type=int, default=1, help="number of dilation cycles"
+)
 ccmask.add_argument("--thr", required=False, type=float, help="cc threshold")
 
 map_mask = subparsers.add_parser("mapmask", description="Generate a mask from a map.")
@@ -80,21 +84,27 @@ map_mask.add_argument(
     "--itr", required=False, type=int, default=3, help="number of dilate iterations"
 )
 map_mask.add_argument(
-    "--res", required=False, type=float, default=15.0, help="lowpass resolution in Angstroms"
+    "--res",
+    required=False,
+    type=float,
+    default=15.0,
+    help="lowpass resolution in Angstroms",
 )
 map_mask.add_argument(
     "--fil",
     required=False,
     type=str,
     default="butterworth",
-    help="filter type to use: ideal or butterworth"
+    help="filter type to use: ideal or butterworth",
 )
 
 lowpass = subparsers.add_parser(
     "lowpass", description="Lowpass filter to specified resolution."
 )
 lowpass.add_argument("--map", required=True, help="input map (mrc/map)")
-lowpass.add_argument("--res", required=True, type=float, help="lowpass resolution in Angstrom")
+lowpass.add_argument(
+    "--res", required=True, type=float, help="lowpass resolution in Angstrom"
+)
 lowpass.add_argument(
     "--fil",
     required=False,
@@ -175,7 +185,9 @@ conv_mtz2map.add_argument("--mtz", required=True, help="input map (mtz)")
 conv_mtz2map.add_argument("--map", required=True, help="input map (mrc/map)")
 conv_mtz2map.add_argument("--out", required=True, help="output map (mrc/map)")
 
-resample_d = subparsers.add_parser("resample", description="Resample a map in Fourier space.")
+resample_d = subparsers.add_parser(
+    "resample", description="Resample a map in Fourier space."
+)
 resample_d.add_argument("--map", required=True, help="input map (mrc/map)")
 resample_d.add_argument(
     "--pix", required=True, type=float, help="target pixel size (A)"
@@ -189,13 +201,20 @@ resample_d.add_argument(
     help="target map dimensions. e.g. 100 100 100 ",
 )
 resample_d.add_argument(
-    "--cel", required=False, default=None, nargs="+", type=np.float, help="target cell. e.g. a b c 90 90 90"
+    "--cel",
+    required=False,
+    default=None,
+    nargs="+",
+    type=np.float,
+    help="target cell. e.g. a b c 90 90 90",
 )
 resample_d.add_argument(
     "--out", required=False, default="resampled.mrc", help="output map name"
 )
 
-resample_m = subparsers.add_parser("resamplemap2map", description="Resample map2 on map1.")
+resample_m = subparsers.add_parser(
+    "resamplemap2map", description="Resample map2 on map1."
+)
 resample_m.add_argument("--map1", required=True, help="static map (mrc/map)")
 resample_m.add_argument("--map2", required=True, help="map to resample (mrc/map)")
 resample_m.add_argument(
@@ -249,26 +268,47 @@ fourierspc.add_argument(
     "--msk", required=False, default=None, type=str, help="input mask (mrc/map)"
 )
 
-mapmodelfsc = subparsers.add_parser("mapmodelfsc", description="map-model correlation")
-mapmodelfsc.add_argument("--h1", required=True, help="input halfmap1 map")
-mapmodelfsc.add_argument("--h2", required=True, help="input halfmap2 map")
-mapmodelfsc.add_argument("--mdf", required=True, help="input full atomic model")
-mapmodelfsc.add_argument(
+mapmodelvalid = subparsers.add_parser(
+    "mapmodelvalidate", description="map-model validation using FSC"
+)
+mapmodelvalid.add_argument("--h1", required=True, help="input halfmap1 map")
+mapmodelvalid.add_argument("--h2", required=True, help="input halfmap2 map")
+mapmodelvalid.add_argument("--mdf", required=True, help="input full atomic model")
+mapmodelvalid.add_argument(
     "--md1", required=False, default=None, type=str, help="input halfmap1 atomic model"
 )
-mapmodelfsc.add_argument("--msk", required=False, help="input mask (mrc/map)")
-mapmodelfsc.add_argument("--res", required=False, type=float, help="Resolution (A)")
-mapmodelfsc.add_argument(
+mapmodelvalid.add_argument("--msk", required=False, help="input mask (mrc/map)")
+mapmodelvalid.add_argument("--res", required=False, type=float, help="Resolution (A)")
+mapmodelvalid.add_argument(
     "--bfc",
     required=False,
     default=0.0,
     type=float,
     help="Overall B factor for model. default=0.0 ",
 )
-mapmodelfsc.add_argument(
+mapmodelvalid.add_argument(
     "--lig", action="store_true", help="use if there is ligand, but no description"
 )
-mapmodelfsc.add_argument(
+mapmodelvalid.add_argument(
+    "--lgf", required=False, default=None, type=str, help="ligand description file"
+)
+
+mmfsc = subparsers.add_parser("mapmodelfsc", description="map-model FSC")
+mmfsc.add_argument("--map", required=True, help="input map")
+mmfsc.add_argument("--mdl", required=True, help="input atomic model")
+mmfsc.add_argument("--msk", required=False, help="input mask (mrc/map)")
+mmfsc.add_argument("--res", required=False, default=5.0, type=float, help="Resolution (A)")
+mmfsc.add_argument(
+    "--bfc",
+    required=False,
+    default=0.0,
+    type=float,
+    help="Overall B factor for model. default=0.0 ",
+)
+mmfsc.add_argument(
+    "--lig", action="store_true", help="use if there is ligand, but no description"
+)
+mmfsc.add_argument(
     "--lgf", required=False, default=None, type=str, help="ligand description file"
 )
 
@@ -324,7 +364,7 @@ mapoverlay.add_argument(
 mapoverlay.add_argument(
     "--fitres",
     required=False,
-    default=0.,
+    default=0.0,
     type=float,
     help="final fit resol. (A). default= 0.0 A",
 )
@@ -735,11 +775,14 @@ def mmrealsp_corr(args):
 
 def fouriersp_corr(args):
     from emda.emda_methods import fouriersp_correlation
+
     # half1_map, half2_map, kernel_size=5, mask=None
-    fouriersp_correlation(half1_map=args.h1, half2_map=args.h2, kernel_size=args.knl, mask=args.msk)
+    fouriersp_correlation(
+        half1_map=args.h1, half2_map=args.h2, kernel_size=args.knl, mask=args.msk
+    )
 
 
-def map_model_fsc(args):
+def validate_mapmodel(args):
     from emda.emda_methods import map_model_validate
 
     _ = map_model_validate(
@@ -751,6 +794,20 @@ def map_model_fsc(args):
         modelresol=args.res,
         bfac=args.bfc,
         lig=args.lig,
+        lgf=args.lgf,
+    )
+
+
+def mapmodel_fsc(args):
+    import emda.emda_methods as em
+
+    _, _ = em.mapmodel_fsc(
+        map1=args.map,
+        model=args.mdl,
+        bfac=args.bfc,
+        lig=args.lig,
+        mask=args.msk,
+        modelresol=args.res,
         lgf=args.lgf,
     )
 
@@ -958,8 +1015,10 @@ def main(command_line=None):
         mmrealsp_corr(args)
     if args.command == "fcc":
         fouriersp_corr(args)
+    if args.command == "mapmodelvalidate":
+        validate_mapmodel(args)
     if args.command == "mapmodelfsc":
-        map_model_fsc(args)
+        mapmodel_fsc(args)
     if args.command == "overlay":
         map_overlay(args, f)
         f.close()
