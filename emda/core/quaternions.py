@@ -1,18 +1,26 @@
 import numpy as np
-from math import sqrt, cos, sin
+import math
 
 
 def get_quaternion(theta):
     rv = theta[0]
-    q1 = rv[0] * np.sin(np.pi * theta[1] / 360.0)
-    q2 = rv[1] * np.sin(np.pi * theta[1] / 360.0)
-    q3 = rv[2] * np.sin(np.pi * theta[1] / 360.0)
+    ang = math.sin(np.deg2rad(theta[1]) / 2.0)
+    q1, q2, q3 = rv[0] * ang, rv[1] * ang, rv[2] * ang
     # Constraint to creat quaternion
     q0 = np.sqrt(1 - q1 * q1 - q2 * q2 - q3 * q3)
     # Quaternion
     q = np.array([q0, q1, q2, q3], dtype=np.float64)
     return q
 
+def quart2axis(q):
+    q = q / np.sqrt(np.dot(q, q))
+    angle = 2 * math.acos(q[0])
+    s = math.sqrt(1.0 - q[0]*q[0])
+    if s < 1e-3:
+        x, y, z = q[1], q[2], q[3]
+    else:
+        x, y, z = q[1] / s, q[2] / s, q[3] / s
+    return [x, y, z, angle]
 
 def q_normalised(rv):
     q02 = 1 - np.sum(n * n for n in rv[1:])
@@ -124,8 +132,6 @@ def isRotationMatrix(R):
 # The result is the same as MATLAB except the order
 # of the euler angles ( x and z are swapped ).
 def rotationMatrixToEulerAngles(R):
-    import math
-
     assert isRotationMatrix(R)
     sy = math.sqrt(R[0, 0] * R[0, 0] + R[1, 0] * R[1, 0])
     singular = sy < 1e-6
@@ -147,8 +153,6 @@ def rotmat_from_axisangle(axis, theta):
     Rotation matrix is obtained from expanding Rodiguez formula.
     This requires angle in radians.
     """
-    import math
-
     axis = np.asarray(axis)
     axis = axis / math.sqrt(np.dot(axis, axis))
     x, y, z = axis
