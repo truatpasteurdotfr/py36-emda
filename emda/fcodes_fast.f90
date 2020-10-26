@@ -111,6 +111,99 @@ subroutine resolution_grid(uc,mode,maxbin,nx,ny,nz,nbin,res_arr,bin_idx,s_grid)
   if(debug) print*, 'time for calculation(s) = ', finish-start
 end subroutine resolution_grid
 
+subroutine resol_grid_em(uc,mode,maxbin,nx,ny,nz,nbin,res_arr,bin_idx,s_grid)
+  implicit none
+  real*8, parameter :: PI = 3.141592653589793
+  integer, intent(in) :: mode, maxbin,nx,ny,nz
+  real, dimension(6),intent(in) :: uc
+  integer,dimension(-nz/2:(nz-2)/2,-ny/2:(ny-2)/2,-nx/2:(nx-2)/2),intent(out) :: bin_idx
+  real, dimension(-nz/2:(nz-2)/2,-ny/2:(ny-2)/2,-nx/2:(nx-2)/2),intent(out) :: s_grid
+  real, dimension(0:maxbin-1),intent(out) :: res_arr
+  integer, intent(out) :: nbin
+  ! locals
+  integer, dimension(3) :: nxyz
+  real, dimension(0:maxbin-1) :: bin_arr
+  real       :: low_res,high_res,resol,start,finish
+  real       :: r(3),s1(3),step(3)
+  integer    :: i,j,k,n,xyzmin(3),xyzmax(3),hkl(3),sloc,ibin,mnloc,ib
+  logical    :: debug
+  !
+  debug         = .FALSE.
+  if(mode == 1) debug = .TRUE.
+  call cpu_time(start)
+
+  if(debug) print*, 'fcodes_fast...'
+  bin_idx = -100
+  s_grid = 0.0
+  n = 0
+  r = 0.0; s1 = 0.0
+  res_arr = 0.0
+  step = 0.0
+  mnloc = -100
+  xyzmin = 0; xyzmax = 0; hkl = 0
+
+  nxyz = (/ nx, ny, nz /)
+
+  xyzmin(1) = int(-nxyz(1)/2)
+  xyzmin(2) = int(-nxyz(2)/2)
+  xyzmin(3) = int(-nxyz(3)/2)
+  xyzmax    = -(xyzmin+1)
+  if(debug) print*, 'xyzmin = ', xyzmin
+  if(debug) print*, 'xyzmax = ', xyzmax(1), xyzmax(2), 0
+  if(debug) print*, 'unit cell = ', uc
+  call get_resol(uc,real(xyzmax(1)),0.0,0.0,r(1))
+  call get_resol(uc,0.0,real(xyzmax(2)),0.0,r(2))
+  call get_resol(uc,0.0,0.0,real(xyzmax(3)),r(3))
+  if(debug) print*,'a-max, b-max, c-max = ', r
+  !
+  sloc = minloc(r,1)
+  hkl = 0
+  do i = 1, 3
+     if(sloc == i) hkl(i) = sloc/sloc
+  end do
+
+  do i = 0, xyzmax(sloc)-1
+     !step = (i + 1.5) * hkl
+     step = (i + 2.5) * hkl
+     call get_resol(uc,step(1),step(2),step(3),resol)
+     if(debug) print*, i,step(1),step(2),step(3),resol
+     !print*, i,step(1),step(2),step(3),resol
+     print*, i,resol
+     res_arr(i) = resol
+     bin_arr(i) = i + 2.5
+     nbin = i + 1
+  end do
+  print*, 'nbin=', nbin
+  high_res = res_arr(nbin-1)
+  call get_resol(uc,0.0,0.0,0.0,low_res)
+  print*,"Low res=",low_res,"High res=",high_res ,'A'
+
+  print*, 'Creating resolution grid. Please wait...'
+
+  ! Friedel's Law
+  do i=xyzmin(1), xyzmax(1)
+     do j=xyzmin(2), xyzmax(2)
+        outer: do k=xyzmin(3), 0 !xyzmax(3)
+           do ib=0, nbin-1
+              if(sqrt(real(k)**2 + real(j)**2 + real(i)**2) .le. bin_arr(ib))then
+                 bin_idx(k,j,i) = ib
+                 s_grid(k,j,i) = 1.0/res_arr(ib)
+                 if(k == xyzmin(3) .or. j == xyzmin(2) .or. i == xyzmin(1))then
+                    cycle outer
+                 end if
+                 bin_idx(-k,-j,-i) = ib
+                 s_grid(-k,-j,-i) = s_grid(k,j,i)
+                 cycle outer
+              end if
+           end do
+        end do outer
+     end do
+  end do
+
+  call cpu_time(finish)
+  if(debug) print*, 'time for calculation(s) = ', finish-start
+end subroutine resol_grid_em
+
 subroutine resolution_grid_full(uc,highres,mode,maxbin,nx,ny,nz,resol_grid,s_grid,mask)
   implicit none
   integer, intent(in) :: mode,maxbin,nx,ny,nz
@@ -200,127 +293,6 @@ subroutine make_resarr(uc,maxbin,res_arr,nbin,firststep)
   return
 end subroutine make_resarr
 
-subroutine resol_grid_fast(uc,res_arr,mode,nbin,nx,ny,nz,resol_grid,s_grid,bin_idx,lores,hires)
-  ! TO FINISH
-  implicit none
-  integer, intent(in) :: mode,nbin,nx,ny,nz
-  real, intent(in),optional :: lores,hires
-  real, dimension(6),intent(in) :: uc
-  real, dimension(0:nbin-1),intent(in) :: res_arr
-  real, dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out) :: s_grid
-  real, dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out) :: resol_grid
-  integer,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out) :: bin_idx
-  ! locals
-  integer, dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2) :: h,k,l
-  real, dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2) :: s2
-  integer, dimension(3) :: nxyz
-  real       :: lowres,highres,resol,start,finish,tmp_val,tmp_min,val
-  real       :: astar, bstar, cstar
-  integer    :: i1,i2,i3,xyzmin(3),xyzmax(3),mnloc,ibin
-  logical    :: debug
-  !
-  debug = .FALSE.
-  if(mode == 1) debug = .TRUE.
-  call cpu_time(start)
-
-  resol_grid = 0.0
-  s_grid = 0.0
-  s2 = 0.0
-  bin_idx = -100
-  xyzmin = 0; xyzmax = 0
-
-  nxyz = (/ nx, ny, nz /)
-
-  xyzmin(1) = int(-nxyz(1)/2)
-  xyzmin(2) = int(-nxyz(2)/2)
-  xyzmin(3) = int(-nxyz(3)/2)
-  xyzmax    = -(xyzmin+1)
-  lowres = res_arr(0); highres = res_arr(nbin-1)
-  ! Current F2PY do not handle optional args conrrectly.
-  ! Optional args are always present
-  if(present(lores))then
-     if((lores <= 0.0) .or. (lores > res_arr(0)))then
-        lowres = res_arr(0)
-     else
-        lowres = lores
-     end if
-  end if
-  if(present(hires))then
-     if((hires <= 0.0) .or. (hires > res_arr(0)))then
-        highres = res_arr(nbin-1)
-     else
-        highres = hires
-     end if
-  end if
-     
-  if(present(hires)) highres = hires
-  print*, 'xyzmin = ', xyzmin
-  print*, 'xyzmax = ', xyzmax
-  print*, 'unit cell = ', uc
-  print*, 'Low, High resolution cutoff: ', lowres, highres, 'A'
-  print*, 'Number of resolution shells: ', nbin
-  !print*, 'Resolution shells:', res_arr(0:nbin-1)
-  print*, 'Creating resolution grid. Please wait...'
-
-  do i1=xyzmin(1), xyzmax(1)
-     do i2=xyzmin(2), xyzmax(2)
-        do i3=xyzmin(3), 0
-           h(i1,i2,i3) = i1
-           k(i1,i2,i3) = i2
-           l(i1,i2,i3) = i3
-           if(i3==xyzmin(3) .or. i2==xyzmin(2) .or. i1==xyzmin(1)) cycle
-           h(-i1,-i2,-i3) = i1
-           k(-i1,-i2,-i3) = i2
-           l(-i1,-i2,-i3) = i3
-        end do
-     end do
-  end do
-  ! resolution calculation
-  astar = 1.0 / uc(1)
-  bstar = 1.0 / uc(2)
-  cstar = 1.0 / uc(3)
-  s2 = (h * astar)**2 + (k * bstar)**2 + (l * cstar)**2
-  s2(0,0,0) = astar
-  s_grid = sqrt(s2)
-  resol_grid = 1.0 / sqrt(s2)  
-  !
-  ! now generating bin_idx
-  ! Friedel's Law
-  do i1=xyzmin(1), xyzmax(1)
-     do i2=xyzmin(2), xyzmax(2)
-        do i3=xyzmin(3), 0
-           resol = resol_grid(i1,i2,i3)
-           if(resol < highres .or. resol > lowres) cycle
-           ! Find the matching bin to resol
-           !mnloc = minloc(sqrt((res_arr - resol)**2), DIM=1) - 1
-           !mnloc  = 1
-           !if(mnloc < 0 .or. mnloc > nbin-1) cycle
-           !bin_idx(i1,i2,i3) = mnloc
-           !if(i3 == xyzmin(3) .or. i2 == xyzmin(2) .or. i1 == xyzmin(1)) cycle
-           !bin_idx(-i1,-i2,-i3) = mnloc
-           do ibin = 0, nbin - 1
-              val = sqrt((res_arr(ibin) - resol)**2)
-              if(ibin == 0)then
-                 tmp_val = val; tmp_min = val
-                 mnloc = ibin 
-              else
-                 tmp_val = val
-                 if(tmp_val < tmp_min)then
-                    tmp_min = val
-                    mnloc = ibin
-                 end if
-              end if
-           end do
-           bin_idx(i1,i2,i3) = mnloc
-           if(i3 == xyzmin(3) .or. i2 == xyzmin(2) .or. i1 == xyzmin(1)) cycle
-           bin_idx(-i1,-i2,-i3) = mnloc
-        end do
-     end do
-  end do
-  call cpu_time(finish)
-  if(debug) print*, 'time for calculation(s) = ', finish-start
-end subroutine resol_grid_fast
-
 subroutine conv3d_to_1d(f3d,uc,nx,ny,nz,mode,f1d,resol1d)
   ! this subroutine converts 3d grid data into 1d. only the
   ! hemispphereis taken.
@@ -383,6 +355,204 @@ subroutine conv3d_to_1d(f3d,uc,nx,ny,nz,mode,f1d,resol1d)
   return
 end subroutine conv3d_to_1d
 
+subroutine calc_halffsc(hf1,hf2,bin_idx,nbin,mode,nx,ny,nz, &
+     Fo,Eo,bin_stats,bin_arr_count)
+  implicit none
+  real*8, parameter :: PI = 3.141592653589793
+  integer, intent(in) :: nbin,mode,nx,ny,nz
+  complex*16, dimension(-nz/2:(nz-2)/2, -ny/2:(ny-2)/2, -nx/2:(nx-2)/2),intent(in)  :: hf1,hf2
+  complex*16, dimension(-nz/2:(nz-2)/2, -ny/2:(ny-2)/2, -nx/2:(nx-2)/2),intent(out) :: Fo,Eo
+  integer, dimension(-nz/2:(nz-2)/2, -ny/2:(ny-2)/2, -nx/2:(nx-2)/2),intent(in) :: bin_idx
+  real*8, dimension(0:nbin-1,0:3),intent(out) :: bin_stats
+  integer, dimension(0:nbin-1),intent(out) :: bin_arr_count
+  ! locals
+  integer, dimension(3) :: nxyz
+  real*8, dimension(0:nbin-1, 0:17) :: bindata
+  complex*16  :: fdiff
+  real*8  :: A,B,A1,A2,B1,B2
+  real :: start,finish
+  integer :: i,j,k,xyzmin(3),xyzmax(3),ibin,indx
+  logical :: debug,make_all_zero
+  !
+  debug         = .FALSE.
+  make_all_zero = .FALSE.
+  if(mode == 1) debug = .TRUE.
+  call cpu_time(start)
+
+  !bin_stats[:,0-3] - bin_noise_var,bin_sgnl_var,bin_total_var,bin_fsc
+  !bindata[:,0-5] - A1_sum,B1_sum,A2_sum,B2_sum,A1A2_sum,B1B2_sum
+  !bindata[:,6-9] - A1A1_sum,B1B1_sum,A2A2_sum,B2B2_sum
+  !bindata[:,10-13] - A_sum,B_sum,AA_sum,BB_sum
+  !bindata[:,14-16] - F1_var, F2_var, F1F2_covar
+  !bindata[:,17] - bin_arr_fdiff
+
+  Fo = dcmplx(0.0d0, 0.0d0)
+  Eo = dcmplx(0.0d0, 0.0d0)
+  bin_stats = 0.0
+  bindata = 0.0
+  bin_arr_count = 0
+  xyzmin = 0; xyzmax = 0
+  nxyz = (/ nx, ny, nz /)
+
+  xyzmin(1) = int(-nxyz(1)/2)
+  xyzmin(2) = int(-nxyz(2)/2)
+  xyzmin(3) = int(-nxyz(3)/2)
+  xyzmax    = -(xyzmin+1)
+  if(debug) print*, 'Use only hemisphere data'
+  if(debug) print*, 'xyzmin = ', xyzmin
+  if(debug) print*, 'xyzmax = ', xyzmax(1),xyzmax(2),0
+  do i=xyzmin(1), xyzmax(1)
+     do j=xyzmin(2), xyzmax(2)
+        do k=xyzmin(3), 0!xyzmax(3)
+           if(k == xyzmin(3) .or. j == xyzmin(2) .or. i == xyzmin(1)) cycle
+           indx = bin_idx(k,j,i)
+           if(indx < 0 .or. indx > nbin-1) cycle
+           bin_arr_count(indx) = bin_arr_count(indx) + 1
+           fdiff = hf1(k,j,i) - hf2(k,j,i)
+           bindata(indx,17) = bindata(indx,17) + real(fdiff * conjg(fdiff))
+           ! correspondence hf1 : A1 + iB1 ; hf2 = A2 + iB2
+           A1 = real(hf1(k,j,i));  A2 = real(hf2(k,j,i))
+           B1 = aimag(hf1(k,j,i)); B2 =  aimag(hf2(k,j,i))
+           Fo(k,j,i) = (hf1(k,j,i) + hf2(k,j,i))/2.0                
+           A = real(Fo(k,j,i)); B = aimag(Fo(k,j,i))
+           bindata(indx,0)  = bindata(indx,0)  + A1
+           bindata(indx,1)  = bindata(indx,1)  + B1
+           bindata(indx,2)  = bindata(indx,2)  + A2
+           bindata(indx,3)  = bindata(indx,3)  + B2
+           bindata(indx,4)  = bindata(indx,4)  + A1*A2
+           bindata(indx,5)  = bindata(indx,5)  + B1*B2
+           bindata(indx,6)  = bindata(indx,6)  + A1*A1
+           bindata(indx,7)  = bindata(indx,7)  + B1*B1
+           bindata(indx,8)  = bindata(indx,8)  + A2*A2
+           bindata(indx,9)  = bindata(indx,9)  + B2*B2
+           bindata(indx,10) = bindata(indx,10) + A
+           bindata(indx,11) = bindata(indx,11) + B
+           bindata(indx,12) = bindata(indx,12) + A*A
+           bindata(indx,13) = bindata(indx,13) + B*B
+           Fo(-k,-j,-i) = conjg(Fo(k,j,i))
+        end do
+     end do
+  end do
+  if(debug) print*, 'bin_arr_count=', sum(bin_arr_count)
+  do ibin=0, nbin-1 !to make compatible with python arrays
+     bin_stats(ibin,0) = bindata(ibin,17) / (bin_arr_count(ibin) * 4)
+     bin_stats(ibin,2) = (bindata(ibin,12) + bindata(ibin,13))/bin_arr_count(ibin) - &
+          ((bindata(ibin,10)/bin_arr_count(ibin))**2 + &
+          (bindata(ibin,11)/bin_arr_count(ibin))**2)
+     bindata(ibin,14)  = (bindata(ibin,6) + bindata(ibin,7))/bin_arr_count(ibin) - &
+          ((bindata(ibin,0)/bin_arr_count(ibin))**2 + &
+          (bindata(ibin,1)/bin_arr_count(ibin))**2)
+     bindata(ibin,15)  = (bindata(ibin,8) + bindata(ibin,9))/bin_arr_count(ibin) - &
+          ((bindata(ibin,2)/bin_arr_count(ibin))**2 + &
+          (bindata(ibin,3)/bin_arr_count(ibin))**2)
+     bindata(ibin,16)  = (bindata(ibin,4) + bindata(ibin,5)) / bin_arr_count(ibin) - &
+          (bindata(ibin,0) / bin_arr_count(ibin) * &
+          bindata(ibin,2) / bin_arr_count(ibin) + &
+          bindata(ibin,1) / bin_arr_count(ibin) * &
+          bindata(ibin,3) / bin_arr_count(ibin))
+     bin_stats(ibin,1) = bindata(ibin,16)
+     bin_stats(ibin,3) = bin_stats(ibin,1) / (sqrt(bindata(ibin,14)) * sqrt(bindata(ibin,15)))
+     if(debug)then
+        print*,ibin,bin_stats(ibin,0),bin_stats(ibin,1), &
+             bin_stats(ibin,2),bin_stats(ibin,3),bin_arr_count(ibin)
+     end if
+  end do
+  ! Calculate normalized structure factors
+  do i=xyzmin(1), xyzmax(1)
+     do j=xyzmin(2), xyzmax(2)
+        do k=xyzmin(3), 0 !xyzmax(3)
+           if(k == xyzmin(3) .or. j == xyzmin(2) .or. i == xyzmin(1)) cycle
+           indx = bin_idx(k,j,i)
+           if(indx < 0 .or. indx > nbin-1) cycle
+           if(bin_stats(indx,1) <= 0.0) cycle ! singal var cannot be negative
+           Eo(k,j,i) = Fo(k,j,i)/sqrt(bin_stats(indx,2))
+           Eo(-k,-j,-i) = conjg(Eo(k,j,i))
+        end do
+     end do
+  end do
+  call cpu_time(finish)
+  if(debug) print*, 'time for calculation(s) = ', finish-start
+end subroutine calc_halffsc
+
+subroutine calc_fsc(hf1,hf2,bin_idx,nbin,mode,binstats,bin_arr_count,nx,ny,nz)
+  implicit none
+  integer,intent(in) :: nbin,mode,nx,ny,nz
+  integer, dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in)  :: bin_idx
+  complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in)  :: hf1,hf2
+  real*8, dimension(0:nbin-1,0:1), intent(out) :: binstats
+  integer, dimension(0:nbin-1),intent(out) :: bin_arr_count
+  real*8, dimension(0:nbin-1,0:11) :: bindata
+  real*8    :: A1,A2,B1,B2
+  integer   :: i,j,k,xmin,xmax,ymin,ymax,zmin,zmax,ibin,indx
+  real      :: start, finish
+  logical   :: debug, make_all_zero 
+  !
+  debug = .FALSE.
+  make_all_zero = .FALSE.
+  if(mode == 1) debug = .TRUE.
+  call cpu_time(start)
+  !binstats[:,0:1] - F1F2_covar,bin_fsc
+  !bindata[:,0:5] - A1_sum,B1_sum,A2_sum,B2_sum,A1A2_sum,B1B2_sum
+  !bindata[:,6:9] - A1A1_sum,B1B1_sum,A2A2_sum,B2B2_sum
+  !bindata[:,10:11] - F1_var,F2_var
+  !
+  binstats = 0.0
+  bindata = 0.0
+  xmin = int(-nx/2); xmax = -(xmin+1)
+  ymin = int(-ny/2); ymax = -(ymin+1)
+  zmin = int(-nz/2); zmax = -(zmin+1)
+  if(debug) print*, '[',xmin,xmax,'],[', ymin,ymax,'],[',zmin,0,']'
+
+  bin_arr_count = 0
+  if(debug) print*, 'using hemisphere data...'
+  do i=xmin, xmax
+     do j=ymin, ymax
+        do k=zmin, 0 !zmax
+           indx = bin_idx(k,j,i)
+           if(indx < 0 .or. indx > nbin-1)then
+              cycle
+           else
+              bin_arr_count(indx) = bin_arr_count(indx) + 1
+              ! correspondence hf1 : A1 + iB1 ; hf2 = A2 + iB2
+              A1 = real(hf1(k,j,i));  A2 = real(hf2(k,j,i))
+              B1 = aimag(hf1(k,j,i)); B2 = aimag(hf2(k,j,i))
+              bindata(indx,0) = bindata(indx,0) + A1
+              bindata(indx,1) = bindata(indx,1) + B1
+              bindata(indx,2) = bindata(indx,2) + A2
+              bindata(indx,3) = bindata(indx,3) + B2
+              bindata(indx,4) = bindata(indx,4) + A1*A2
+              bindata(indx,5) = bindata(indx,5) + B1*B2
+              bindata(indx,6) = bindata(indx,6) + A1*A1
+              bindata(indx,7) = bindata(indx,7) + B1*B1
+              bindata(indx,8) = bindata(indx,8) + A2*A2
+              bindata(indx,9) = bindata(indx,9) + B2*B2
+           end if
+        end do
+     end do
+  end do
+  if(debug) print*,'ibin F1F2_covar(ibin) F1_var(ibin) F2_var(ibin) bin_fsc(ibin) bin_reflex_count'
+  do ibin=0, nbin-1 !to make compatible with python arrays
+     binstats(ibin,0) = (bindata(ibin,4) + bindata(ibin,5)) / bin_arr_count(ibin) - &
+          (bindata(ibin,0) / bin_arr_count(ibin) * &
+          bindata(ibin,2) / bin_arr_count(ibin) + &
+          bindata(ibin,1) / bin_arr_count(ibin) * &
+          bindata(ibin,3) / bin_arr_count(ibin))
+     bindata(ibin,10) = (bindata(ibin,6) + bindata(ibin,7))/bin_arr_count(ibin) - &
+          ((bindata(ibin,0)/bin_arr_count(ibin))**2 + &
+          (bindata(ibin,1)/bin_arr_count(ibin))**2)
+     bindata(ibin,11) = (bindata(ibin,8) + bindata(ibin,9))/bin_arr_count(ibin) - &
+          ((bindata(ibin,2)/bin_arr_count(ibin))**2 + &
+          (bindata(ibin,3)/bin_arr_count(ibin))**2)
+     binstats(ibin,1) = binstats(ibin,0) / (sqrt(bindata(ibin,10)) * sqrt(bindata(ibin,11)))
+     if(debug)then
+        print*,ibin,binstats(ibin,0),bindata(ibin,10),bindata(ibin,11), &
+             binstats(ibin,1),bin_arr_count(ibin)
+     end if
+  end do
+  call cpu_time(finish)
+  if(debug) print*, 'time for loop = ', finish-start
+  return
+end subroutine calc_fsc
 
 subroutine calc_fsc_using_halfmaps(hf1,hf2,bin_idx,nbin,mode,nx,ny,nz, &
      Fo,Eo,bin_noise_var,bin_sgnl_var,bin_total_var,bin_fsc,bin_arr_count)
@@ -631,6 +801,39 @@ subroutine calc_covar_and_fsc_betwn_anytwomaps(hf1,hf2,bin_idx,nbin,mode,&
 end subroutine calc_covar_and_fsc_betwn_anytwomaps
 
 
+!!$subroutine read_into_grid(bin_idx,bin_fsc,nbin,nx,ny,nz,fsc_weighted_grid)
+!!$  implicit none
+!!$  integer, intent(in) :: nbin,nx,ny,nz
+!!$  real*8,  dimension(0:nbin-1),intent(in) :: bin_fsc
+!!$  integer, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in)  :: bin_idx
+!!$  real*8,  dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(out) :: fsc_weighted_grid
+!!$  ! locals
+!!$  integer,   dimension(3) :: nxyz
+!!$  integer    :: i,j,k,xyzmin(3),xyzmax(3)!,ibin
+!!$  !
+!!$  xyzmin = 0; xyzmax = 0
+!!$  fsc_weighted_grid = 0.0
+!!$
+!!$  nxyz = (/ nx, ny, nz /)
+!!$
+!!$  xyzmin(1) = int(-nxyz(1)/2)
+!!$  xyzmin(2) = int(-nxyz(2)/2)
+!!$  xyzmin(3) = int(-nxyz(3)/2)
+!!$  xyzmax    = -(xyzmin+1)
+!!$  ! using Friedel's law
+!!$  do i=xyzmin(1), xyzmax(1)
+!!$     do j=xyzmin(2), xyzmax(2)
+!!$        do k=xyzmin(3), 0!xyzmax(3)
+!!$           if(bin_idx(i,j,k) < 0 .or. bin_idx(i,j,k) > nbin-1) cycle
+!!$           fsc_weighted_grid(i,j,k) = bin_fsc(bin_idx(i,j,k))
+!!$           if(k == xyzmin(3) .or. j == xyzmin(2) .or. i == xyzmin(1)) cycle
+!!$           fsc_weighted_grid(-i,-j,-k) = bin_fsc(bin_idx(i,j,k))
+!!$        end do
+!!$     end do
+!!$  end do
+!!$
+!!$end subroutine read_into_grid
+
 subroutine read_into_grid(bin_idx,bin_fsc,nbin,nx,ny,nz,fsc_weighted_grid)
   implicit none
   integer, intent(in) :: nbin,nx,ny,nz
@@ -639,7 +842,7 @@ subroutine read_into_grid(bin_idx,bin_fsc,nbin,nx,ny,nz,fsc_weighted_grid)
   real*8,  dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(out) :: fsc_weighted_grid
   ! locals
   integer,   dimension(3) :: nxyz
-  integer    :: i,j,k,xyzmin(3),xyzmax(3)!,ibin
+  integer    :: i,j,k,xyzmin(3),xyzmax(3),indx
   !
   xyzmin = 0; xyzmax = 0
   fsc_weighted_grid = 0.0
@@ -654,10 +857,11 @@ subroutine read_into_grid(bin_idx,bin_fsc,nbin,nx,ny,nz,fsc_weighted_grid)
   do i=xyzmin(1), xyzmax(1)
      do j=xyzmin(2), xyzmax(2)
         do k=xyzmin(3), 0!xyzmax(3)
-           if(bin_idx(i,j,k) < 0 .or. bin_idx(i,j,k) > nbin-1) cycle
-           fsc_weighted_grid(i,j,k) = bin_fsc(bin_idx(i,j,k))
+           indx = bin_idx(k,j,i)
+           if(indx < 0 .or. indx > nbin-1) cycle
+           fsc_weighted_grid(k,j,i) = bin_fsc(indx)
            if(k == xyzmin(3) .or. j == xyzmin(2) .or. i == xyzmin(1)) cycle
-           fsc_weighted_grid(-i,-j,-k) = bin_fsc(bin_idx(i,j,k))
+           fsc_weighted_grid(-k,-j,-i) = bin_fsc(indx)
         end do
      end do
   end do
@@ -718,6 +922,41 @@ subroutine get_st(nx,ny,nz,t,st,s1,s2,s3)
   end do
   return
 end subroutine get_st
+
+!!$subroutine get_st(nx,ny,nz,t,st,s1,s2,s3)
+!!$  implicit none
+!!$  real*8, parameter :: PI = 3.141592653589793
+!!$  integer,intent(in) :: nx,ny,nz
+!!$  real*8,dimension(3),intent(in) :: t
+!!$  real*8 :: sv(3)
+!!$  complex*16 :: xj
+!!$  complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out) :: st
+!!$  integer,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out) :: s1,s2,s3
+!!$  integer :: i,j,k,xmin,xmax,ymin,ymax,zmin,zmax
+!!$
+!!$  xj = dcmplx(0.0d0,1.0d0)
+!!$  st = dcmplx(0.0d0,1.0d0)
+!!$  sv = 0.0
+!!$
+!!$  xmin = int(-nx/2); xmax = -(xmin+1)
+!!$  ymin = int(-ny/2); ymax = -(ymin+1)
+!!$  zmin = int(-nz/2); zmax = -(zmin+1)
+!!$
+!!$  do i=xmin, xmax
+!!$     do j=ymin, ymax
+!!$        do k=zmin, zmax
+!!$           s1(k,j,i) = i
+!!$           s2(k,j,i) = j
+!!$           s3(k,j,i) = k
+!!$           sv(1) = i
+!!$           sv(2) = j
+!!$           sv(3) = k
+!!$           st(k,j,i) = exp(2.0d0 * PI * xj * dot_product(t,sv))
+!!$        end do
+!!$     end do
+!!$  end do
+!!$  return
+!!$end subroutine get_st
 
 subroutine fsc_weight_calculation(fsc_weighted_grid,bin_fsc,F1,F2,bin_idx,nbin,mode,nx,ny,nz)
   implicit none
@@ -1456,6 +1695,52 @@ subroutine cutmap(fin,bin_idx,smax,mode,nbin,nx,ny,nz,fout)
   if(debug) print*, 'time for Eo calculation(s) = ', finish-start
 end subroutine cutmap
 
+!!$subroutine cutmap(fin,bin_idx,smax,mode,nbin,nx,ny,nz,fout)
+!!$  implicit none
+!!$  integer,   intent(in) :: smax,mode,nbin,nx,ny,nz
+!!$  complex*16, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in)  :: fin
+!!$  integer,   dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in)  :: bin_idx
+!!$  complex*16, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(out) :: fout
+!!$  ! locals
+!!$  integer,   dimension(3) :: nxyz
+!!$  integer,   dimension(0:nbin-1) :: bin_arr_count
+!!$  !
+!!$  real       :: start,finish
+!!$  integer    :: i,j,k,n,xyzmin(3),xyzmax(3),indx
+!!$  logical    :: debug
+!!$  !
+!!$  debug         = .FALSE.
+!!$  if(mode == 1) debug = .TRUE.
+!!$  call cpu_time(start)
+!!$  fout = dcmplx(0.0d0, 0.0d0)
+!!$  xyzmin = 0; xyzmax = 0
+!!$  nxyz = (/ nx, ny, nz /)
+!!$  xyzmin(1) = int(-nxyz(1)/2)
+!!$  xyzmin(2) = int(-nxyz(2)/2)
+!!$  xyzmin(3) = int(-nxyz(3)/2)
+!!$  xyzmax    = -(xyzmin+1)
+!!$  if(debug) print*, 'xyzmin = ', xyzmin
+!!$  if(debug) print*, 'xyzmax = ', xyzmax
+!!$  if(debug) print*, 'nbin=', nbin
+!!$
+!!$  ! Using Friedel's Law
+!!$  do i=xyzmin(1), xyzmax(1)
+!!$     do j=xyzmin(2), xyzmax(2)
+!!$        do k=xyzmin(3), 0 !xyzmax(3)
+!!$           indx = bin_idx(k,j,i)
+!!$           if(indx < 0 .or. indx > nbin-1) cycle
+!!$           if(indx > smax) cycle
+!!$           fout(k,j,i) = fin(k,j,i)
+!!$           if(k==xyzmin(3) .or. j==xyzmin(2) .or. i==xyzmin(1)) cycle
+!!$           fout(-k,-j,-i) = conjg(fout(k,j,i))
+!!$        end do
+!!$     end do
+!!$  end do
+!!$
+!!$  call cpu_time(finish)
+!!$  if(debug) print*, 'time for Eo calculation(s) = ', finish-start
+!!$end subroutine cutmap
+
 subroutine trilinear(RM,F,FRS,ncopies,mode,nx,ny,nz)
   implicit none
   real*8,intent(in):: RM(3,3)
@@ -1539,6 +1824,88 @@ subroutine trilinear(RM,F,FRS,ncopies,mode,nx,ny,nz)
   return
 end subroutine trilinear
 
+!!$subroutine trilinear(RM,F,FRS,ncopies,mode,nx,ny,nz)
+!!$  implicit none
+!!$  real*8,intent(in):: RM(3,3)
+!!$  integer,intent(in):: nx,ny,nz,mode,ncopies
+!!$  complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2,ncopies),intent(in):: F
+!!$  complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2,ncopies),intent(out):: FRS
+!!$  ! locals
+!!$  integer :: x0(3),x1(3)
+!!$  integer :: nxyz(3),nxyzmn(3),nxyzmx(3)
+!!$  real*8 :: x(3),xd(3),s(3)
+!!$  complex*16 :: c000,c001,c010,c011,c100,c101,c110,c111,c00,c01,c10,c11,c0,c1,c
+!!$  integer :: h,k,l,i
+!!$  integer :: xmin,xmax,ymin,ymax,zmin,zmax,ic
+!!$
+!!$  FRS = dcmplx(0.0d0, 0.0d0)
+!!$  x = 0.0d0
+!!$  xd = 0.0d0
+!!$
+!!$  nxyz(1) = nx; nxyz(2) = ny; nxyz(3) =nz
+!!$  nxyzmn(1) = -nx/2; nxyzmn(2) = -ny/2; nxyzmn(3) = -nz/2
+!!$  nxyzmx(1) = (nx-2)/2; nxyzmx(2) = (ny-2)/2; nxyzmx(3) = (nz-2)/2
+!!$
+!!$  xmin = int(-nx/2); xmax = -(xmin+1)
+!!$  ymin = int(-ny/2); ymax = -(ymin+1)
+!!$  zmin = int(-nz/2); zmax = -(zmin+1)
+!!$
+!!$  !write(*,*) nxyz,nxyzmn,nxyzmx
+!!$
+!!$  do h = zmin, zmax
+!!$     do k = ymin, ymax
+!!$        outer: do l = xmin, 0!xmax
+!!$           s(1) = h
+!!$           s(2) = k
+!!$           s(3) = l
+!!$           x = matmul(transpose(RM),s)
+!!$           do i = 1, 3
+!!$              !x(i)  = dot_product(RM(:,i),s) ! Note that RM is now transposed
+!!$              x0(i) = floor(x(i))
+!!$              x1(i) = x0(i) + 1
+!!$              if((nxyzmx(i) < x0(i)) .or. (x0(i) < nxyzmn(i)) &
+!!$                   .or. (nxyzmx(i) < x1(i)) .or. (x1(i) < nxyzmn(i)))then
+!!$                 cycle outer
+!!$              end if
+!!$              xd(i) = (x(i)-real(x0(i)))!/(x1(i)-x0(i))
+!!$              if(abs(xd(i)).gt.1.0) then
+!!$                 print*, 'Something is wrong ',xd(i)
+!!$                 stop
+!!$              endif
+!!$           end do
+!!$           !  Careful here: we may get to the outside of the array
+!!$           do i = 1,3
+!!$              x1(i) = min(nxyzmx(i),max(nxyzmn(i),x1(i)))
+!!$           enddo
+!!$           do ic = 1, ncopies
+!!$              c000 = F(x0(3),x0(2),x0(1),ic)
+!!$              c001 = F(x1(3),x0(2),x0(1),ic)
+!!$              c010 = F(x0(3),x1(2),x0(1),ic)
+!!$              c011 = F(x1(3),x1(2),x0(1),ic)
+!!$              c100 = F(x0(3),x0(2),x1(1),ic)
+!!$              c101 = F(x1(3),x0(2),x1(1),ic)
+!!$              c110 = F(x0(3),x1(2),x1(1),ic)
+!!$              c111 = F(x1(3),x1(2),x1(1),ic)
+!!$              ! Interpolation along x direction
+!!$              c00 = c000*(1.0d0-xd(1)) + c100*xd(1)
+!!$              c01 = c001*(1.0d0-xd(1)) + c101*xd(1)
+!!$              c10 = c010*(1.0d0-xd(1)) + c110*xd(1)
+!!$              c11 = c011*(1.0d0-xd(1)) + c111*xd(1)
+!!$              ! Interpolation along y direction
+!!$              c0 = c00*(1.0d0-xd(2)) + c10*xd(2)
+!!$              c1 = c01*(1.0d0-xd(2)) + c11*xd(2)
+!!$              ! Interpolation along z direction
+!!$              c = c0*(1.0d0-xd(3)) + c1*xd(3)
+!!$              FRS(l,k,h,ic) = c
+!!$              if((h == xmin).or.(k == ymin).or.(l == zmin)) cycle
+!!$              FRS(-l,-k,-h,ic) = conjg(c)
+!!$           end do
+!!$        end do outer
+!!$     end do
+!!$  end do
+!!$  return
+!!$end subroutine trilinear
+                 
 subroutine trilinear_map(RM,arr1,arr2,nx,ny,nz,mode)
   implicit none
   real*8,dimension(3,3),intent(in):: RM
