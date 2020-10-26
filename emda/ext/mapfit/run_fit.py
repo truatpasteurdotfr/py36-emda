@@ -9,6 +9,7 @@ Mozilla Public License, version 2.0; see LICENSE.
 # fitting function
 from __future__ import absolute_import, division, print_function, unicode_literals
 from emda import core, ext
+from emda.core import quaternions
 import numpy as np
 import fcodes_fast
 
@@ -20,7 +21,7 @@ def fsc_between_static_and_transfomed_map(
 
     nx, ny, nz = staticmap.shape
     st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
-    frt_full = utils.get_FRS(rm, movingmap * st, interp="cubic")[:, :, :, 0]
+    frt_full = utils.get_FRS(rm, movingmap * st, interp="linear")[:, :, :, 0]
     f1f2_fsc, _ = core.fsc.anytwomaps_fsc_covariance(staticmap, frt_full, bin_idx, nbin)
     return f1f2_fsc
 
@@ -31,7 +32,7 @@ def get_ibin(bin_fsc):
         print("ibin: ", ibin)
     else:
         bin_fsc = bin_fsc[bin_fsc > 0.1]
-        dist = np.sqrt((bin_fsc - 0.4) ** 2)
+        dist = np.sqrt((bin_fsc - 0.3) ** 2)
         ibin = np.argmin(dist) + 1
         if ibin % 2 != 0:
             ibin = ibin - 1
@@ -202,4 +203,8 @@ def run_fit(
         ncycles = ncycles  # tweaking this you can change later # cycles
         t = fit.t_accum
         rotmat = fit.rotmat
+        q_final = fit.q
+        x, y, z, ang = quaternions.quart2axis(q_final)
+        print("x, y, z and angle:")
+        print(x, y, z, np.rad2deg(ang))
     return rotmat, t
