@@ -21,9 +21,14 @@ def get_resolution_array(uc, hf1):
 
     nx, ny, nz = hf1.shape
     maxbin = np.amax(np.array([nx // 2, ny // 2, nz // 2]))
-    nbin, res_arr, bin_idx, sgrid = fcodes_fast.resolution_grid(
-        uc, debug_mode, maxbin, nx, ny, nz
-    )
+    if nx == ny == nz:
+        nbin, res_arr, bin_idx, s_grid = fcodes_fast.resol_grid_em(
+            uc, debug_mode, maxbin, nx, ny, nz
+        )
+    else:
+        nbin, res_arr, bin_idx, sgrid = fcodes_fast.resolution_grid(
+            uc, debug_mode, maxbin, nx, ny, nz
+        )
     return nbin, res_arr[:nbin], bin_idx
 
 
@@ -162,4 +167,3 @@ def cut_resolution_for_linefit(f, bin_idx, res_arr, smax):
         dx : dx + 2 * cx, dy : dy + 2 * cx, dz : dz + 2 * cx
     ]
     return fout, cBIdx, cbin
-
