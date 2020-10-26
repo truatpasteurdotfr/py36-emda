@@ -130,6 +130,7 @@ def write_mrc(mapdata, filename, unit_cell, map_origin=None, factor=1.0, label=F
             ")",
         )
         file.header.label = label1
+    #file.update_header_from_data()
     file.close()
 
 
