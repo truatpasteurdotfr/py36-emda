@@ -1273,12 +1273,13 @@ def difference_map(maplist, masklist, smax, mode="ampli"):
     """
     from emda.ext import difference
 
+    msk1 = msk2 = 1.0
     uc, arr1, origin = read_map(maplist[0])
     _, arr2, _ = iotools.read_map(maplist[1])
     _, msk1, _ = iotools.read_map(masklist[0])
     _, msk2, _ = iotools.read_map(masklist[1])
-    f1 = np.fft.fftshift(np.fft.fftn(np.fft.fftshift(arr1)))  # * msk1)))
-    f2 = np.fft.fftshift(np.fft.fftn(np.fft.fftshift(arr2)))  # * msk2)))
+    f1 = np.fft.fftshift(np.fft.fftn(np.fft.fftshift(arr1 * msk1)))
+    f2 = np.fft.fftshift(np.fft.fftn(np.fft.fftshift(arr2 * msk2)))
     if mode == "power":
         dm1_dm2, dm2_dm1 = difference.diffmap_scalebypower(
             f1=f1, f2=f2, cell=uc, origin=origin, smax=smax
