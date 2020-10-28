@@ -297,19 +297,22 @@ mmfsc = subparsers.add_parser("mapmodelfsc", description="map-model FSC")
 mmfsc.add_argument("--map", required=True, help="input map")
 mmfsc.add_argument("--mdl", required=True, help="input atomic model")
 mmfsc.add_argument("--msk", required=False, help="input mask (mrc/map)")
-mmfsc.add_argument("--res", required=False, default=5.0, type=float, help="Resolution (A)")
+mmfsc.add_argument("--res", required=True, type=float, help="Resolution (A)")
 mmfsc.add_argument(
     "--bfc",
     required=False,
     default=0.0,
     type=float,
-    help="Overall B factor for model. default=0.0 ",
+    help="Overall B factor for model. default=0.0 ignored by REFMAC ",
 )
 mmfsc.add_argument(
     "--lig", action="store_true", help="use if there is ligand, but no description"
 )
 mmfsc.add_argument(
     "--lgf", required=False, default=None, type=str, help="ligand description file"
+)
+mmfsc.add_argument(
+    "--phaserand", action="store_true", help="use if phase randomized FSC is calculated"
 )
 
 mapoverlay = subparsers.add_parser("overlay", description="overlay maps")
@@ -798,7 +801,7 @@ def validate_mapmodel(args):
     )
 
 
-def mapmodel_fsc(args):
+def mapmodel_fsc(args, fobj):
     import emda.emda_methods as em
 
     _, _ = em.mapmodel_fsc(
@@ -809,6 +812,8 @@ def mapmodel_fsc(args):
         mask=args.msk,
         modelresol=args.res,
         lgf=args.lgf,
+        phaserand=args.phaserand,
+        fobj=fobj,
     )
 
 
@@ -1018,7 +1023,8 @@ def main(command_line=None):
     if args.command == "mapmodelvalidate":
         validate_mapmodel(args)
     if args.command == "mapmodelfsc":
-        mapmodel_fsc(args)
+        mapmodel_fsc(args, f)
+        f.close()
     if args.command == "overlay":
         map_overlay(args, f)
         f.close()
