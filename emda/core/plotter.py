@@ -89,7 +89,11 @@ def plot_line(mapname, res_arr, arr):
 
 
 def plot_nlines(
-    res_arr, list_arr, mapname="halfmap_fsc.eps", curve_label=["halfmap_fsc"]
+    res_arr,
+    list_arr,
+    mapname="halfmap_fsc.eps",
+    curve_label=["halfmap_fsc"],
+    fscline=0.143,
 ):
     # from mpl_toolkits.axes_grid1 import host_subplot
     # import mpl_toolkits.axisartist as AA
@@ -102,7 +106,9 @@ def plot_nlines(
         ax1.plot(bin_arr, list_arr[icurve], label=curve_label[icurve], linewidth=2)
     xmin = np.min(bin_arr)
     xmax = np.max(bin_arr)
-    plt.plot((xmin, xmax), (0.143, 0.143), color="gray", linestyle=":")
+    plt.plot(
+        (xmin, xmax), (float(fscline), float(fscline)), color="gray", linestyle=":"
+    )
     plt.plot((xmin, xmax), (0.0, 0.0), color="black", linestyle=":")
     pos = np.array(ax1.get_xticks(), dtype=np.int)
     n_bins = res_arr.shape[0]
@@ -274,4 +280,3 @@ def plot_from_twofiles_csv(filename, labels):
     plt.ylabel("Overall Correlation Coefficient")
     plt.savefig("overall_CC_both.eps", format="eps", dpi=300)
     plt.show()
-
