@@ -22,7 +22,7 @@ def fsc_between_static_and_transfomed_map(
     nx, ny, nz = staticmap.shape
     st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
     frt_full = utils.get_FRS(rm, movingmap * st, interp="linear")[:, :, :, 0]
-    f1f2_fsc, _ = core.fsc.anytwomaps_fsc_covariance(staticmap, frt_full, bin_idx, nbin)
+    f1f2_fsc = core.fsc.anytwomaps_fsc_covariance(staticmap, frt_full, bin_idx, nbin)[0]
     return f1f2_fsc
 
 
