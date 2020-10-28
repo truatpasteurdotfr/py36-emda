@@ -21,6 +21,7 @@ def output_rotated_maps(emmap1, r_lst, t_lst, Bf_arr=None):
 
     if Bf_arr is None:
         Bf_arr = [0.0]
+    emmap1.com = False
     if emmap1.com:
         com = emmap1.com1
     fo_lst = emmap1.fo_lst
@@ -43,9 +44,9 @@ def output_rotated_maps(emmap1, r_lst, t_lst, Bf_arr=None):
     core.iotools.write_mrc(data2write, "static_map.mrc", cell, origin)
     del data2write
     for fo, t, rotmat in zip(fo_lst[1:], t_lst, r_lst):
-        f1f2_fsc_unaligned, _ = core.fsc.anytwomaps_fsc_covariance(
+        f1f2_fsc_unaligned = core.fsc.anytwomaps_fsc_covariance(
             fo_lst[0], fo, bin_idx, nbin
-        )
+        )[0]
         fsc12_lst_unaligned.append(f1f2_fsc_unaligned)
         imap_f = imap_f + 1
         st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
@@ -61,9 +62,10 @@ def output_rotated_maps(emmap1, r_lst, t_lst, Bf_arr=None):
             origin,
         )
         # estimating covaraince between current map vs. static map
-        f1f2_fsc, f1f2_covar = core.fsc.anytwomaps_fsc_covariance(
+        bin_stats = core.fsc.anytwomaps_fsc_covariance(
             fo_lst[0], frt_full, bin_idx, nbin
         )
+        f1f2_fsc, f1f2_covar = bin_stats[0], bin_stats[1]
         cov_lst.append(f1f2_covar)
         fsc12_lst.append(f1f2_fsc)
         core.plotter.plot_nlines(
