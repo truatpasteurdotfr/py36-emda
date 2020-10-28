@@ -51,12 +51,12 @@ class EmFit:
         self.ert = get_FRS(self.rotmat, self.e1 * self.st, interp=self.interp)[:, :, :, 0]
         # f are used for FSC
         """ frt = get_FRS(self.rotmat, self.f1 * self.st, interp=self.interp)[:, :, :, 0]
-        fsc, _ = core.fsc.anytwomaps_fsc_covariance(
+        fsc = core.fsc.anytwomaps_fsc_covariance(
             self.mapobj.cfo_lst[0], frt, self.mapobj.cbin_idx, self.mapobj.cbin
-        ) """
-        fsc, _ = core.fsc.anytwomaps_fsc_covariance(
+        )[0] """
+        fsc = core.fsc.anytwomaps_fsc_covariance(
             self.e0, self.ert, self.mapobj.cbin_idx, self.mapobj.cbin
-        )
+        )[0]
         return fsc
 
     def get_wght(self):
@@ -78,9 +78,9 @@ class EmFit:
     """ def get_wght(self, e0, ert):
         cx, cy, cz = e0.shape
         start = timer()
-        fsc, _ = core.fsc.anytwomaps_fsc_covariance(
+        fsc = core.fsc.anytwomaps_fsc_covariance(
             e0, ert, self.mapobj.cbin_idx, self.mapobj.cbin
-        )
+        )[0]
         w_grid = fcodes_fast.read_into_grid(
             self.mapobj.cbin_idx, fsc / (1 - fsc ** 2), self.mapobj.cbin, cx, cy, cz
         )
@@ -122,6 +122,9 @@ class EmFit:
         )
 
         fsc_lst = []
+        fval_list = []
+        q_list = []
+        t_list = []
         nfit = len(self.mapobj.ceo_lst) - 1
         self.e0 = self.mapobj.ceo_lst[0]  # Static map e-data for fit
         fobj.write("\n")
@@ -137,7 +140,7 @@ class EmFit:
         fobj.write("Rotation(degrees)\n")
         fobj.write("Translation(A)\n")
         fobj.write("\n")
-        print("Cycle#   ", "Func. value  ", "Rotation(degrees)  ", "Translation(A)  ")
+        print("Cycle#   ", "Fval  ", "Rot(deg)  ", "Trans(A)  ", "avg(FSC)")
         for ifit in range(nfit):
             self.e1 = self.mapobj.ceo_lst[ifit + 1]
             #self.f1 = self.mapobj.cfo_lst[ifit + 1]
@@ -182,6 +185,9 @@ class EmFit:
                     break
                 self.w_grid, self.w2_grid = self.get_wght()
                 fval = self.functional()
+                fval_list.append(fval)
+                q_list.append(q_accum)
+                t_list.append(t_accum)
                 #fval = self.functional(self.e0, self.e1)
                 if math.isnan(theta2):
                     print("Cannot find a solution! Stopping now...")
@@ -196,7 +202,7 @@ class EmFit:
                     #print(
                     #    "average FSC: before after", np.mean(fsc_lst[0]), np.mean(fsc)
                     #)
-                if i > 0 and fval < fval_previous or i == ncycles - 1:
+                """ if i > 0 and fval < fval_previous or i == ncycles - 1:
                     rotmat = core.quaternions.get_RM(q_accum_previous)
                     fsc_lst.append(fsc)
                     self.rotmat = rotmat  # final rotation
@@ -208,11 +214,37 @@ class EmFit:
                     )
                     theta2 = np.arccos((np.trace(self.rotmat) - 1) / 2) * 180.0 / np.pi
                     print("thets2, trans: ", theta2, translation_vec)
+                    break """
+                if i > 0 and i == ncycles - 1:
+                    # search for max fval in the fval_list
+                    loc = np.argmax(fval_list)
+                    self.rotmat = core.quaternions.get_RM(q_list[-1])
+                    self.q = q_list[-1]
+                    self.t_accum = t_list[-1]
+                    self.fsc_lst = fsc_lst
+                    t_accum_angstrom = self.t_accum * self.pixsize#self.cell[:3]
+                    translation_vec = np.sqrt(
+                        np.sum(t_accum_angstrom * t_accum_angstrom)
+                    )
+                    theta2 = np.arccos((np.trace(self.rotmat) - 1) / 2) * 180.0 / np.pi
+                    print("thets2, trans: ", theta2, translation_vec)
                     break
-                # print('Euler angles: [degrees]: ', Euler_angles)
+
+                    """ rotmat = core.quaternions.get_RM(q_accum)
+                    fsc_lst.append(fsc)
+                    self.rotmat = rotmat  # final rotation
+                    self.t_accum = t_accum  # final translation
+                    self.fsc_lst = fsc_lst
+                    t_accum_angstrom = self.t_accum * self.pixsize#self.cell[:3]
+                    translation_vec = np.sqrt(
+                        np.sum(t_accum_angstrom * t_accum_angstrom)
+                    )
+                    theta2 = np.arccos((np.trace(self.rotmat) - 1) / 2) * 180.0 / np.pi
+                    print("thets2, trans: ", theta2, translation_vec) """
+
                 print(
-                    "{:5d} {:8.4f} {:6.2f} {:6.2f}".format(
-                        i, fval, theta2, translation_vec
+                    "{:5d} {:8.4f} {:6.2f} {:6.2f} {:6.2f}".format(
+                        i, fval, theta2, translation_vec, np.average(self.fsc)
                     )
                 )
                 fobj.write(
@@ -265,10 +297,10 @@ class EmFit:
                 q_accum = q_accum / np.sqrt(np.dot(q_accum, q_accum))
                 rm_accum = core.quaternions.get_RM(q_accum)
                 theta2 = np.arccos((np.trace(rm_accum) - 1) / 2) * 180.0 / np.pi
-                if theta2 < 0.01:
-                    tmp = q_init  # revert to no-rotation
-                else:
-                    tmp = tmp + q_init
+                #if theta2 < 0.01:
+                #    tmp = q_init  # revert to no-rotation
+                #else:
+                tmp = tmp + q_init
                 q = tmp / np.sqrt(np.dot(tmp, tmp))
                 self.q = q
                 fval_previous = fval
