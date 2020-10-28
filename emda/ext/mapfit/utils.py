@@ -648,7 +648,8 @@ def set_dim_even(x):
 
 def get_fsc_wght(e0, ert, bin_idx, nbin):
     cx, cy, cz = e0.shape
-    fsc, f1f2_covar = core.fsc.anytwomaps_fsc_covariance(e0, ert, bin_idx, nbin)
+    bin_stats = core.fsc.anytwomaps_fsc_covariance(e0, ert, bin_idx, nbin)
+    fsc, f1f2_covar = bin_stats[0], bin_stats[1]
     fsc = np.array(fsc, dtype=np.float64, copy=False)
     w_grid = fcodes_fast.read_into_grid(bin_idx, fsc / (1 - fsc ** 2), nbin, cx, cy, cz)
     w_grid = np.array(w_grid, dtype=np.float64, copy=False)
