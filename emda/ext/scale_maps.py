@@ -58,10 +58,11 @@ def scale_twomaps_by_power(f1, f2, bin_idx=None, uc=None, res_arr=None):
     else:
         nbin = np.max(bin_idx) + 1
     # find how far the signal is
-    f1f2_fsc,f1f2_covar = core.fsc.anytwomaps_fsc_covariance(f1=f1,
+    bin_stats = core.fsc.anytwomaps_fsc_covariance(f1=f1,
                                                         f2=f2,
                                                         bin_idx=bin_idx,
                                                         nbin=nbin)
+    f1f2_fsc, f1f2_covar = bin_stats[0], bin_stats[1]
     mask = (mapaverage.set_array(f1f2_covar, 0.1) > 0.0).astype(int)
     inverse_mask = (mask < 1).astype(int)
     power_1 = fcodes_fast.calc_power_spectrum(f1,bin_idx,nbin,debug_mode,nx,ny,nz)
