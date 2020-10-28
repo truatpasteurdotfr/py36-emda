@@ -49,7 +49,7 @@ def anytwomaps_fsc_covariance(f1, f2, bin_idx, nbin):
     """ f1f2_covar, bin_fsc, bincount = fcodes_fast.calc_covar_and_fsc_betwn_anytwomaps(
         f1, f2, bin_idx, nbin, debug_mode, nx, ny, nz
     ) """
-    return bin_fsc, f1f2_covar
+    return [bin_fsc, f1f2_covar, bin_arr_count]
 
 
 def predict_fsc(hf1, hf2, bin_idx, nbin, res_arr, nparticles=None, bfac=None):
