@@ -616,7 +616,7 @@ def twomap_fsc(map1name, map2name, fobj=None, xmlobj=None):
     f1 = np.fft.fftshift(np.fft.fftn(arr1))
     f2 = np.fft.fftshift(np.fft.fftn(arr2))
     nbin, res_arr, bin_idx = restools.get_resolution_array(uc, f1)
-    bin_fsc, _ = fsc.anytwomaps_fsc_covariance(f1, f2, bin_idx, nbin)
+    bin_fsc = fsc.anytwomaps_fsc_covariance(f1, f2, bin_idx, nbin)[0]
     if xmlobj is not None:
         xmlobj.map1path = os.path.abspath(map1name)
         xmlobj.map2path = os.path.abspath(map2name)
@@ -749,7 +749,7 @@ def get_fsc(arr1, arr2, uc):
     fmap1 = np.fft.fftshift(np.fft.fftn(arr1))
     fmap2 = np.fft.fftshift(np.fft.fftn(arr2))
     nbin, res_arr, bin_idx = restools.get_resolution_array(uc, fmap1)
-    bin_fsc, _ = fsc.anytwomaps_fsc_covariance(fmap1, fmap2, bin_idx, nbin)
+    bin_fsc = fsc.anytwomaps_fsc_covariance(fmap1, fmap2, bin_idx, nbin)[0]
     return res_arr, bin_fsc
 
 
@@ -844,7 +844,7 @@ def mask_from_map(
     from emda.ext import maskmap_class
 
     _, arrlp = lowpass_map(uc, arr, resol, filter, order=order)
-    write_mrc(arrlp, "lowpass.mrc", uc, orig)
+    #write_mrc(arrlp, "lowpass.mrc", uc, orig)
     mask = maskmap_class.mapmask(arr=arrlp, uc=uc, kern_rad=kern, prob=prob, itr=itr)
     write_mrc(mask, "mapmask.mrc", uc, orig)
     return mask
@@ -1232,9 +1232,11 @@ def map_model_validate(
 def mapmodel_fsc(
     map1,
     model,
+    fobj,
     bfac=0.0,
     modelresol=5.0,
     lig=False,
+    phaserand=False,
     mask=None,
     lgf=None,
 ):
@@ -1248,6 +1250,8 @@ def mapmodel_fsc(
         lig=lig,
         mask_map=mask,
         lgf=lgf,
+        phaserand=phaserand,
+        fobj=fobj,
     )
     return res_arr, bin_fsc
 
