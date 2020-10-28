@@ -45,13 +45,13 @@ def randomize_phases(sf):
     return sf_phase_randomized
 
 
-def get_randomized_sf(resol_grid, rho, resol_randomize=10.0):
+def get_randomized_sf(bin_idx, rho, rand_idx):
     print("SF phase randomization")
     f_ori = np.fft.fftshift(np.fft.fftn(rho))
     f_all_random = randomize_phases(f_ori)
     nx, ny, nz = f_ori.shape
     f_beyond_random = fcodes_fast.add_random_phase_beyond(
-        f_ori, f_all_random, resol_grid, resol_randomize, nx, ny, nz
+        f_ori, f_all_random, bin_idx, rand_idx, nx, ny, nz
     )
     return f_beyond_random
 
