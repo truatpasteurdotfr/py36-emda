@@ -57,9 +57,9 @@ def lsq(f1, f2, s, x0):
 def get_resolution(fhf_lst, uc):
     assert fhf_lst[0].shape == fhf_lst[1].shape
     nbin, res_arr, bin_idx = core.restools.get_resolution_array(uc, fhf_lst[0])
-    bin_fsc, _ = core.fsc.anytwomaps_fsc_covariance(
+    bin_fsc = core.fsc.anytwomaps_fsc_covariance(
         fhf_lst[0], fhf_lst[1], bin_idx, nbin
-    )
+    )[0]
     bin_fsc = bin_fsc[bin_fsc > 0.1]
     if len(bin_fsc) > 0:
         dist = np.sqrt((bin_fsc - 0.143) ** 2)
