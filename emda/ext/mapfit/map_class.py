@@ -687,13 +687,8 @@ class EmmapAverage:
         com_lst = []
         if self.mask_list is not None:
             if len(self.hfmap_list) // 2 != len(self.mask_list):
-                print(
-                    "mask_list size is not equal to half the \
-                    size of map_list!"
-                )
-                print("exiting program...")
-                exit()
-
+                raise SystemExit("mask_list size is not equal to half the \
+                    size of map_list!")
             for i in range(0, len(self.hfmap_list), 2):
                 if i % 2 == 0:
                     _, mask, _ = core.iotools.read_map(self.mask_list[i // 2])
@@ -702,8 +697,6 @@ class EmmapAverage:
                 uc, arr2, origin = core.iotools.read_map(self.hfmap_list[i + 1])
                 arr1 = utils.set_dim_even(arr1)
                 arr2 = utils.set_dim_even(arr2)
-
-                # for i in range(0,len(self.hfmap_list),2):
                 if i == 0:
                     fobj.write("Static map:\n")
                     fobj.write(
