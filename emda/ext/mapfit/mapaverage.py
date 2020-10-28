@@ -89,7 +89,7 @@ def fsc_between_static_and_transfomed_map(
     nx, ny, nz = staticmap.shape
     st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
     frt_full = utils.get_FRS(cell, rm, movingmap * st)[:, :, :, 0]
-    f1f2_fsc, _ = core.fsc.anytwomaps_fsc_covariance(staticmap, frt_full, bin_idx, nbin)
+    f1f2_fsc = core.fsc.anytwomaps_fsc_covariance(staticmap, frt_full, bin_idx, nbin)[0]
     return f1f2_fsc
 
 
@@ -176,9 +176,10 @@ def main(
         cov_lst = []
         # estimating covaraince between current map vs. static map
         for frt in emmap1.fo_lst[1:]:
-            f1f2_fsc,f1f2_covar = \
+            bin_stats = \
                 fsc.anytwomaps_fsc_covariance(emmap1.fo_lst[0], \
                     frt,emmap1.bin_idx, emmap1.nbin)
+            f1f2_fsc, f1f2_covar = bin_stats[0], bin_stats[1]
             # mask f1f2_covar so that anything beyond zero get zeros
             f1f2_covar = set_array(f1f2_covar)
             cov_lst.append(f1f2_covar)        
