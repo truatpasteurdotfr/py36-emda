@@ -50,7 +50,8 @@ def phase_randomized_fsc(arr1, arr2, mask, bin_idx, res_arr, fobj, resol_rand=No
     fsc_list = []
     nbin = np.max(bin_idx) + 1
     fmap1 = np.fft.fftshift(np.fft.fftn(arr1 * mask))
-    fmap2 = np.fft.fftshift(np.fft.fftn(arr2 * mask))
+    #fmap2 = np.fft.fftshift(np.fft.fftn(arr2 * mask))
+    fmap2 = np.fft.fftshift(np.fft.fftn(arr2))
     bin_stats = core.fsc.anytwomaps_fsc_covariance(
         f1=fmap1, f2=fmap2, bin_idx=bin_idx, nbin=nbin
     )
@@ -72,7 +73,8 @@ def phase_randomized_fsc(arr1, arr2, mask, bin_idx, res_arr, fobj, resol_rand=No
     randarr2 = np.real(np.fft.ifftn(np.fft.ifftshift(f2_randomized)))
     full_fsc_n, _, _, _, _, _ = core.fsc.halfmaps_fsc_variance(
         np.fft.fftshift(np.fft.fftn(randarr1 * mask)),
-        np.fft.fftshift(np.fft.fftn(randarr2 * mask)),
+        #np.fft.fftshift(np.fft.fftn(randarr2 * mask)),
+        np.fft.fftshift(np.fft.fftn(randarr2)),
         bin_idx,
         nbin,
     )
@@ -80,6 +82,13 @@ def phase_randomized_fsc(arr1, arr2, mask, bin_idx, res_arr, fobj, resol_rand=No
     fsc_true = (full_fsc_t - full_fsc_n) / (1 - full_fsc_n)
     fsc_true[: idx + 2] = full_fsc_t[: idx + 2]
     fsc_list.append(fsc_true)
+    core.plotter.plot_nlines(
+        res_arr=res_arr,
+        list_arr=fsc_list,
+        mapname="fsc_phaserand.eps",
+        curve_label=["total", "noise", "true"],
+        fscline=0.5,
+    )
     return fsc_list, bin_count
 
 
@@ -255,6 +264,19 @@ def fsc_mapmodel(
             maporigin=orig,
         )
         em.write_mrc(modelmap, 'modelmap.mrc', uc, orig)
+    fsc_list = []
+    nbin, res_arr, bin_idx = core.restools.get_resolution_array(uc, arr1)
+    print("Resolution grid Done.")
+    print("Calculating unmasked FSC...")
+    # unmask FSC
+    f_map = np.fft.fftshift(np.fft.fftn(arr1))
+    f_model = np.fft.fftshift(np.fft.fftn(modelmap))
+    bin_stats = core.fsc.anytwomaps_fsc_covariance(
+        f1=f_map, f2=f_model, bin_idx=bin_idx, nbin=nbin
+    )
+    print("FSC calculation Done.")
+    bin_fsc, bin_count = bin_stats[0], bin_stats[2]
+    fsc_list.append(bin_fsc)
     if mask_map is not None:
         print("mask file: %s is used.\n" % os.path.abspath(mask_map))
         fobj.write("mask file: %s\n" % os.path.abspath(mask_map))
@@ -266,48 +288,51 @@ def fsc_mapmodel(
     if phaserand:
         print("Phase randomization is carrying out...")
         fobj.write("Phase randomization is carrying out...\n")
-        nbin, res_arr, bin_idx = core.restools.get_resolution_array(uc, arr1)
-        print("Resolution grid Created.")
-        fsc_list, bin_count = phase_randomized_fsc(arr1, modelmap, mask, bin_idx, res_arr, fobj)
-        bin_fsc = fsc_list[-1]
+        #nbin, res_arr, bin_idx = core.restools.get_resolution_array(uc, arr1)
+        #print("Resolution grid Created.")
+        fsclist, bin_count = phase_randomized_fsc(arr1, modelmap, mask, bin_idx, res_arr, fobj)
+        bin_fsc = fsclist[-1]
+        fsc_list.append(bin_fsc)
     else:
         f_map = np.fft.fftshift(np.fft.fftn(arr1 * mask))
-        f_model = np.fft.fftshift(np.fft.fftn(modelmap))
-        nbin, res_arr, bin_idx = core.restools.get_resolution_array(uc, arr1)
-        print("Resolution grid Done.")
+        #f_model = np.fft.fftshift(np.fft.fftn(modelmap))
+        #nbin, res_arr, bin_idx = core.restools.get_resolution_array(uc, arr1)
+        #print("Resolution grid Done.")
         print("Calculating FSC...")
         bin_stats = core.fsc.anytwomaps_fsc_covariance(
             f1=f_map, f2=f_model, bin_idx=bin_idx, nbin=nbin
         )
         print("FSC calculation Done.")
         bin_fsc, bin_count = bin_stats[0], bin_stats[2]
+        fsc_list.append(bin_fsc)
     # output data into a file
     fobj.write("\n")
     fobj.write("bin number \n")
     fobj.write("resolution (Ang.) \n")
-    fobj.write("FSC \n")
+    fobj.write("unmask-FSC \n")
+    fobj.write("mask-FSC \n")
     fobj.write("number of reflections \n")
     fobj.write("\n")
     print()
-    print("Bin#    Resolution(A)   FSC     #reflx")
+    print("Bin#    Resolution(A)   unmask-FSC   mask-FSC     #reflx")
     i = -1
-    for fsci, nfc in zip(bin_fsc, bin_count):
+    for umfsci, mfsci, nfc in zip(fsc_list[0], fsc_list[1], bin_count):
         i += 1
         print(
-            "{:-3d} {:-6.2f} {:-14.4f} {:-10d}".format(
-                i, res_arr[i], fsci, nfc
+            "{:-3d} {:-8.3f} {:-14.4f} {:-14.4f} {:-10d}".format(
+                i, res_arr[i], umfsci, mfsci, nfc
             )
         )
         fobj.write(
-            "{:-3d} {:-6.2f} {:-14.4f} {:-10d}\n".format(
-                i, res_arr[i], fsci, nfc
+            "{:-3d} {:-8.3f} {:-14.4f} {:-14.4f} {:-10d}\n".format(
+                i, res_arr[i], umfsci, mfsci, nfc
             )
         )
     core.plotter.plot_nlines(
         res_arr=res_arr,
-        list_arr=[bin_fsc],
+        list_arr=fsc_list,
         mapname="fsc_modelmap.eps",
-        curve_label=["map-model"],
+        curve_label=["unmask-FSC", "mask-FSC"],
         fscline=0.5,
     )
     print("FSC plotted into fsc_modelmap.eps")
