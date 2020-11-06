@@ -25,6 +25,7 @@ def bestmap_1dfsc(f1, f2, bin_idx, nbin):
 
     cx, cy, cz = f1.shape
     fsc, _, _, _, _, eo = fsc.halfmaps_fsc_variance(f1, f2, bin_idx, nbin)
+    fsc = 2 * fsc / (1 + fsc)
     fsc_grid = fcodes_fast.read_into_grid(bin_idx, fsc, nbin, cx, cy, cz)
     fsc_grid_filtered = np.where(fsc_grid < 0.0, 0.0, fsc_grid)
     return np.sqrt(fsc_grid_filtered) * eo
