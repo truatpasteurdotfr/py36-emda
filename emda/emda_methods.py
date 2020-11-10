@@ -469,12 +469,9 @@ def halfmap_fsc(half1name, half2name, filename=None, maskname=None):
 
     uc, arr1, _ = iotools.read_map(half1name)
     uc, arr2, _ = iotools.read_map(half2name)
-    if maskname is not None:
-        _, mask, _ = read_map(maskname)
-        arr1 = arr1 * mask
-        arr2 = arr2 * mask
     hf1 = np.fft.fftshift(np.fft.fftn(arr1))
     hf2 = np.fft.fftshift(np.fft.fftn(arr2))
+    fsc_list = []
     nbin, res_arr, bin_idx = restools.get_resolution_array(uc, hf1)
     (
         _,
@@ -487,10 +484,38 @@ def halfmap_fsc(half1name, half2name, filename=None, maskname=None):
     ) = fcodes_fast.calc_fsc_using_halfmaps(
         hf1, hf2, bin_idx, nbin, debug_mode, hf1.shape[0], hf1.shape[1], hf1.shape[2]
     )
+    fsc_list.append(bin_fsc)
+    if maskname is not None:
+        _, mask, _ = read_map(maskname)
+        arr1_msk = arr1 * mask
+        arr2_msk = arr2 * mask
+        hf1msk = np.fft.fftshift(np.fft.fftn(arr1_msk))
+        hf2msk = np.fft.fftshift(np.fft.fftn(arr2_msk))
+        (
+            _,
+            _,
+            msk_noisevar,
+            msk_signalvar,
+            msk_totalvar,
+            msk_bin_fsc,
+            msk_bincount,
+        ) = fcodes_fast.calc_fsc_using_halfmaps(
+            hf1msk,
+            hf2msk,
+            bin_idx,
+            nbin,
+            debug_mode,
+            hf1msk.shape[0],
+            hf1msk.shape[1],
+            hf1msk.shape[2],
+        )
+        fsc_list.append(msk_bin_fsc)
     if filename is not None:
         tdata = open(filename, "w")
         tdata.write("halfmap1 file: %s\n" % os.path.abspath(half1name))
         tdata.write("halfmap2 file: %s\n" % os.path.abspath(half2name))
+        tdata.write("\n")
+        tdata.write("***** Unmasked statistics *****\n")
         tdata.write("\n")
         tdata.write("bin # \n")
         tdata.write("resolution (Ang.) \n")
@@ -509,10 +534,40 @@ def halfmap_fsc(half1name, half2name, filename=None, maskname=None):
                     i, res_arr[i], sv, nv, tv, fsci, nfc
                 )
             )
-    print("Bin    Resolution     FSC")
-    for i in range(len(res_arr)):
-        print("{:5d} {:6.2f} {:14.4f}".format(i, res_arr[i], bin_fsc[i]))
-    return res_arr, bin_fsc
+        if maskname is not None:
+            tdata.write("\n")
+            tdata.write("***** Masked statistics *****\n")
+            tdata.write("\n")
+            tdata.write("bin # \n")
+            tdata.write("resolution (Ang.) \n")
+            tdata.write("signal variance \n")
+            tdata.write("noise variance \n")
+            tdata.write("total variance \n")
+            tdata.write("halfmap fsc \n")
+            tdata.write("# reflx \n")
+            i = -1
+            for sv, nv, tv, fsci, nfc in zip(
+                msk_signalvar, msk_noisevar, msk_totalvar, msk_bin_fsc, msk_bincount
+            ):
+                i += 1
+                tdata.write(
+                    "{:-3d} {:-6.2f} {:-14.4f} {:-14.4f} {:-14.4f} {:-14.4f} {:-10d}\n".format(
+                        i, res_arr[i], sv, nv, tv, fsci, nfc
+                    )
+                )
+    if maskname is not None:
+        print("Bin    Resolution     unmasked-FSC   masked-FSC")
+        for i in range(len(res_arr)):
+            print(
+                "{:5d} {:6.2f} {:14.4f} {:14.4f}".format(
+                    i, res_arr[i], bin_fsc[i], msk_bin_fsc[i]
+                )
+            )
+    else:
+        print("Bin    Resolution     FSC")
+        for i in range(len(res_arr)):
+            print("{:5d} {:6.2f} {:14.4f}".format(i, res_arr[i], bin_fsc[i]))
+    return res_arr, fsc_list
 
 
 def get_variance(half1name, half2name, filename=None, maskname=None):
@@ -753,7 +808,7 @@ def get_fsc(arr1, arr2, uc):
     return res_arr, bin_fsc
 
 
-def mask_from_halfmaps(uc, half1, half2, radius=9, norm=False, iter=1, thresh=None):
+def mask_from_halfmaps(uc, half1, half2, radius=9, norm=False, iter=1, thresh=0.5):
     """Generates a mask from half maps.
 
     Generates a mask from half maps based on real space local correlation.
@@ -791,9 +846,14 @@ def mask_from_halfmaps(uc, half1, half2, radius=9, norm=False, iter=1, thresh=No
         arr1, arr2 = realsp_local.hfdata_normalized(hf1=hf1, hf2=hf2, uc=uc)
         write_mrc(arr1, "normarr1.mrc", uc)
     obj_maskmap = maskmap_class.MaskedMaps()
-    obj_maskmap.generate_mask(arr1, arr2, smax=radius, iter=iter, threshold=thresh)
-    mask = obj_maskmap.mask
-    return mask
+    obj_maskmap.smax = radius
+    obj_maskmap.arr1 = arr1
+    obj_maskmap.arr2 = arr2
+    obj_maskmap.iter = iter
+    obj_maskmap.prob = thresh
+    # obj_maskmap.generate_mask(arr1, arr2, smax=radius, iter=iter, threshold=thresh)
+    obj_maskmap.generate_mask()
+    return obj_maskmap.mask
 
 
 def mask_from_map(
@@ -844,7 +904,7 @@ def mask_from_map(
     from emda.ext import maskmap_class
 
     _, arrlp = lowpass_map(uc, arr, resol, filter, order=order)
-    #write_mrc(arrlp, "lowpass.mrc", uc, orig)
+    # write_mrc(arrlp, "lowpass.mrc", uc, orig)
     mask = maskmap_class.mapmask(arr=arrlp, uc=uc, kern_rad=kern, prob=prob, itr=itr)
     write_mrc(mask, "mapmask.mrc", uc, orig)
     return mask
@@ -1255,6 +1315,7 @@ def mapmodel_fsc(
     )
     return res_arr, bin_fsc
 
+
 def difference_map(maplist, masklist, smax, mode="ampli"):
     """Calculates difference map.
 
@@ -1282,8 +1343,8 @@ def difference_map(maplist, masklist, smax, mode="ampli"):
     _, arr2, _ = iotools.read_map(maplist[1])
     _, msk1, _ = iotools.read_map(masklist[0])
     _, msk2, _ = iotools.read_map(masklist[1])
-    f1 = np.fft.fftshift(np.fft.fftn(np.fft.fftshift(arr1)))# * msk1)))
-    f2 = np.fft.fftshift(np.fft.fftn(np.fft.fftshift(arr2)))# * msk2)))
+    f1 = np.fft.fftshift(np.fft.fftn(np.fft.fftshift(arr1)))  # * msk1)))
+    f2 = np.fft.fftshift(np.fft.fftn(np.fft.fftshift(arr2)))  # * msk2)))
     if mode == "power":
         dm1_dm2, dm2_dm1 = difference.diffmap_scalebypower(
             f1=f1, f2=f2, cell=uc, origin=origin, smax=smax
@@ -1579,7 +1640,7 @@ def mirror_map(mapname):
 
 
 def model2map(
-    modelxyz, dim, resol, cell, bfac=0.0, lig=False, maporigin=None, ligfile=None
+    modelxyz, dim, resol, cell, bfac=0.0, lig=True, maporigin=None, ligfile=None
 ):
     import gemmi as gm
 
@@ -1728,7 +1789,8 @@ def shift_density(arr, shift):
     """
     from scipy import ndimage
 
-    return ndimage.interpolation.shift(arr, shift)
+    # return ndimage.interpolation.shift(arr, shift)
+    return ndimage.shift(arr, shift, mode="wrap")
 
 
 def rotate_density(arr, rotmat, interp="linear"):
