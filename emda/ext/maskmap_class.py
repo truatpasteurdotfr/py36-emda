@@ -17,6 +17,14 @@ class MaskedMaps:
     def __init__(self, hfmap_list=None):
         self.hfmap_list = hfmap_list
         self.mask = None
+        self.uc = None
+        self.arr1 = None
+        self.arr2 = None
+        self.origin = None
+        self.iter = 3
+        self.smax = 9
+        self.prob = 0.99
+        self.threshold = None
 
     def read_halfmaps(self):
         for n in range(0, len(self.hfmap_list), 2):
@@ -27,21 +35,22 @@ class MaskedMaps:
         self.arr2 = arr2
         self.origin = origin
 
-    def generate_mask(self, arr1, arr2, smax=9, iter=1, threshold=None):
+    def generate_mask(self):
         from emda.ext import realsp_local
         kern = core.restools.create_soft_edged_kernel_pxl(
-            smax
+            self.smax
         )  # sphere with radius of n pixles
-        _, fullcc3d = realsp_local.get_3d_realspcorrelation(arr1, arr2, kern)
-        if threshold is None:
+        _, fullcc3d = realsp_local.get_3d_realspcorrelation(self.arr1, self.arr2, kern)
+        """ if self.threshold is None:
             cc_mask, threshold = self.histogram(fullcc3d)
         else:
             cc_mask, _ = self.histogram(fullcc3d)
         print("threshold: ", threshold)
         mask = fullcc3d * (fullcc3d >= threshold)
         # dilate and softened the mask
-        mask = make_soft(binary_dilation_ccmask(mask * cc_mask, iter))
-        mask = mask * (mask >= 0.0)
+        mask = make_soft(binary_dilation_ccmask(mask * cc_mask, self.iter))
+        mask = mask * (mask >= 0.0) """
+        mask = self.histogram2(fullcc3d, prob=self.prob)
         self.mask = mask
 
     def create_edgemask(self, radius):
@@ -57,6 +66,54 @@ class MaskedMaps:
             (X - center[0]) ** 2 + (Y - center[1]) ** 2 + (Z - center[2]) ** 2
         )
         mask = dist_from_center <= radius
+        return mask
+
+    def histogram2(self, arr, prob=0.65):
+        from scipy import stats
+        from scipy.ndimage.morphology import binary_dilation
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        arr_tmp = arr
+        X2 = np.sort(arr.flatten())
+        F2 = np.array(range(len(X2))) / float(len(X2) - 1)
+        loc = np.where(F2 >= prob)
+        thresh = X2[loc[0][0]]
+        thresh = max([thresh, np.max(X2) * 0.02])
+        print("threshold: ", thresh) 
+        # plot the sorted data:
+        fig = plt.figure()
+        ax1 = fig.add_subplot(121)
+        ax1.plot(F2, X2)
+        ax1.set_xlabel("$p$")
+        ax1.set_ylabel("$x$")
+        ax2 = fig.add_subplot(122)
+        ax2.plot(X2, F2)
+        ax2.set_xlabel("$x$")
+        ax2.set_ylabel("$p$")
+        plt.savefig("cdf.png", format="png", dpi=300)
+
+        nx, ny, nz = arr.shape
+        maxbin = np.amax(np.array([nx // 2, ny // 2, nz // 2]))
+        counts = stats.binned_statistic(
+            arr.flatten(), arr.flatten(), statistic="count", bins=maxbin, range=(0, 1)
+        )[0]
+        sc = counts - np.roll(counts, 1)
+        ulim = len(sc) - 11 + np.argmax(sc[-10:])
+        edge_mask = self.create_edgemask(ulim)
+        cc_mask = np.zeros(shape=(nx, ny, nz), dtype="bool")
+        cx, cy, cz = edge_mask.shape
+        dx = (nx - cx) // 2
+        dy = (ny - cy) // 2
+        dz = (nz - cz) // 2
+        print(dx, dy, dz)
+        cc_mask[dx : dx + cx, dy : dy + cy, dz : dz + cz] = edge_mask
+        arr_tmp = arr_tmp * cc_mask
+        binary_arr = (arr_tmp > thresh).astype(int)
+        dilate = binary_dilation(binary_arr, iterations=self.iter)
+        mask = make_soft(dilate, kern_rad=self.smax)
+        mask = mask * (mask >= 0.0)
         return mask
 
     def histogram(self, arr1):
