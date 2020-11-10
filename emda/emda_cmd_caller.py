@@ -66,7 +66,9 @@ ccmask.add_argument("--nrm", action="store_true", help="if True use normalized m
 ccmask.add_argument(
     "--itr", required=False, type=int, default=1, help="number of dilation cycles"
 )
-ccmask.add_argument("--thr", required=False, type=float, help="cc threshold")
+ccmask.add_argument(
+    "--thr", required=False, default=0.5, type=float, help="cc threshold"
+)
 
 map_mask = subparsers.add_parser("mapmask", description="Generate a mask from a map.")
 map_mask.add_argument("--map", required=True, help="input map")
@@ -559,6 +561,12 @@ magref.add_argument(
 )
 magref.add_argument("--ref", required=True, type=str, help="reference map [.mrc/.map]")
 
+centerofmass = subparsers.add_parser("com", description="center of mass")
+centerofmass.add_argument("--map", required=True, type=str, help="input map (MRC/MAP)")
+centerofmass.add_argument(
+    "--msk", required=False, default=None, type=str, help="mask to apply on the map"
+)
+
 
 def apply_mask(args):
     from emda.emda_methods import applymask
@@ -588,12 +596,25 @@ def anymap_fsc(args, fobj):
 def halfmap_fsc(args):
     from emda.emda_methods import halfmap_fsc
 
-    res_arr, bin_fsc = halfmap_fsc(
+    res_arr, fsc_list = halfmap_fsc(
         half1name=args.h1, half2name=args.h2, filename=args.out, maskname=args.msk
     )
-    plotter.plot_nlines(
-        res_arr, [bin_fsc], "halfmap_fsc.eps", curve_label=["halfmap_fsc"]
-    )
+    if len(fsc_list) == 2:
+        plotter.plot_nlines(
+            res_arr,
+            fsc_list,
+            "halfmap_fsc.eps",
+            curve_label=["unmask-FSC", "masked-FSC"],
+            plot_title="Halfmap FSC",
+        )
+    elif len(fsc_list) == 1:
+        plotter.plot_nlines(
+            res_arr,
+            fsc_list,
+            "halfmap_fsc.eps",
+            curve_label=["unmask-FSC"],
+            plot_title="Halfmap FSC",
+        )
 
 
 def singlemap_fsc(args):
@@ -989,6 +1010,17 @@ def magnification(args):
     em.mapmagnification(maplist=args.map, rmap=args.ref)
 
 
+def center_of_mass(args):
+    from emda import emda_methods as em
+
+    uc, arr, orig = em.get_data(args.map)
+    if args.msk is not None:
+        _, mask, _ = em.get_data(args.msk)
+        assert arr.shape == mask.shape
+        arr = arr * mask
+    print(em.center_of_mass_density(arr))
+
+
 def main(command_line=None):
     f = open("EMDA.txt", "w")
     f.write("EMDA session recorded at %s.\n\n" % (datetime.datetime.now()))
@@ -1067,6 +1099,8 @@ def main(command_line=None):
         resample2maps(args)
     if args.command == "magref":
         magnification(args)
+    if args.command == "com":
+        center_of_mass(args)
 
 
 if __name__ == "__main__":
