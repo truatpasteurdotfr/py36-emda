@@ -94,6 +94,7 @@ def plot_nlines(
     mapname="halfmap_fsc.eps",
     curve_label=["halfmap_fsc"],
     fscline=0.143,
+    plot_title=None,
 ):
     # from mpl_toolkits.axes_grid1 import host_subplot
     # import mpl_toolkits.axisartist as AA
@@ -118,7 +119,9 @@ def plot_nlines(
     ax1.set_xlabel("Resolution ($\AA$)")
     plt.legend(loc=0)
     plt.ylabel("Fourier Shell Correlation")
-    font = {"family": "serif", "color": "black", "weight": "bold", "size": 16}
+    font = {"family": "serif", "color": "black", "weight": "bold", "size": 12}
+    if plot_title is not None:
+        plt.title(plot_title, fontdict=font)
     plt.savefig(mapname, format="eps", dpi=300)
 
 
