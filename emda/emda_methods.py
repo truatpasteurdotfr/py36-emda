@@ -1142,7 +1142,7 @@ def realsp_correlation(
 
 
 def realsp_correlation_mapmodel(
-    fullmap, model, resol, kernel_size=5, lig=False, trimpx=1, mask_map=None, lgf=None
+    fullmap, model, resol, kernel_size=5, lig=False, norm=False, mask_map=None, lgf=None
 ):
     """Calculates real space local correlation between map and model.
 
@@ -1161,9 +1161,9 @@ def realsp_correlation_mapmodel(
             mask_map: string, optional
                 Mask file to apply on correlation maps. If not given, a spherical mask
                 will be employed. Default radius = (map.shape[0] // 2) - trimpx
-            trimpx: integer, optional
-                Parameter to adjust the radius (in pixels) of the spherical mask
-                in the absence of mask_map argument. default is 1.
+            norm: bool, optional
+                If True, correlation will be carried out on normalized maps.
+                Default is False.
             lig: bool, optional
                 An argument for model based map calculation using REFMAC.
                 Set True, if there is a ligand in the model, but no description.
@@ -1187,7 +1187,8 @@ def realsp_correlation_mapmodel(
         resol=resol,
         mask_map=mask_map,
         lgf=lgf,
-        trim_px=trimpx,
+        #trim_px=trimpx,
+        norm=norm,
     )
 
 
