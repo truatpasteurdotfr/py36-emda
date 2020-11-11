@@ -244,15 +244,16 @@ mmrealspc = subparsers.add_parser("mmcc", description="real space correlation")
 mmrealspc.add_argument("--map", required=True, help="input full/deposited map")
 mmrealspc.add_argument("--mdl", required=True, help="Input model (cif/pdb)")
 mmrealspc.add_argument("--res", required=True, type=float, help="Resolution (A)")
+mmrealspc.add_argument("--nrm", action="store_true", help="if use, normalized maps are used")
 mmrealspc.add_argument(
     "--msk", required=False, default=None, type=str, help="input mask (mrc/map)"
 )
 mmrealspc.add_argument(
     "--knl", required=False, type=int, default=5, help="Kernel size (pixels)"
 )
-mmrealspc.add_argument(
+""" mmrealspc.add_argument(
     "--tpx", required=False, type=int, default=1, help="mask trim by n pixels"
-)
+) """
 mmrealspc.add_argument(
     "--lig", action="store_true", help="use if there is ligand, but no description"
 )
@@ -792,7 +793,8 @@ def mmrealsp_corr(args):
         model=args.mdl,
         resol=args.res,
         mask_map=args.msk,
-        trimpx=args.tpx,
+        #trimpx=args.tpx,
+        norm=args.nrm,
         lgf=args.lgf,
     )
 
