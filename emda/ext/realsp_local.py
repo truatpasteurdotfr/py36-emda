@@ -69,8 +69,8 @@ def get_3d_realspcorrelation(half1, half2, kern):
     return halfmaps_cc, fullmap_cc
 
 
-def get_3d_realspmapmodelcorrelation(map, model, kern_sphere):
-    mapmodel_cc, _ = get_3d_realspcorrelation(map, model, kern_sphere)
+def get_3d_realspmapmodelcorrelation(imap, model, kern_sphere):
+    mapmodel_cc, _ = get_3d_realspcorrelation(imap, model, kern_sphere)
     return mapmodel_cc
 
 
@@ -100,6 +100,8 @@ def rcc(
     mask_map=None,
     lgf=None,
 ):
+    import emda.emda_methods as em
+
     hf1, hf2 = None, None
     bin_idx = None
     print(
@@ -113,17 +115,18 @@ def rcc(
         _, cc_mask, _ = core.iotools.read_map(mask_map)
     if mask_map is None:
         # creating ccmask from half data
-        obj_maskmap = ext.maskmap_class.MaskedMaps()
-        obj_maskmap.generate_mask(arr1, arr2)
-        cc_mask = obj_maskmap.mask
-    #
+        print("Mask is not given. EMDA will generate cc_mask.mrc and be used.")
+        print("Please take a look at this automatic mask. It may be suboptimal.")
+        cc_mask = em.mask_from_halfmaps(uc, arr1, arr2, radius=7, thresh=0.65)
+        em.write_mrc(cc_mask, "cc_mask.mrc", uc, origin)
+    cc_mask = cc_mask * (cc_mask > 0.0)
     nx, ny, nz = arr1.shape
     # Creating soft-edged mask
     kern_sphere_soft = core.restools.create_soft_edged_kernel_pxl(kernel_size)
     # full map from half maps
-    f_hf1 = np.fft.fftn(arr1)
-    f_hf2 = np.fft.fftn(arr2)
-    fullmap = np.real(np.fft.ifftn((f_hf1 + f_hf2) / 2.0))
+    f_hf1, f_hf2 = np.fft.fftn(arr1), np.fft.fftn(arr2)
+    f_fullmap = (f_hf1 + f_hf2) / 2.0
+    fullmap = np.real(np.fft.ifftn(f_fullmap))
     if norm:
         hf1, hf2 = np.fft.fftshift(f_hf1), np.fft.fftshift(f_hf2)
         print("Normalising maps...")
@@ -135,17 +138,21 @@ def rcc(
         # Real space correlation maps
         print("Calculating 3D correlation using normalized maps...")
         halfmapscc, fullmapcc = get_3d_realspcorrelation(
-            half1=nm.normmap1, half2=nm.normmap2, kern=kern_sphere_soft
+            half1=nm.normmap1 * cc_mask,
+            half2=nm.normmap2 * cc_mask,
+            kern=kern_sphere_soft,
         )
     if not norm:
         # Real space correlation maps
         print("Calculating 3D correlation...")
         halfmapscc, fullmapcc = get_3d_realspcorrelation(
-            half1=arr1, half2=arr2, kern=kern_sphere_soft
+            half1=arr1 * cc_mask, half2=arr2 * cc_mask, kern=kern_sphere_soft
         )
+    halfmapscc = halfmapscc * (halfmapscc > 0.0)
+    fullmapcc = fullmapcc * (fullmapcc > 0.0)
     print("Writing out correlation maps")
     core.iotools.write_mrc(
-        mapdata=halfmapscc,
+        mapdata=halfmapscc * cc_mask,
         filename="rcc_halfmap_smax" + str(kernel_size) + ".mrc",
         unit_cell=uc,
         map_origin=origin,
@@ -189,18 +196,29 @@ def rcc(
             _, model_arr, _ = core.iotools.read_map(model)
         elif model.lower().endswith(".mtz"):
             model_arr = core.maptools.mtz2map(model, (nx, ny, nz))
+        """ if mask_map is None:
+            # generate mask from the model for map-model correlation
+            modelmask = em.mask_from_map(uc, model_arr, kern=9, itr=5)
+            cc_mask = modelmask """
+        em.write_mrc(model_arr, "modelmap.mrc", uc, origin)
         if norm:
             # normalisation
-            normmodel = normalized(map=model_arr, bin_idx=bin_idx, nbin=nbin)
+            normmodel = normalized_modelmap(
+                modelmap=model_arr, f_fullmap=f_fullmap, bin_idx=bin_idx, nbin=nbin
+            )
+            em.write_mrc(normmodel, "normmodel.mrc", uc, origin)
             print("Calculating model-map correlation...\n")
             mapmodelcc = get_3d_realspmapmodelcorrelation(
-                map=normfull, model=normmodel, kern_sphere=kern_sphere_soft
+                imap=normfull * cc_mask,
+                model=normmodel * cc_mask,
+                kern_sphere=kern_sphere_soft,
             )
         if not norm:
             print("Calculating model-map correlation...\n")
             mapmodelcc = get_3d_realspmapmodelcorrelation(
-                map=fullmap, model=model_arr, kern_sphere=kern_sphere_soft
+                imap=fullmap * cc_mask, model=model_arr, kern_sphere=kern_sphere_soft
             )
+        mapmodelcc = mapmodelcc * (mapmodelcc > 0.0)
         core.iotools.write_mrc(
             mapdata=mapmodelcc * cc_mask,
             filename="rcc_mapmodel_smax" + str(kernel_size) + ".mrc",
@@ -211,6 +229,7 @@ def rcc(
         print("Calculating truemap-model correlation...")
         # truemap-model correlation
         truemapmodelcc = truemap_model_cc(mapmodelcc, fullmapcc)
+        truemapmodelcc = truemapmodelcc * (truemapmodelcc > 0.0)
         core.iotools.write_mrc(
             mapdata=truemapmodelcc * cc_mask,
             filename="rcc_truemapmodel_smax" + str(kernel_size) + ".mrc",
@@ -218,7 +237,7 @@ def rcc(
             map_origin=origin,
             label=True,
         )
-        print("Map-model correlation calculated!")
+        print("Map-model correlation calculated! Maps were writted!")
 
 
 def scale_model2map(fullmap, model_arr, uc):
@@ -237,8 +256,18 @@ def scale_model2map(fullmap, model_arr, uc):
 
 
 def mapmodel_rcc(
-    fullmap, model, resol, kernel_size=9, lig=False, trim_px=1, mask_map=None, lgf=None
+    fullmap,
+    model,
+    resol,
+    kernel_size=9,
+    lig=False,
+    norm=False,
+    #trim_px=1,
+    mask_map=None,
+    lgf=None,
 ):
+    import emda.emda_methods as em
+    import fcodes_fast as fc
 
     print(
         "Calculating 3D correlation between map and model. \
@@ -247,8 +276,8 @@ def mapmodel_rcc(
     uc, arr1, origin = core.iotools.read_map(fullmap)
     nx, ny, nz = arr1.shape
     if mask_map is not None:
-        _, cc_mask, _ = core.iotools.read_map(mask_map)
-    else:
+        _, mask, _ = core.iotools.read_map(mask_map)
+    """ else:
         nbin = arr1.shape[0] // 2 - trim_px
         obj_maskmap = ext.maskmap_class.MaskedMaps()
         edge_mask = obj_maskmap.create_edgemask(nbin)
@@ -258,9 +287,7 @@ def mapmodel_rcc(
         dy = (ny - cy) // 2
         dz = (nz - cz) // 2
         print(dx, dy, dz)
-        cc_mask[dx : dx + cx, dy : dy + cy, dz : dz + cz] = edge_mask
-
-    assert arr1.shape == cc_mask.shape
+        cc_mask[dx : dx + cx, dy : dy + cy, dz : dz + cz] = edge_mask """
     print("\nMap-model correlation!\n")
     dim = [nx, ny, nz]
     if model.endswith((".pdb", ".ent", ".cif")):
@@ -276,28 +303,78 @@ def mapmodel_rcc(
     core.iotools.write_mrc(
         mapdata=model_arr, filename="modelmap.mrc", unit_cell=uc, map_origin=origin
     )
+    if mask_map is None:
+        # generate mask from the model
+        mask = em.mask_from_map(uc, model_arr, kern=9, itr=5)
+    assert arr1.shape == mask.shape
     print("Calculating model-map correlation...\n")
     kern_sphere_soft = core.restools.create_soft_edged_kernel_pxl(kernel_size)
-    mapmodelcc = get_3d_realspmapmodelcorrelation(arr1, model_arr, kern_sphere_soft)
+    if norm:
+        # using normalised maps
+        f_mdl = np.fft.fftshift(np.fft.fftn(model_arr))
+        f_map = np.fft.fftshift(np.fft.fftn(arr1))
+        nbin, res_arr, bin_idx = core.restools.get_resolution_array(uc, arr1)
+        eo, _, _, _, binfsc, _ = fc.get_normalized_sf(
+            f_mdl, f_map, bin_idx, nbin, 0, nx, ny, nz
+        )
+        e_mdl = eo[:, :, :, 0]
+        e_map = eo[:, :, :, 1]
+        fsc_frid = fc.read_into_grid(bin_idx, binfsc, nbin, nx, ny, nz)
+        norm_mdl = np.real(np.fft.ifftn(np.fft.ifftshift(e_mdl * fsc_frid)))
+        norm_map = np.real(np.fft.ifftn(np.fft.ifftshift(e_map * fsc_frid)))
+        mapmodelcc = get_3d_realspmapmodelcorrelation(
+            norm_map * mask, norm_mdl, kern_sphere_soft
+        )
+    if not norm:
+        mapmodelcc = get_3d_realspmapmodelcorrelation(
+            arr1 * mask, model_arr, kern_sphere_soft
+        )
     core.iotools.write_mrc(
-        mapdata=mapmodelcc * cc_mask,
+        mapdata=mapmodelcc * mask,
         filename="rcc_mapmodel.mrc",
         unit_cell=uc,
         map_origin=origin,
         label=True,
     )
-    print("Calculating truemap-model correlation...")
-    print("Map-model correlation calculated!")
+    print("Map-model correlation calculated! Maps were written!")
 
 
 def normalized(map, bin_idx=None, nbin=None, uc=None):
+    import fcodes_fast as fc
+
     # normalise in resol bins
     if bin_idx is None:
         if uc is not None:
             nbin, res_arr, bin_idx = core.restools.get_resolution_array(uc, map)
     hf1 = np.fft.fftshift(np.fft.fftn(map))
-    _, _, _, totalvar, _, eo = core.fsc.halfmaps_fsc_variance(hf1, hf1, bin_idx, nbin)
-    norm_map = np.real(np.fft.ifftn(np.fft.ifftshift(eo)))
+    binfsc, _, _, totalvar, _, eo = core.fsc.halfmaps_fsc_variance(
+        hf1, hf1, bin_idx, nbin
+    )
+    binfsc = binfsc * (totalvar > 1e-5)
+    nx, ny, nz = eo.shape
+    fsc_frid = fc.read_into_grid(bin_idx, binfsc, nbin, nx, ny, nz)
+    norm_map = np.real(np.fft.ifftn(np.fft.ifftshift(eo * fsc_frid)))
+    return norm_map
+
+
+def normalized_modelmap(modelmap, f_fullmap, bin_idx=None, nbin=None, uc=None):
+    import fcodes_fast as fc
+
+    # normalise in resol bins
+    if bin_idx is None:
+        if uc is not None:
+            nbin, res_arr, bin_idx = core.restools.get_resolution_array(uc, modelmap)
+    f1 = np.fft.fftshift(np.fft.fftn(modelmap))
+    f_fullmap = np.fft.fftshift(f_fullmap)
+    """ _, _, _, _, _, eo = core.fsc.halfmaps_fsc_variance(f1, f1, bin_idx, nbin)
+    binfsc, _, _, _, _, _ = core.fsc.halfmaps_fsc_variance(f1, f_fullmap, bin_idx, nbin) """
+    nx, ny, nz = f1.shape
+    eo, _, _, _, binfsc, _ = fc.get_normalized_sf(
+        f1, f_fullmap, bin_idx, nbin, 0, nx, ny, nz
+    )
+    e1 = eo[:, :, :, 0]
+    fsc_frid = fc.read_into_grid(bin_idx, binfsc, nbin, nx, ny, nz)
+    norm_map = np.real(np.fft.ifftn(np.fft.ifftshift(e1 * fsc_frid)))
     return norm_map
 
 
@@ -348,7 +425,7 @@ class NormalizedMaps:
 
         if self.bin_idx is None:
             self.get_parameters()
-        self.binfsc, _, _, _, _, self.e0 = core.fsc.halfmaps_fsc_variance(
+        """ self.binfsc, _, _, _, _, self.e0 = core.fsc.halfmaps_fsc_variance(
             self.hf1, self.hf2, self.bin_idx, self.nbin
         )
         _, _, _, _, _, self.e1 = core.fsc.halfmaps_fsc_variance(
@@ -356,9 +433,18 @@ class NormalizedMaps:
         )
         _, _, _, _, _, self.e2 = core.fsc.halfmaps_fsc_variance(
             self.hf2, self.hf2, self.bin_idx, self.nbin
-        )
+        ) """
         nx, ny, nz = self.hf1.shape
-        fsc3d = fc.read_into_grid(self.bin_idx, self.binfsc, self.nbin, nx, ny, nz)
-        self.normmap1 = np.real(np.fft.ifftn(np.fft.ifftshift(self.e1 * fsc3d)))
-        self.normmap2 = np.real(np.fft.ifftn(np.fft.ifftshift(self.e2 * fsc3d)))
-        self.normfull = np.real(np.fft.ifftn(np.fft.ifftshift(self.e0 * fsc3d)))
+        eo, _, _, _, self.binfsc, _ = fc.get_normalized_sf(
+            self.hf1, self.hf2, self.bin_idx, self.nbin, 0, nx, ny, nz
+        )
+        self.e1 = eo[:, :, :, 0]
+        self.e2 = eo[:, :, :, 1]
+        self.e0 = eo[:, :, :, 2]
+        fsc_ful = 2 * self.binfsc / (1 + self.binfsc)
+        fsc_frid = fc.read_into_grid(self.bin_idx, fsc_ful, self.nbin, nx, ny, nz)
+        fsc_grid_filtered = np.where(fsc_frid < 0.0, 0.0, fsc_frid)
+        fsc_grid_str = np.sqrt(fsc_grid_filtered)
+        self.normmap1 = np.real(np.fft.ifftn(np.fft.ifftshift(self.e1 * fsc_grid_str)))
+        self.normmap2 = np.real(np.fft.ifftn(np.fft.ifftshift(self.e2 * fsc_grid_str)))
+        self.normfull = np.real(np.fft.ifftn(np.fft.ifftshift(self.e0 * fsc_grid_str)))
