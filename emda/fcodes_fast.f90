@@ -708,6 +708,156 @@ subroutine calc_fsc_using_halfmaps(hf1,hf2,bin_idx,nbin,mode,nx,ny,nz, &
   if(debug) print*, 'time for calculation(s) = ', finish-start
 end subroutine calc_fsc_using_halfmaps
 
+subroutine get_normalized_sf(hf1,hf2,bin_idx,nbin,mode,nx,ny,nz, &
+     Eo,bin_noise_var,bin_sgnl_var,bin_total_var,bin_fsc,bin_arr_count)
+  implicit none
+  real*8, parameter :: PI = 3.141592653589793
+
+  integer, intent(in) :: nbin,mode,nx,ny,nz
+  complex*16, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in)  :: hf1,hf2
+  complex*16, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2, 3),intent(out) :: Eo
+  integer, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in) :: bin_idx
+  real*8, dimension(0:nbin-1),intent(out) :: bin_sgnl_var,bin_noise_var,bin_total_var,bin_fsc
+  integer, dimension(0:nbin-1),intent(out) :: bin_arr_count
+  ! locals
+  complex*16, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2) :: Fo
+  integer, dimension(3) :: nxyz
+  real*8, dimension(0:nbin-1) :: A1_sum,B1_sum,A2_sum,B2_sum,A1A2_sum,B1B2_sum
+  real*8, dimension(0:nbin-1) :: A1A1_sum,B1B1_sum,A2A2_sum,B2B2_sum
+  real*8, dimension(0:nbin-1) :: bin_arr_fdiff,A_sum,B_sum,AA_sum,BB_sum
+  real*8, dimension(0:nbin-1) :: F1_var, F2_var, F1F2_covar
+  !
+  complex*16  :: fdiff
+  real*8     :: A,B,A1,A2,B1,B2,bin_sigvar,denominator
+  real       :: start,finish
+  integer    :: i,j,k,xyzmin(3),xyzmax(3),ibin
+  logical    :: debug,make_all_zero
+  !
+  debug         = .FALSE.
+  make_all_zero = .FALSE.
+  if(mode == 1) debug = .TRUE.
+  call cpu_time(start)
+
+  Fo = dcmplx(0.0d0, 0.0d0)
+  Eo = dcmplx(0.0d0, 0.0d0)
+
+  bin_arr_fdiff = 0.0
+  bin_sigvar    = 0.0
+  bin_noise_var = 0.0
+  bin_sgnl_var  = 0.0
+  bin_total_var = 0.0
+
+  F1F2_covar = 0.0
+  F1_var = 0.0
+  F2_var = 0.0
+  bin_total_var = 0.0
+  bin_fsc = 0.0
+
+  A_sum = 0.0
+  B_sum = 0.0
+  AA_sum = 0.0
+  BB_sum = 0.0
+
+  A1_sum = 0.0; A2_sum = 0.0
+  B1_sum = 0.0; B2_sum = 0.0
+  A1A2_sum = 0.0; B1B2_sum = 0.0
+  A1A1_sum = 0.0; B1B1_sum = 0.0
+  A2A2_sum = 0.0; B2B2_sum = 0.0
+
+  bin_arr_count = 0
+  xyzmin = 0; xyzmax = 0
+  nxyz = (/ nx, ny, nz /)
+
+  xyzmin(1) = int(-nxyz(1)/2)
+  xyzmin(2) = int(-nxyz(2)/2)
+  xyzmin(3) = int(-nxyz(3)/2)
+  xyzmax    = -(xyzmin+1)
+  if(debug) print*, 'Use only hemisphere data'
+  if(debug) print*, 'xyzmin = ', xyzmin
+  if(debug) print*, 'xyzmax = ', xyzmax(1),xyzmax(2),0
+
+  do i=xyzmin(1), xyzmax(1)
+     do j=xyzmin(2), xyzmax(2)
+        do k=xyzmin(3), 0
+           if(k == xyzmin(3) .or. j == xyzmin(2) .or. i == xyzmin(1)) cycle
+           if(bin_idx(i,j,k) < 0 .or. bin_idx(i,j,k) > nbin-1) cycle
+           bin_arr_count(bin_idx(i,j,k)) = bin_arr_count(bin_idx(i,j,k)) + 1
+           fdiff = hf1(i,j,k) - hf2(i,j,k)
+           bin_arr_fdiff(bin_idx(i,j,k)) = bin_arr_fdiff(bin_idx(i,j,k)) + real(fdiff * conjg(fdiff))
+           Fo(i,j,k) = (hf1(i,j,k) + hf2(i,j,k))/2.0                
+           A = real(Fo(i,j,k)); B = aimag(Fo(i,j,k))
+           A_sum(bin_idx(i,j,k)) = A_sum(bin_idx(i,j,k)) + A
+           AA_sum(bin_idx(i,j,k)) = AA_sum(bin_idx(i,j,k)) + A*A
+           B_sum(bin_idx(i,j,k)) = B_sum(bin_idx(i,j,k)) + B
+           BB_sum(bin_idx(i,j,k)) = BB_sum(bin_idx(i,j,k)) + B*B
+
+           ! correspondence hf1 : A1 + iB1 ; hf2 = A2 + iB2
+           A1 = real(hf1(i,j,k));  A2 = real(hf2(i,j,k))
+           B1 = aimag(hf1(i,j,k)); B2 = aimag(hf2(i,j,k))
+           A1_sum(bin_idx(i,j,k)) = A1_sum(bin_idx(i,j,k)) + A1
+           A2_sum(bin_idx(i,j,k)) = A2_sum(bin_idx(i,j,k)) + A2
+           B1_sum(bin_idx(i,j,k)) = B1_sum(bin_idx(i,j,k)) + B1
+           B2_sum(bin_idx(i,j,k)) = B2_sum(bin_idx(i,j,k)) + B2
+
+           A1A2_sum(bin_idx(i,j,k)) = A1A2_sum(bin_idx(i,j,k)) + A1 * A2
+           B1B2_sum(bin_idx(i,j,k)) = B1B2_sum(bin_idx(i,j,k)) + B1 * B2
+
+           A1A1_sum(bin_idx(i,j,k)) = A1A1_sum(bin_idx(i,j,k)) + A1 * A1
+           B1B1_sum(bin_idx(i,j,k)) = B1B1_sum(bin_idx(i,j,k)) + B1 * B1
+
+           A2A2_sum(bin_idx(i,j,k)) = A2A2_sum(bin_idx(i,j,k)) + A2 * A2
+           B2B2_sum(bin_idx(i,j,k)) = B2B2_sum(bin_idx(i,j,k)) + B2 * B2
+           Fo(-i,-j,-k) = conjg(Fo(i,j,k))
+        end do
+     end do
+  end do
+
+  if(debug) print*, 'bin_arr_count=', sum(bin_arr_count)
+
+  do ibin=0, nbin-1 !to make compatible with python arrays
+     bin_noise_var(ibin) = bin_arr_fdiff(ibin) / (bin_arr_count(ibin) * 4)
+     bin_total_var(ibin) = (AA_sum(ibin) + BB_sum(ibin))/bin_arr_count(ibin) &
+          - ((A_sum(ibin)/bin_arr_count(ibin))**2 + (B_sum(ibin)/bin_arr_count(ibin))**2)
+
+     F1F2_covar(ibin) = (A1A2_sum(ibin) + B1B2_sum(ibin)) / bin_arr_count(ibin) - &
+          (A1_sum(ibin) / bin_arr_count(ibin) * A2_sum(ibin) / bin_arr_count(ibin) + &
+          B1_sum(ibin) / bin_arr_count(ibin) * B2_sum(ibin) / bin_arr_count(ibin))
+
+     F1_var(ibin) = (A1A1_sum(ibin) + B1B1_sum(ibin))/bin_arr_count(ibin) - &
+          ((A1_sum(ibin)/bin_arr_count(ibin))**2 + (B1_sum(ibin)/bin_arr_count(ibin))**2)
+     F2_var(ibin) = (A2A2_sum(ibin) + B2B2_sum(ibin))/bin_arr_count(ibin) - &
+          ((A2_sum(ibin)/bin_arr_count(ibin))**2 + (B2_sum(ibin)/bin_arr_count(ibin))**2)
+
+     bin_sgnl_var(ibin) = F1F2_covar(ibin)
+     denominator = (sqrt(F1_var(ibin)) * sqrt(F2_var(ibin)))
+     bin_fsc(ibin) = F1F2_covar(ibin) / denominator
+     !print*,ibin,bin_total_var(ibin),denominator, denominator-bin_total_var(ibin)
+     if(debug)then
+        print*,ibin,bin_noise_var(ibin),bin_sgnl_var(ibin), &
+             bin_total_var(ibin),bin_fsc(ibin),bin_arr_count(ibin)
+     end if
+  end do
+
+  ! Calculate normalized structure factors
+  do i=xyzmin(1), xyzmax(1)
+     do j=xyzmin(2), xyzmax(2)
+        do k=xyzmin(3), 0
+           if(k == xyzmin(3) .or. j == xyzmin(2) .or. i == xyzmin(1)) cycle
+           if(bin_idx(i,j,k) < 0 .or. bin_idx(i,j,k) > nbin-1) cycle
+           Eo(i,j,k,1) = hf1(i,j,k) / sqrt(F1_var(bin_idx(i,j,k)))
+           Eo(-i,-j,-k,1) = conjg(Eo(i,j,k,1))
+           Eo(i,j,k,2) = hf2(i,j,k) / sqrt(F2_var(bin_idx(i,j,k)))
+           Eo(-i,-j,-k,2) = conjg(Eo(i,j,k,2))
+           if(bin_sgnl_var(bin_idx(i,j,k)) <= 0.0) cycle ! singal var cannot be negative
+           Eo(i,j,k,3) = Fo(i,j,k)/sqrt(bin_total_var(bin_idx(i,j,k)))
+           Eo(-i,-j,-k,3) = conjg(Eo(i,j,k,3))
+        end do
+     end do
+  end do
+  call cpu_time(finish)
+  if(debug) print*, 'time for calculation(s) = ', finish-start
+end subroutine get_normalized_sf
+
 subroutine calc_covar_and_fsc_betwn_anytwomaps(hf1,hf2,bin_idx,nbin,mode,&
      F1F2_covar,bin_fsc,bin_arr_count,nx,ny,nz)
   implicit none
@@ -2533,6 +2683,88 @@ subroutine calc_derivatives(e0,e1,wgrid,w2grid,sv,dFRS,dRdq,xyz_sum,vol,nx,ny,nz
      end do
   end do
 end subroutine calc_derivatives
+
+subroutine calc_derivatives2(e0,e1,wgrid,w2grid,sv,dFRS,dRdq,dqda,xyz_sum,vol,nx,ny,nz,df,ddf)
+   implicit none
+   real*8, parameter :: PI = 3.141592653589793
+   integer, intent(in) :: nx,ny,nz
+   complex*16, dimension(nx,ny,nz),intent(in)  :: e0,e1
+   complex*16, dimension(nx,ny,nz,3),intent(in)  :: dFRS
+   real*8, dimension(nx,ny,nz),intent(in) :: wgrid,w2grid
+   real*8, dimension(nx,ny,nz,3),intent(in) :: sv
+   real*8, dimension(3,3,3),intent(in) :: dRdq
+   real*8, dimension(6),intent(in):: xyz_sum
+   real*8, dimension(3),intent(in):: dqda
+   real*8, intent(in) :: vol
+   real*8, dimension(6),intent(out) :: df
+   real*8, dimension(6,6),intent(out) :: ddf
+   !locals
+   integer :: i,j,k,l,n
+   real*8 :: tp2
+   complex*16 :: xj,tpi
+   real*8, dimension(3,3) :: a,b
+   real*8, dimension(nx,ny,nz) :: wfsc
+ 
+   xj = dcmplx(0.0d0,1.0d0)
+   a = 0.0d0
+   b = 0.0d0
+   df = 0.0d0
+   ddf = 0.0d0
+ 
+   tp2 = (2.0d0 * PI)**2
+   tpi = (2.0d0 * PI * xj)
+   ! translation derivatives
+   do i=1,3
+      df(i) = real(sum(wgrid * e0 * conjg(e1 * tpi * sv(:,:,:,i))))
+      do j=1,3
+         if(i==1 .or. (i>1 .and. j>=i))then
+            ddf(i,j) = -tp2 * sum(w2grid * sv(:,:,:,i) * sv(:,:,:,j))
+         else
+            ddf(i,j) = ddf(j,i)
+         end if
+      end do
+   end do
+   !
+   ! rotation derivatives
+   do i=1,3
+      a = 0.0d0
+      do k=1,3
+         do l=1,3
+            if(k==1 .or. (k>1 .and. l>=k))then
+               a(k,l) = sum(wgrid * real(conjg(e0) * (dFRS(:,:,:,k) * &
+                    sv(:,:,:,l) * dRdq(i,k,l) * dqda(i))))
+            else
+               a(k,l) = a(l,k)
+            end if
+         end do
+      end do
+      df(i+3) = sum(a)
+   end do
+   wfsc = wgrid * real(conjg(e0) * e1)
+   do i=1,3
+      do j=1,3
+         if(i==1 .or. (i>1 .and. j>=i))then
+            b = 0.0d0
+            n = 0
+            do k=1,3
+               do l=1,3
+                  if(k==1 .or. (k>1 .and. l>=k))then
+                     n = n + 1
+                     b(k,l) = (-tp2/vol) * xyz_sum(n) * &
+                          sum(wfsc * sv(:,:,:,k) * sv(:,:,:,l) * &
+                          dRdq(i,k,l) * dRdq(j,k,l) * dqda(j) * dqda(i))
+                  else
+                     b(k,l) = b(l,k)
+                  end if
+               end do
+            end do
+            ddf(i+3,j+3) = sum(b)
+         else
+            ddf(i+3,j+3) = ddf(j+3,i+3)
+         end if
+      end do
+   end do
+ end subroutine calc_derivatives2
 
 subroutine differencemap(Fo,Fc,bin_idx,res_arr,smax,mode,nbin,nx,ny,nz, &
      diffmap)
