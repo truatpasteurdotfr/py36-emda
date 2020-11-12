@@ -42,6 +42,7 @@ def plot_nlines_log(
     # curve_label=["Signal","Noise","Predicted"],
     curve_label=None,
     mapname=None,
+    plot_title=None,
 ):
     if mapname is None:
         mapname = "variances.eps"
@@ -64,6 +65,9 @@ def plot_nlines_log(
     plt.ylabel("log.Variance(Fo)")
     font = {"family": "serif", "color": "black", "weight": "bold", "size": 16}
     plt.legend(loc=0)
+    font = {"family": "serif", "color": "black", "weight": "bold", "size": 12}
+    if plot_title is not None:
+        plt.title(plot_title, fontdict=font)
     plt.savefig(mapname, format="eps", dpi=300)
     plt.show()
 
