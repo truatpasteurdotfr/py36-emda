@@ -4,23 +4,28 @@ import math
 
 def get_quaternion(theta):
     rv = theta[0]
+    rv = np.asarray(rv, dtype='float')
+    rv = rv / np.sqrt(np.dot(rv, rv))
     ang = math.sin(np.deg2rad(theta[1]) / 2.0)
     q1, q2, q3 = rv[0] * ang, rv[1] * ang, rv[2] * ang
+    q0 = math.cos(np.deg2rad(theta[1]) / 2.0)
     # Constraint to creat quaternion
-    q0 = np.sqrt(1 - q1 * q1 - q2 * q2 - q3 * q3)
+    #q0 = np.sqrt(1 - q1 * q1 - q2 * q2 - q3 * q3)
     # Quaternion
     q = np.array([q0, q1, q2, q3], dtype=np.float64)
     return q
 
+
 def quart2axis(q):
     q = q / np.sqrt(np.dot(q, q))
     angle = 2 * math.acos(q[0])
-    s = math.sqrt(1.0 - q[0]*q[0])
+    s = math.sqrt(1.0 - q[0] * q[0])
     if s < 1e-3:
         x, y, z = q[1], q[2], q[3]
     else:
         x, y, z = q[1] / s, q[2] / s, q[3] / s
     return [x, y, z, angle]
+
 
 def q_normalised(rv):
     q02 = 1 - np.sum(n * n for n in rv[1:])
@@ -168,3 +173,46 @@ def rotmat_from_axisangle(axis, theta):
         ],
         dtype="float",
     )
+
+
+def rot2quart(rm):
+
+    m11 = rm[0, 0]
+    m12 = rm[0, 1]
+    m13 = rm[0, 2]
+    m21 = rm[1, 0]
+    m22 = rm[1, 1]
+    m23 = rm[1, 2]
+    m31 = rm[2, 0]
+    m32 = rm[2, 1]
+    m33 = rm[2, 2]
+
+    trace = m11 + m22 + m33
+
+    q = np.zeros(4, dtype=np.float64)
+
+    if trace > 0:
+        s = 0.5 / math.sqrt(trace + 1.0)
+        q[0] = 0.25 / s
+        q[1] = (m32 - m23) * s
+        q[2] = (m13 - m31) * s
+        q[3] = (m21 - m12) * s
+    elif m11 > m22 and m11 > m33:
+        s = 2.0 * math.sqrt(1.0 + m11 - m22 - m33)
+        q[0] = (m32 - m23) / s
+        q[1] = 0.25 * s
+        q[2] = (m12 + m21) / s
+        q[3] = (m13 + m31) / s
+    elif m22 > m33:
+        s = 2.0 * math.sqrt(1.0 + m22 - m11 - m33)
+        q[0] = (m13 - m31) / s
+        q[1] = (m12 + m21) / s
+        q[2] = 0.25 * s
+        q[3] = (m23 + m32) / s
+    else:
+        s = 2.0 * math.sqrt(1.0 + m33 - m11 - m22)
+        q[0] = (m21 - m12) / s
+        q[1] = (m13 + m31) / s
+        q[2] = (m23 + m32) / s
+        q[3] = 0.25 * s
+    return q
