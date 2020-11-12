@@ -244,7 +244,9 @@ mmrealspc = subparsers.add_parser("mmcc", description="real space correlation")
 mmrealspc.add_argument("--map", required=True, help="input full/deposited map")
 mmrealspc.add_argument("--mdl", required=True, help="Input model (cif/pdb)")
 mmrealspc.add_argument("--res", required=True, type=float, help="Resolution (A)")
-mmrealspc.add_argument("--nrm", action="store_true", help="if use, normalized maps are used")
+mmrealspc.add_argument(
+    "--nrm", action="store_true", help="if use, normalized maps are used"
+)
 mmrealspc.add_argument(
     "--msk", required=False, default=None, type=str, help="input mask (mrc/map)"
 )
@@ -660,7 +662,11 @@ def power_map(args):
 
     res_arr, power_spectrum = get_map_power(args.map)
     plotter.plot_nlines_log(
-        res_arr, [power_spectrum], curve_label=["Power"], mapname="map_power.eps"
+        res_arr,
+        [power_spectrum],
+        curve_label=["Power"],
+        mapname="map_power.eps",
+        plot_title="Rotationally averaged power spectrum",
     )
 
 
@@ -793,7 +799,7 @@ def mmrealsp_corr(args):
         model=args.mdl,
         resol=args.res,
         mask_map=args.msk,
-        #trimpx=args.tpx,
+        # trimpx=args.tpx,
         norm=args.nrm,
         lgf=args.lgf,
     )
