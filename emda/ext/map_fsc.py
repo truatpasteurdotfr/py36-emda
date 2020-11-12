@@ -264,6 +264,8 @@ def fsc_mapmodel(
             maporigin=orig,
         )
         em.write_mrc(modelmap, 'modelmap.mrc', uc, orig)
+    elif model.endswith((".mrc", ".map")):
+        _, modelmap, _ = em.get_data(model)
     fsc_list = []
     nbin, res_arr, bin_idx = core.restools.get_resolution_array(uc, arr1)
     print("Resolution grid Done.")
@@ -334,6 +336,7 @@ def fsc_mapmodel(
         mapname="fsc_modelmap.eps",
         curve_label=["unmask-FSC", "mask-FSC"],
         fscline=0.5,
+        plot_title="Map-model FSC"
     )
     print("FSC plotted into fsc_modelmap.eps")
     fobj.write("\n")
