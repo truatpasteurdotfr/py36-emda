@@ -454,7 +454,7 @@ def run_refmac_sfcalc(filename, resol, bfac, lig=False, ligfile=None):
     sfcalc_inp.write("resolution %f\n" % resol)
     sfcalc_inp.write("temp set %f\n" % bfac)
     sfcalc_inp.write("source em mb\n")
-    sfcalc_inp.write("make hydrogen no\n")
+    sfcalc_inp.write("make hydrogen yes\n")
     sfcalc_inp.write("end")
     sfcalc_inp.close()
     # Read in sfcalc_inp
