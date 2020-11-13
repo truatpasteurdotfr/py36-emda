@@ -1187,7 +1187,7 @@ def realsp_correlation_mapmodel(
         resol=resol,
         mask_map=mask_map,
         lgf=lgf,
-        #trim_px=trimpx,
+        # trim_px=trimpx,
         norm=norm,
     )
 
@@ -1580,15 +1580,28 @@ def prepare_refmac_data(
     )
 
 
-def overall_cc(map1name, map2name, space="real", maskname=None):
+def overall_cc(map1name, map2name, space="real", resol=5, maskname=None):
     from emda.ext import cc
 
     data_found = False
     if map1name.endswith((".mrc", ".map")):
         uc, arr1, origin = iotools.read_map(map1name)
+        _, arr2, _ = get_data(
+            struct=map2name, resol=resol, uc=uc, dim=arr1.shape, maporigin=origin
+        )
+    elif map1name.endswith((".pdb", ".ent", ".cif")):
         if map2name.endswith((".mrc", ".map")):
             uc, arr2, origin = iotools.read_map(map2name)
-        elif map2name.endswith((".pdb", ".ent", ".cif")):
+            _, arr1, _ = get_data(
+                struct=map1name, resol=resol, uc=uc, dim=arr2.shape, maporigin=origin
+            )
+    else:
+        uc, arr1, origin = get_data(struct=map1name, resol=resol)
+        _, arr1, _ = get_data(
+            struct=map2name, resol=resol, uc=uc, dim=arr1.shape, maporigin=origin
+        )
+
+        """ elif map2name.endswith((".pdb", ".ent", ".cif")):
             arr2 = model2map(
                 modelxyz=map2name,
                 dim=arr1.shape,
@@ -1601,9 +1614,9 @@ def overall_cc(map1name, map2name, space="real", maskname=None):
         data_found = True
     if map2name.endswith((".mrc", ".map")):
         uc, arr2, origin = iotools.read_map(map2name)
-        if map2name.endswith((".mrc", ".map")):
+        if map1name.endswith((".mrc", ".map")):
             uc, arr1, origin = iotools.read_map(map1name)
-        elif map2name.endswith((".pdb", ".ent", ".cif")):
+        elif map1name.endswith((".pdb", ".ent", ".cif")):
             arr1 = model2map(
                 modelxyz=map1name,
                 dim=arr2.shape,
@@ -1615,7 +1628,7 @@ def overall_cc(map1name, map2name, space="real", maskname=None):
             )
 
     uc, arr1, origin = iotools.read_map(map1name)
-    uc, arr2, origin = iotools.read_map(map2name)
+    uc, arr2, origin = iotools.read_map(map2name) """
     if maskname is not None:
         uc, msk, origin = read_map(maskname)
         arr1 = arr1 * msk
