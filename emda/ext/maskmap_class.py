@@ -218,6 +218,7 @@ def mapmask(arr, uc, itr=3, kern_rad=3, prob=0.99):
     ax2.set_xlabel("$x$")
     ax2.set_ylabel("$p$")
     plt.savefig("cdf.png", format="png", dpi=300)
+    plt.close()
     binary_arr = (arr_tmp > thresh).astype(int)
     dilate = binary_dilation(binary_arr, iterations=itr)
     mask = make_soft(dilate, kern_rad)
