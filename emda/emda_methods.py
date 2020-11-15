@@ -1600,48 +1600,24 @@ def overall_cc(map1name, map2name, space="real", resol=5, maskname=None):
         _, arr1, _ = get_data(
             struct=map2name, resol=resol, uc=uc, dim=arr1.shape, maporigin=origin
         )
-
-        """ elif map2name.endswith((".pdb", ".ent", ".cif")):
-            arr2 = model2map(
-                modelxyz=map2name,
-                dim=arr1.shape,
-                resol=7,
-                cell=uc,
-                bfac=0.0,
-                lig=False,
-                ligfile=None,
-            )
-        data_found = True
-    if map2name.endswith((".mrc", ".map")):
-        uc, arr2, origin = iotools.read_map(map2name)
-        if map1name.endswith((".mrc", ".map")):
-            uc, arr1, origin = iotools.read_map(map1name)
-        elif map1name.endswith((".pdb", ".ent", ".cif")):
-            arr1 = model2map(
-                modelxyz=map1name,
-                dim=arr2.shape,
-                resol=7,
-                cell=uc,
-                bfac=0.0,
-                lig=False,
-                ligfile=None,
-            )
-
-    uc, arr1, origin = iotools.read_map(map1name)
-    uc, arr2, origin = iotools.read_map(map2name) """
     if maskname is not None:
         uc, msk, origin = read_map(maskname)
-        arr1 = arr1 * msk
-        arr2 = arr2 * msk
+        msk = msk * (msk > 0.0)
+    else:
+        msk = None
     if space == "fourier":
         print("Overall CC calculation in Fourier space")
-        f1 = np.fft.fftn(arr1)
-        f2 = np.fft.fftn(arr2)
+        if msk is not None:
+            f1 = np.fft.fftn(arr1 * msk)
+            f2 = np.fft.fftn(arr2 * msk)
+        else:
+            f1 = np.fft.fftn(arr1)
+            f2 = np.fft.fftn(arr2)            
         occ, hocc = cc.cc_overall_fouriersp(f1=f1, f2=f2)
         print("Overall Correlation in Fourier space= ", occ)
     else:
         print("Overall CC calculation in Real/Image space")
-        occ, hocc = cc.cc_overall_realsp(map1=arr1, map2=arr2)
+        occ, hocc = cc.cc_overall_realsp(map1=arr1, map2=arr2, mask=msk)
         print("Overall Correlation in real space= ", occ)
     return occ, hocc
 
