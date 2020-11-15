@@ -70,6 +70,7 @@ def plot_nlines_log(
         plt.title(plot_title, fontdict=font)
     plt.savefig(mapname, format="eps", dpi=300)
     #plt.show()
+    plt.close()
 
 
 def plot_line(mapname, res_arr, arr):
@@ -127,6 +128,7 @@ def plot_nlines(
     if plot_title is not None:
         plt.title(plot_title, fontdict=font)
     plt.savefig(mapname, format="eps", dpi=300)
+    plt.close()
 
 
 def plot_nlines2(
