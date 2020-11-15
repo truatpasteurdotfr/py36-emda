@@ -11,11 +11,18 @@ import numpy as np
 import math
 
 
-def cc_overall_realsp(map1, map2):
+def cc_overall_realsp(map1, map2, mask=None):
     # Overall correlation - real space
-
-    mean1 = np.mean(map1)
-    mean2 = np.mean(map2)
+    if mask is not None:
+        map1 = map1 * mask
+        map2 = map2 * mask
+        mean1 = np.sum(map1) / np.sum(mask)
+        mean2 = np.sum(map2) / np.sum(mask)
+        mean1 = mean1 * mask
+        mean2 = mean2 * mask
+    else:
+        mean1 = np.mean(map1)
+        mean2 = np.mean(map2)
     covar = np.sum(map1 * map2 - (mean1 * mean2))
     var1 = np.sum(map1 * map1 - (mean1 * mean1))
     var2 = np.sum(map2 * map2 - (mean2 * mean2))
