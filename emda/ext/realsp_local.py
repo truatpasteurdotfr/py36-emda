@@ -74,7 +74,7 @@ def get_3d_realspmapmodelcorrelation(imap, model, kern_sphere):
     return mapmodel_cc
 
 
-def calculate_modelmap(modelxyz, dim, resol, uc, bfac=0.0, lig=False, lgf=None):
+def calculate_modelmap(modelxyz, dim, resol, uc, bfac=0.0, lig=True, lgf=None):
     import emda.emda_methods as em
 
     modelmap = em.model2map(
@@ -94,7 +94,7 @@ def rcc(
     half2_map,
     kernel_size,
     norm=False,
-    lig=False,
+    lig=True,
     model=None,
     model_resol=None,
     mask_map=None,
@@ -260,7 +260,7 @@ def mapmodel_rcc(
     model,
     resol,
     kernel_size=9,
-    lig=False,
+    lig=True,
     norm=False,
     #trim_px=1,
     mask_map=None,
