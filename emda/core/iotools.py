@@ -435,7 +435,7 @@ def read_mmcif(mmcif_file):
     return cell, x_np, y_np, z_np, Biso_np
 
 
-def run_refmac_sfcalc(filename, resol, bfac, lig=False, ligfile=None):
+def run_refmac_sfcalc(filename, resol, bfac, lig=True, ligfile=None):
     import os
     import os.path
     import subprocess
