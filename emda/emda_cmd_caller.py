@@ -233,9 +233,9 @@ realspc.add_argument("--nrm", action="store_true", help="if True use normalized 
 realspc.add_argument(
     "--knl", required=False, type=int, default=5, help="Kernel size (pixels)"
 )
-realspc.add_argument(
-    "--lig", action="store_true", help="use if there is ligand, but no description"
-)
+#realspc.add_argument(
+#    "--lig", action="store_true", help="use if there is ligand, but no description"
+#)
 realspc.add_argument(
     "--lgf", required=False, default=None, type=str, help="ligand description file"
 )
@@ -256,9 +256,9 @@ mmrealspc.add_argument(
 """ mmrealspc.add_argument(
     "--tpx", required=False, type=int, default=1, help="mask trim by n pixels"
 ) """
-mmrealspc.add_argument(
-    "--lig", action="store_true", help="use if there is ligand, but no description"
-)
+#mmrealspc.add_argument(
+#    "--lig", action="store_true", help="use if there is ligand, but no description"
+#)
 mmrealspc.add_argument(
     "--lgf", required=False, default=None, type=str, help="ligand description file"
 )
@@ -291,9 +291,9 @@ mapmodelvalid.add_argument(
     type=float,
     help="Overall B factor for model. default=0.0 ",
 )
-mapmodelvalid.add_argument(
-    "--lig", action="store_true", help="use if there is ligand, but no description"
-)
+#mapmodelvalid.add_argument(
+#    "--lig", action="store_true", help="use if there is ligand, but no description"
+#)
 mapmodelvalid.add_argument(
     "--lgf", required=False, default=None, type=str, help="ligand description file"
 )
@@ -310,9 +310,9 @@ mmfsc.add_argument(
     type=float,
     help="Overall B factor for model. default=0.0 ignored by REFMAC ",
 )
-mmfsc.add_argument(
-    "--lig", action="store_true", help="use if there is ligand, but no description"
-)
+#mmfsc.add_argument(
+#    "--lig", action="store_true", help="use if there is ligand, but no description"
+#)
 mmfsc.add_argument(
     "--lgf", required=False, default=None, type=str, help="ligand description file"
 )
@@ -536,9 +536,9 @@ model2map.add_argument(
 model2map.add_argument(
     "--bfc", required=False, default=0.0, type=float, help="overall b-factor"
 )
-model2map.add_argument(
-    "--lig", action="store_true", help="use if there is ligand, but no description"
-)
+#model2map.add_argument(
+#    "--lig", action="store_true", help="use if there is ligand, but no description"
+#)
 model2map.add_argument(
     "--lgf", required=False, default=None, type=str, help="ligand description file"
 )
@@ -570,6 +570,8 @@ centerofmass.add_argument(
     "--msk", required=False, default=None, type=str, help="mask to apply on the map"
 )
 
+fetchdata = subparsers.add_parser("fetch", description="fetch EMmap and model")
+fetchdata.add_argument("--emd", required=True, nargs="+", type=str, help="list of EMD entries. e.g. 3651")
 
 def apply_mask(args):
     from emda.emda_methods import applymask
@@ -781,7 +783,7 @@ def realsp_corr(args):
         half2map=args.h2,
         kernel_size=args.knl,
         norm=args.nrm,
-        lig=args.lig,
+        #lig=args.lig,
         model=args.mdl,
         model_resol=args.res,
         mask_map=args.msk,
@@ -795,7 +797,7 @@ def mmrealsp_corr(args):
     realsp_correlation_mapmodel(
         fullmap=args.map,
         kernel_size=args.knl,
-        lig=args.lig,
+        #lig=args.lig,
         model=args.mdl,
         resol=args.res,
         mask_map=args.msk,
@@ -825,7 +827,7 @@ def validate_mapmodel(args):
         mask=args.msk,
         modelresol=args.res,
         bfac=args.bfc,
-        lig=args.lig,
+        #lig=args.lig,
         lgf=args.lgf,
     )
 
@@ -837,7 +839,7 @@ def mapmodel_fsc(args, fobj):
         map1=args.map,
         model=args.mdl,
         bfac=args.bfc,
-        lig=args.lig,
+        #lig=args.lig,
         mask=args.msk,
         modelresol=args.res,
         lgf=args.lgf,
@@ -984,7 +986,7 @@ def modeltomap(args):
         bfac=args.bfc,
         cell=args.cel,
         maporigin=args.org,
-        lig=args.lig,
+        #lig=args.lig,
         ligfile=args.lgf,
     )
     write_mrc(modelmap, "modelmap.mrc", args.cel, args.org)
@@ -1027,6 +1029,11 @@ def center_of_mass(args):
         assert arr.shape == mask.shape
         arr = arr * mask
     print(em.center_of_mass_density(arr))
+
+
+def fetch_data(args):
+    from emda import emda_methods as em
+    em.fetch_data(args.emd)
 
 
 def main(command_line=None):
@@ -1109,6 +1116,8 @@ def main(command_line=None):
         magnification(args)
     if args.command == "com":
         center_of_mass(args)
+    if args.command == "fetch":
+        fetch_data(args)
 
 
 if __name__ == "__main__":
