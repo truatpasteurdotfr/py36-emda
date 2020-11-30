@@ -570,6 +570,122 @@ def halfmap_fsc(half1name, half2name, filename=None, maskname=None):
     return res_arr, fsc_list
 
 
+def halfmap_fsc_ph(half1name, half2name, filename="halffsc.txt", maskname=None):
+    """Computes Fourier Shell Correlation (FSC) using half maps.
+
+    Computes Fourier Shell Correlation (FSC) using half maps.
+    FSC is not corrected for mask effect in this implementation.
+
+    Arguments:
+        Inputs:
+            half1name: string
+                Name of the half map 1.
+            half2name: string
+                Name of the half map 2.
+            filename: string
+                If present, statistics will be printed into this file.
+            maskname: String
+                If present, input maps will be masked before computing FSC.
+
+        Outputs:
+            res_arr: float, 1D array
+                Linear array of resolution in Angstrom units.
+            bin_fsc: float, 1D array
+                Linear array of FSC in each resolution bin.
+    """
+    import os
+
+    tdata = open(filename, "w")
+
+    uc, arr1, _ = iotools.read_map(half1name)
+    uc, arr2, _ = iotools.read_map(half2name)
+    hf1 = np.fft.fftshift(np.fft.fftn(arr1))
+    hf2 = np.fft.fftshift(np.fft.fftn(arr2))
+    fsc_list = []
+    nbin, res_arr, bin_idx = restools.get_resolution_array(uc, hf1)
+    (
+        _,
+        _,
+        noisevar,
+        signalvar,
+        totalvar,
+        bin_fsc,
+        bincount,
+    ) = fcodes_fast.calc_fsc_using_halfmaps(
+        hf1, hf2, bin_idx, nbin, debug_mode, hf1.shape[0], hf1.shape[1], hf1.shape[2]
+    )
+    fsc_list.append(bin_fsc)
+    tdata.write("halfmap1 file: %s\n" % os.path.abspath(half1name))
+    tdata.write("halfmap2 file: %s\n" % os.path.abspath(half2name))
+    tdata.write("\n")
+    tdata.write("***** Unmasked statistics *****\n")
+    tdata.write("\n")
+    tdata.write("bin # \n")
+    tdata.write("resolution (Ang.) \n")
+    tdata.write("signal variance \n")
+    tdata.write("noise variance \n")
+    tdata.write("total variance \n")
+    tdata.write("halfmap fsc \n")
+    tdata.write("# reflx \n")
+    i = -1
+    for sv, nv, tv, fsci, nfc in zip(
+        signalvar, noisevar, totalvar, bin_fsc, bincount
+    ):
+        i += 1
+        tdata.write(
+            "{:-3d} {:-6.2f} {:-14.4f} {:-14.4f} {:-14.4f} {:-14.4f} {:-10d}\n".format(
+                i, res_arr[i], sv, nv, tv, fsci, nfc
+            )
+        )
+    if maskname is not None:
+        _, mask, _ = read_map(maskname)
+        from emda.ext.phase_randomize import phase_randomized_fsc
+        idx = np.argmin((bin_fsc - 0.8) ** 2)
+        resol_rand = res_arr[idx]
+        fsc_list_ph, msk_bincount = phase_randomized_fsc(
+            arr1=arr1,
+            arr2=arr2,
+            mask=mask,
+            bin_idx=bin_idx,
+            res_arr=res_arr,
+            fobj=tdata,
+            #resol_rand=resol_rand,
+        )
+        fsc_list.append(fsc_list_ph[0])
+        fsc_list.append(fsc_list_ph[1])
+        fsc_list.append(fsc_list_ph[2])
+
+        tdata.write("\n")
+        tdata.write("***** Fourier Shell Correlation *****\n")
+        tdata.write("\n")
+        tdata.write("bin # \n")
+        tdata.write("resolution (Ang.) \n")
+        tdata.write("Unmask FSC \n")
+        tdata.write("Masked FSC \n")
+        tdata.write("Noise FSC \n")
+        tdata.write("True FSC \n")
+        tdata.write("# reflx \n")
+        i = -1
+        for umf, mf, nf, tf, nfc in zip(
+            fsc_list[0], fsc_list[1], fsc_list[2], fsc_list[3], msk_bincount
+        ):
+            i += 1
+            tdata.write(
+                "{:-3d} {:-6.2f} {:-14.4f} {:-14.4f} {:-14.4f} {:-14.4f} {:-10d}\n".format(
+                    i, res_arr[i], umf, mf, nf, tf, nfc
+                )
+            )
+    if len(fsc_list) == 4:
+        plotter.plot_nlines(
+            res_arr,
+            fsc_list,
+            "halfmap_fsc_ph.eps",
+            curve_label=["Unmask", "Masked","Noise","Corrected"],
+            plot_title="Halfmap FSC",
+        )
+    return res_arr, fsc_list
+
+
 def get_variance(half1name, half2name, filename=None, maskname=None):
     """Returns noise and signal variances of half maps.
 
@@ -1077,7 +1193,7 @@ def realsp_correlation(
     half2map,
     kernel_size=5,
     norm=False,
-    lig=False,
+    lig=True,
     model=None,
     model_resol=None,
     mask_map=None,
@@ -1110,7 +1226,7 @@ def realsp_correlation(
             lig: bool, optional
                 An argument for model based map calculation using REFMAC.
                 Set True, if there is a ligand in the model, but no description.
-                Default is False.
+                Default is True.
             lgf: string, optional
                 An argument for model based map calculation using REFMAC.
                 Ligand description file (cif).
@@ -1142,7 +1258,7 @@ def realsp_correlation(
 
 
 def realsp_correlation_mapmodel(
-    fullmap, model, resol, kernel_size=5, lig=False, norm=False, mask_map=None, lgf=None
+    fullmap, model, resol, kernel_size=5, lig=True, norm=False, mask_map=None, lgf=None
 ):
     """Calculates real space local correlation between map and model.
 
@@ -1167,7 +1283,7 @@ def realsp_correlation_mapmodel(
             lig: bool, optional
                 An argument for model based map calculation using REFMAC.
                 Set True, if there is a ligand in the model, but no description.
-                Default is False.
+                Default is True.
             lgf: string, optional
                 An argument for model based map calculation using REFMAC.
                 Ligand description file (cif).
@@ -1224,7 +1340,7 @@ def map_model_validate(
     half2map,
     modelfpdb,
     bfac=0.0,
-    lig=False,
+    lig=True,
     model1pdb=None,
     mask=None,
     modelresol=None,
@@ -1258,7 +1374,7 @@ def map_model_validate(
             lig: bool, optional
                 An argument for model based map calculation using REFMAC.
                 Set True, if there is a ligand in the model, but no description.
-                Default is False.
+                Default is True.
             lgf: string, optional
                 An argument for model based map calculation using REFMAC.
                 Ligand description file (cif).
@@ -1296,7 +1412,7 @@ def mapmodel_fsc(
     fobj,
     bfac=0.0,
     modelresol=5.0,
-    lig=False,
+    lig=True,
     phaserand=False,
     mask=None,
     lgf=None,
@@ -1612,7 +1728,7 @@ def overall_cc(map1name, map2name, space="real", resol=5, maskname=None):
             f2 = np.fft.fftn(arr2 * msk)
         else:
             f1 = np.fft.fftn(arr1)
-            f2 = np.fft.fftn(arr2)            
+            f2 = np.fft.fftn(arr2)
         occ, hocc = cc.cc_overall_fouriersp(f1=f1, f2=f2)
         print("Overall Correlation in Fourier space= ", occ)
     else:
@@ -1852,3 +1968,8 @@ def get_dim(model, shiftmodel="new1.cif"):
     distances = np.sqrt(np.power(xc_np, 2) + np.power(yc_np, 2) + np.power(zc_np, 2))
     dim1 = 2 + (int(np.max(distances)) + 1) * 2
     return dim1
+
+
+def fetch_data(emdbidlist):
+    from emda.ext import downmap
+    downmap.main(emdbidlist)
