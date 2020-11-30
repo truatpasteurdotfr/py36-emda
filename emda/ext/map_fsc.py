@@ -20,10 +20,8 @@ def calc_fsc_mrc(hf1, hf2, bin_idx, nbin):
 
 
 def calculate_modelmap(
-    uc, model, dim, resol, bfac=0.0, lig=False, lgf=None, maporigin=None
+    uc, model, dim, resol, bfac=0.0, lig=True, lgf=None, maporigin=None
 ):
-    import emda.emda_methods as em
-
     modelmap = em.model2map(
         modelxyz=model,
         dim=dim,
@@ -97,7 +95,7 @@ def map_model_fsc(
     half2_map,
     modelf_pdb,
     bfac=0.0,
-    lig=False,
+    lig=True,
     norm_mask=False,
     model1_pdb=None,
     mask_map=None,
@@ -242,7 +240,7 @@ def fsc_mapmodel(
     model_resol=5.0,
     bfac=0.0,
     phaserand=False,
-    lig=False,
+    lig=True,
     mask_map=None,
     lgf=None,
 ):
