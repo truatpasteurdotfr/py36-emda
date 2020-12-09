@@ -262,6 +262,7 @@ def mapmodel_rcc(
     kernel_size=9,
     lig=True,
     norm=False,
+    nomask=False,
     #trim_px=1,
     mask_map=None,
     lgf=None,
@@ -275,8 +276,11 @@ def mapmodel_rcc(
     )
     uc, arr1, origin = core.iotools.read_map(fullmap)
     nx, ny, nz = arr1.shape
+    mask = 1
+    generate_mask = not(nomask)
     if mask_map is not None:
         _, mask, _ = core.iotools.read_map(mask_map)
+        generate_mask=False
     """ else:
         nbin = arr1.shape[0] // 2 - trim_px
         obj_maskmap = ext.maskmap_class.MaskedMaps()
@@ -303,10 +307,13 @@ def mapmodel_rcc(
     core.iotools.write_mrc(
         mapdata=model_arr, filename="modelmap.mrc", unit_cell=uc, map_origin=origin
     )
-    if mask_map is None:
+    if generate_mask:
         # generate mask from the model
         mask = em.mask_from_map(uc, model_arr, kern=9, itr=5)
-    assert arr1.shape == mask.shape
+    if np.isscalar(mask):
+        print("Correlation is calculated without a mask")
+    else:
+        print("Correlation is calculated using a mask")
     print("Calculating model-map correlation...\n")
     kern_sphere_soft = core.restools.create_soft_edged_kernel_pxl(kernel_size)
     if norm:
