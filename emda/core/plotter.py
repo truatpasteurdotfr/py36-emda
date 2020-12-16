@@ -43,6 +43,8 @@ def plot_nlines_log(
     curve_label=None,
     mapname=None,
     plot_title=None,
+    xlabel="Resolution ($\AA$)",
+    ylabel="log.Variance(Fo)",
 ):
     if mapname is None:
         mapname = "variances.eps"
@@ -61,8 +63,8 @@ def plot_nlines_log(
     pos[pos < 0] = 0
     pos[pos >= n_bins] = n_bins - 1
     ax1.set_xticklabels(np.round(res_arr[pos], decimals=2))
-    ax1.set_xlabel("Resolution ($\AA$)")
-    plt.ylabel("log.Variance(Fo)")
+    ax1.set_xlabel(xlabel)
+    plt.ylabel(ylabel)
     font = {"family": "serif", "color": "black", "weight": "bold", "size": 16}
     plt.legend(loc=0)
     font = {"family": "serif", "color": "black", "weight": "bold", "size": 12}
