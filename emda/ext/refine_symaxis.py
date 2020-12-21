@@ -384,6 +384,8 @@ class EmFit:
             # axis
             step_ax = step_ax * alpha
             self.axis = getaxis(axis_ini, step_ax)
+            if avg_fsc > 0.9999:
+                break
         # plot fval vs ncycle
         from matplotlib import pyplot as plt
 
@@ -413,6 +415,7 @@ def overlay(
 ):
     axis = np.asarray(rotaxis)
     axis = axis / math.sqrt(np.dot(axis, axis))
+    initial_axis = axis
     fobj.write("   Initial axis: " + str(axis) + "\n")
     try:
         emmap1 = EmmapOverlay(imap=imap, imask=imask)
@@ -440,29 +443,38 @@ def overlay(
     final_axis = fit.axis
     final_tran = fit.t
     print("Final axis: ", final_axis[::-1])
-    print("Final translation (A): ", final_tran * emmap1.pixsize)
+    #print("Final translation (A): ", final_tran * emmap1.pixsize)
     fobj.write("   Final axis: " + str(final_axis[::-1]) + "\n")
     ax = final_axis
     for angle in angle_list:
         q = quaternions.get_quaternion([[ax[0], ax[1], ax[2]], [angle]])
         rotmat_list.append(quaternions.get_RM(q))
     output_rotated_maps(emdcode, emmap1, rotmat_list, final_tran)
-    return q
+    return initial_axis, final_axis[::-1]
 
 
 def get_intial_axis(imap):
-    import run_proshade as proshade
+    from emda.ext import run_proshade as proshade
 
     symorder, x, y, z, theta = proshade.get_symmops_from_proshade(imap)
     return x, y, z, symorder
 
 
-def main(maplist, emdbid="0000", fobj=None):
+def main(maplist, emdbidlist=None, fobj=None):
     if fobj is None:
         fobj = open("EMDA_symref.txt", "w")
     refined_axis_ang = []
-    emdcode = "EMD-" + emdbid
-    for imap in maplist:
+    initial_ax_list = []
+    final_ax_list = []
+    fold_list = []
+    emdcode_list = []
+    if emdbidlist is not None:
+        assert len(emdbidlist) == len(maplist)
+    else:
+        ids = np.arange(len(maplist))
+        emdbidlist = [",".join(item) for item in ids.astype(str)]
+    for imap, emdbid in zip(maplist, emdbidlist):
+        emdcode = "EMD-" + emdbid
         fobj.write("Map: " + imap + "\n")
         fobj.write("emdcode: " + emdcode + "\n")
         x, y, z, symorder = get_intial_axis(imap)
@@ -471,10 +483,17 @@ def main(maplist, emdbid="0000", fobj=None):
             rotaxis = [ix, iy, iz]
             emdcode = "{0}_{1}".format(emdcode, str(i))
             i += 1
-            q = overlay(
+            initial_axis, final_axis = overlay(
                 emdcode=emdcode, imap=imap, rotaxis=rotaxis, symorder=fold, fobj=fobj
             )
-            refined_axis_ang.append(quaternions.quart2axis(q))
+            #refined_axis_ang.append(quaternions.quart2axis(q))
+            emdcode_list.append(emdcode)
+            fold_list.append(fold)
+            initial_ax_list.append(initial_axis)
+            final_ax_list.append(final_axis)
+            #print(emdcode, fold, initial_axis, final_axis)
+    #datadict = dict(zip(emdcode_list, fold_list, initial_ax_list, final_ax_list))
+    return emdcode_list, fold_list, initial_ax_list, final_ax_list
 
 
 if __name__ == "__main__":
