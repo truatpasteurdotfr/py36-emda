@@ -260,6 +260,9 @@ mmrealspc.add_argument(
 #    "--lig", action="store_true", help="use if there is ligand, but no description"
 #)
 mmrealspc.add_argument(
+    "--nomask", action="store_true", help="if use, correlation maps are not masked"
+)
+mmrealspc.add_argument(
     "--lgf", required=False, default=None, type=str, help="ligand description file"
 )
 
@@ -573,6 +576,10 @@ centerofmass.add_argument(
 fetchdata = subparsers.add_parser("fetch", description="fetch EMmap and model")
 fetchdata.add_argument("--emd", required=True, nargs="+", type=str, help="list of EMD entries. e.g. 3651")
 
+symaxref = subparsers.add_parser("symref", description="refine symmetry axis of a group")
+symaxref.add_argument("--map", required=True, nargs="+", type=str, help="list of maps to find symmetry axes")
+symaxref.add_argument("--emd", required=False, nargs="+", type=str, help="list of emdbid of maps")
+
 def apply_mask(args):
     from emda.emda_methods import applymask
 
@@ -801,6 +808,7 @@ def mmrealsp_corr(args):
         model=args.mdl,
         resol=args.res,
         mask_map=args.msk,
+        nomask=args.nomask,
         # trimpx=args.tpx,
         norm=args.nrm,
         lgf=args.lgf,
@@ -1036,6 +1044,12 @@ def fetch_data(args):
     em.fetch_data(args.emd)
 
 
+def symaxis_refinement(args):
+    from emda import emda_methods as em
+
+    _, _, _, _ = em.symaxis_refine(maplist=args.map, emdbidlist=args.emd)
+
+
 def main(command_line=None):
     f = open("EMDA.txt", "w")
     f.write("EMDA session recorded at %s.\n\n" % (datetime.datetime.now()))
@@ -1118,6 +1132,8 @@ def main(command_line=None):
         center_of_mass(args)
     if args.command == "fetch":
         fetch_data(args)
+    if args.command == "symref":
+        symaxis_refinement(args)
 
 
 if __name__ == "__main__":
