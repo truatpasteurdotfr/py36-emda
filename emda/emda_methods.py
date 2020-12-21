@@ -1985,7 +1985,7 @@ def fetch_data(emdbidlist):
     downmap.main(emdbidlist)
 
 
-def symaxis_refine(maplist, emdbidlist):
+def symaxis_refine(maplist, emdbidlist=None):
     from emda.ext import refine_symaxis
 
     emdcode_list, fold_list, initial_ax_list, final_ax_list = refine_symaxis.main(
