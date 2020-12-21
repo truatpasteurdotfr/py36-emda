@@ -628,9 +628,7 @@ def halfmap_fsc_ph(half1name, half2name, filename="halffsc.txt", maskname=None):
     tdata.write("halfmap fsc \n")
     tdata.write("# reflx \n")
     i = -1
-    for sv, nv, tv, fsci, nfc in zip(
-        signalvar, noisevar, totalvar, bin_fsc, bincount
-    ):
+    for sv, nv, tv, fsci, nfc in zip(signalvar, noisevar, totalvar, bin_fsc, bincount):
         i += 1
         tdata.write(
             "{:-3d} {:-6.2f} {:-14.4f} {:-14.4f} {:-14.4f} {:-14.4f} {:-10d}\n".format(
@@ -640,6 +638,7 @@ def halfmap_fsc_ph(half1name, half2name, filename="halffsc.txt", maskname=None):
     if maskname is not None:
         _, mask, _ = read_map(maskname)
         from emda.ext.phase_randomize import phase_randomized_fsc
+
         idx = np.argmin((bin_fsc - 0.8) ** 2)
         resol_rand = res_arr[idx]
         fsc_list_ph, msk_bincount = phase_randomized_fsc(
@@ -649,7 +648,7 @@ def halfmap_fsc_ph(half1name, half2name, filename="halffsc.txt", maskname=None):
             bin_idx=bin_idx,
             res_arr=res_arr,
             fobj=tdata,
-            #resol_rand=resol_rand,
+            # resol_rand=resol_rand,
         )
         fsc_list.append(fsc_list_ph[0])
         fsc_list.append(fsc_list_ph[1])
@@ -680,7 +679,7 @@ def halfmap_fsc_ph(half1name, half2name, filename="halffsc.txt", maskname=None):
             res_arr,
             fsc_list,
             "halfmap_fsc_ph.eps",
-            curve_label=["Unmask", "Masked","Noise","Corrected"],
+            curve_label=["Unmask", "Masked", "Noise", "Corrected"],
             plot_title="Halfmap FSC",
         )
     return res_arr, fsc_list
@@ -1258,7 +1257,15 @@ def realsp_correlation(
 
 
 def realsp_correlation_mapmodel(
-    fullmap, model, resol, kernel_size=5, lig=True, norm=False, mask_map=None, lgf=None
+    fullmap,
+    model,
+    resol,
+    kernel_size=5,
+    lig=True,
+    norm=False,
+    nomask=False,
+    mask_map=None,
+    lgf=None,
 ):
     """Calculates real space local correlation between map and model.
 
@@ -1275,8 +1282,10 @@ def realsp_correlation_mapmodel(
             kernel_size: integer, optional
                 Radius of integration kernal in pixels. Default is 5.
             mask_map: string, optional
-                Mask file to apply on correlation maps. If not given, a spherical mask
-                will be employed. Default radius = (map.shape[0] // 2) - trimpx
+                Mask file to apply on correlation maps.
+            nomask: bool, optional
+                If True, correlation maps are not masked. Otherwise, internally
+                calculated mask is used, if a mask is not supplied.
             norm: bool, optional
                 If True, correlation will be carried out on normalized maps.
                 Default is False.
@@ -1303,7 +1312,7 @@ def realsp_correlation_mapmodel(
         resol=resol,
         mask_map=mask_map,
         lgf=lgf,
-        # trim_px=trimpx,
+        nomask=nomask,
         norm=norm,
     )
 
@@ -1972,4 +1981,14 @@ def get_dim(model, shiftmodel="new1.cif"):
 
 def fetch_data(emdbidlist):
     from emda.ext import downmap
+
     downmap.main(emdbidlist)
+
+
+def symaxis_refine(maplist, emdbidlist):
+    from emda.ext import refine_symaxis
+
+    emdcode_list, fold_list, initial_ax_list, final_ax_list = refine_symaxis.main(
+        maplist=maplist, emdbidlist=emdbidlist
+    )
+    return emdcode_list, fold_list, initial_ax_list, final_ax_list
