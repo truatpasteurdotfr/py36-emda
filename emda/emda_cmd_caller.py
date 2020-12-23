@@ -579,6 +579,7 @@ fetchdata.add_argument("--emd", required=True, nargs="+", type=str, help="list o
 symaxref = subparsers.add_parser("symref", description="refine symmetry axis of a group")
 symaxref.add_argument("--map", required=True, nargs="+", type=str, help="list of maps to find symmetry axes")
 symaxref.add_argument("--emd", required=False, nargs="+", type=str, help="list of emdbid of maps")
+symaxref.add_argument("--mapout", action="store_true", help="Use to output maps")
 
 def apply_mask(args):
     from emda.emda_methods import applymask
@@ -1047,7 +1048,7 @@ def fetch_data(args):
 def symaxis_refinement(args):
     from emda import emda_methods as em
 
-    _, _, _, _ = em.symaxis_refine(maplist=args.map, emdbidlist=args.emd)
+    _, _, _, _, _ = em.symaxis_refine(maplist=args.map, emdbidlist=args.emd, mapoutvar=args.mapout)
 
 
 def main(command_line=None):
