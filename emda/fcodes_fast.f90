@@ -1845,6 +1845,57 @@ subroutine cutmap(fin,bin_idx,smax,mode,nbin,nx,ny,nz,fout)
   if(debug) print*, 'time for Eo calculation(s) = ', finish-start
 end subroutine cutmap
 
+subroutine cutmap_arr(fin,bin_idx,smax,mode,nbin,nx,ny,nz,n,fout)
+  implicit none
+  integer,   intent(in) :: smax,mode,nbin,nx,ny,nz,n
+  complex*16, dimension(n, -nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in)  :: fin
+  integer,   dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in)  :: bin_idx
+  complex*16, dimension(n, -nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(out) :: fout
+  ! locals
+  integer,   dimension(3) :: nxyz
+  integer,   dimension(0:nbin-1) :: bin_arr_count
+  !
+  real       :: start,finish
+  integer    :: i,j,k,l,xyzmin(3),xyzmax(3)
+  logical    :: debug
+  !
+  debug         = .FALSE.
+  if(mode == 1) debug = .TRUE.
+  call cpu_time(start)
+
+  fout = dcmplx(0.0d0, 0.0d0)
+
+  xyzmin = 0; xyzmax = 0
+
+  nxyz = (/ nx, ny, nz /)
+
+  xyzmin(1) = int(-nxyz(1)/2)
+  xyzmin(2) = int(-nxyz(2)/2)
+  xyzmin(3) = int(-nxyz(3)/2)
+  xyzmax    = -(xyzmin+1)
+  if(debug) print*, 'xyzmin = ', xyzmin
+  if(debug) print*, 'xyzmax = ', xyzmax
+  if(debug) print*, 'nbin=', nbin
+
+  ! Using Friedel's Law
+  do i=xyzmin(1), xyzmax(1)
+     do j=xyzmin(2), xyzmax(2)
+        do k=xyzmin(3), 0
+           do l=1, n
+              if(bin_idx(i,j,k) < 0 .or. bin_idx(i,j,k) > nbin-1) cycle
+              if(bin_idx(i,j,k) > smax) cycle
+              fout(l,i,j,k) = fin(l,i,j,k)
+              if(k==xyzmin(3) .or. j==xyzmin(2) .or. i==xyzmin(1)) cycle
+              fout(l,-i,-j,-k) = conjg(fout(l,i,j,k))
+           end do
+        end do
+     end do
+  end do
+
+  call cpu_time(finish)
+  if(debug) print*, 'time for Eo calculation(s) = ', finish-start
+end subroutine cutmap_arr
+
 !!$subroutine cutmap(fin,bin_idx,smax,mode,nbin,nx,ny,nz,fout)
 !!$  implicit none
 !!$  integer,   intent(in) :: smax,mode,nbin,nx,ny,nz
