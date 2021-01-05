@@ -1979,10 +1979,10 @@ def get_dim(model, shiftmodel="new1.cif"):
     return dim1
 
 
-def fetch_data(emdbidlist):
+def fetch_data(emdbidlist, alldata=False):
     from emda.ext import downmap
 
-    downmap.main(emdbidlist)
+    downmap.main(emdbidlist, alldata=alldata)
 
 
 def symaxis_refine(maplist, mapoutvar=False, emdbidlist=None):
