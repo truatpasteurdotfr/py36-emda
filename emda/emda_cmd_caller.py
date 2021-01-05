@@ -575,6 +575,7 @@ centerofmass.add_argument(
 
 fetchdata = subparsers.add_parser("fetch", description="fetch EMmap and model")
 fetchdata.add_argument("--emd", required=True, nargs="+", type=str, help="list of EMD entries. e.g. 3651")
+fetchdata.add_argument("--all", action="store_true", help="Use to download all data (mask, map, halfdata, model)")
 
 symaxref = subparsers.add_parser("symref", description="refine symmetry axis of a group")
 symaxref.add_argument("--map", required=True, nargs="+", type=str, help="list of maps to find symmetry axes")
@@ -1042,7 +1043,7 @@ def center_of_mass(args):
 
 def fetch_data(args):
     from emda import emda_methods as em
-    em.fetch_data(args.emd)
+    em.fetch_data(args.emd, args.all)
 
 
 def symaxis_refinement(args):
