@@ -65,7 +65,7 @@ subroutine resolution_grid(uc,mode,maxbin,nx,ny,nz,nbin,res_arr,bin_idx,s_grid)
   print*, 'nbin=', nbin
   high_res = res_arr(nbin-1)
   call get_resol(uc,0.0,0.0,0.0,low_res)
-  print*,"Low res=",low_res,"High res=",high_res ,'A'
+  !print*,"Low res=",low_res,"High res=",high_res ,'A'
 
   print*, 'Creating resolution grid. Please wait...'
 
@@ -176,7 +176,7 @@ subroutine resol_grid_em(uc,mode,maxbin,nx,ny,nz,nbin,res_arr,bin_idx,s_grid)
   print*, 'nbin=', nbin
   high_res = res_arr(nbin-1)
   call get_resol(uc,0.0,0.0,0.0,low_res)
-  print*,"Low res=",low_res,"High res=",high_res ,'A'
+  !print*,"Low res=",low_res,"High res=",high_res ,'A'
 
   print*, 'Creating resolution grid. Please wait...'
 
@@ -2942,11 +2942,12 @@ subroutine diffmap_norm(Fo,Fc,bin_idx,res_arr,smax,mode,nbin,nx,ny,nz, &
   !
   integer    :: i,j,k,xyzmin(3),xyzmax(3),ibin,cbin
   real       :: start, finish
-  logical    :: debug
+  logical    :: debug, make_all_zero
   real*8     :: d_tmp, d2_tmp
 
   !
   debug         = .FALSE.
+  make_all_zero = .FALSE.
   if(mode == 1) debug = .TRUE.
   call cpu_time(start)
 
@@ -3003,15 +3004,30 @@ subroutine diffmap_norm(Fo,Fc,bin_idx,res_arr,smax,mode,nbin,nx,ny,nz, &
      end do
   end do
 
-  ! Estimate scale_d in resolution bins
+  ! Set FSC to zero after covar bacame less than zero
   if(debug) print*,'ibin  resol  FoFo   FcFc   FoFc   FSC    bincount'
   do ibin=0, nbin-1
-     if(FcFc_sum(ibin) == 0.0 .or. FoFo_sum(ibin) == 0.0) cycle
-     if(FoFc_sum(ibin) == 0.0) cycle
-     fsc(ibin) = FoFc_sum(ibin) / (sqrt(FcFc_sum(ibin)) * sqrt(FoFo_sum(ibin)))
-     print*,ibin, res_arr(ibin), FoFo_sum(ibin),FcFc_sum(ibin), FoFc_sum(ibin), &
-          fsc(ibin),bin_arr_count(ibin)
+     if(FoFc_sum(ibin) < 0.0) make_all_zero = .TRUE.
+     if(make_all_zero) FoFc_sum(ibin) = 0.0
+     if(.not.(make_all_zero) .and. (FoFc_sum(ibin) > 0.0)) then
+        fsc(ibin) = FoFc_sum(ibin) / &
+           (sqrt(FcFc_sum(ibin)) * sqrt(FoFo_sum(ibin)))
+     end if
+     if(debug)then
+        print*,ibin, res_arr(ibin), FoFo_sum(ibin),FcFc_sum(ibin), &
+               FoFc_sum(ibin),fsc(ibin),bin_arr_count(ibin) 
+     end if    
   end do
+
+
+  !if(debug) print*,'ibin  resol  FoFo   FcFc   FoFc   FSC    bincount'
+  !do ibin=0, nbin-1
+  !   if(FcFc_sum(ibin) == 0.0 .or. FoFo_sum(ibin) == 0.0) cycle
+  !   !if(FoFc_sum(ibin) == 0.0) cycle
+  !   fsc(ibin) = FoFc_sum(ibin) / (sqrt(FcFc_sum(ibin)) * sqrt(FoFo_sum(ibin)))
+  !   print*,ibin, res_arr(ibin), FoFo_sum(ibin),FcFc_sum(ibin), FoFc_sum(ibin), &
+  !        fsc(ibin),bin_arr_count(ibin)
+  !end do
 
   
   ! Calculate difference map
@@ -3024,10 +3040,11 @@ subroutine diffmap_norm(Fo,Fc,bin_idx,res_arr,smax,mode,nbin,nx,ny,nz, &
         do k=xyzmin(3), xyzmax(3)
            if(bin_idx(i,j,k) < 0 .or. bin_idx(i,j,k) > nbin-1) cycle
            if(bin_idx(i,j,k) > cbin) cycle
-           diffmap(i,j,k,0) = (Eo(i,j,k) - Ec(i,j,k)) * fsc(bin_idx(i,j,k))
-           diffmap(i,j,k,1) = (Ec(i,j,k) - Eo(i,j,k)) * fsc(bin_idx(i,j,k))
-           diffmap(i,j,k,2) = Eo(i,j,k) * fsc(bin_idx(i,j,k))
-           diffmap(i,j,k,3) = Ec(i,j,k) * fsc(bin_idx(i,j,k))
+           if(fsc(bin_idx(i,j,k)) <= 0.0) cycle
+           diffmap(i,j,k,0) = (Eo(i,j,k) - Ec(i,j,k)) * sqrt(fsc(bin_idx(i,j,k)))
+           diffmap(i,j,k,1) = (Ec(i,j,k) - Eo(i,j,k)) * sqrt(fsc(bin_idx(i,j,k)))
+           diffmap(i,j,k,2) = Eo(i,j,k) * sqrt(fsc(bin_idx(i,j,k)))
+           diffmap(i,j,k,3) = Ec(i,j,k) * sqrt(fsc(bin_idx(i,j,k)))
         end do
      end do
   end do
