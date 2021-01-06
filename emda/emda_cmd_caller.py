@@ -439,7 +439,7 @@ diffmap.add_argument(
     "--map", required=True, nargs="+", type=str, help="maplist to diffmap"
 )
 diffmap.add_argument(
-    "--msk", required=True, default=None, nargs="+", type=str, help="masklist for maps"
+    "--msk", required=False, default=None, nargs="+", type=str, help="masklist for maps"
 )
 diffmap.add_argument(
     "--res",
