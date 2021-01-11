@@ -200,7 +200,8 @@ def estimate_map_resol(hfmap1name, hfmap2name):
             map_resol: float
                 Map resolution determined by the halfmap FSC.
     """
-    map_resol = maptools.estimate_map_resol(hfmap1=hfmap1name, hfmap2=hfmap2name)
+    map_resol = maptools.estimate_map_resol(
+        hfmap1=hfmap1name, hfmap2=hfmap2name)
     return map_resol
 
 
@@ -322,7 +323,8 @@ def map2mtzfull(uc, arr1, arr2, mtzname="halfnfull.mtz"):
     """
     hf1 = np.fft.fftshift(np.fft.fftn(arr1))
     hf2 = np.fft.fftshift(np.fft.fftn(arr2))
-    iotools.write_3d2mtz_full(unit_cell=uc, hf1data=hf1, hf2data=hf2, outfile=mtzname)
+    iotools.write_3d2mtz_full(
+        unit_cell=uc, hf1data=hf1, hf2data=hf2, outfile=mtzname)
 
 
 def mtz2map(mtzname, map_size):
@@ -802,7 +804,8 @@ def twomap_fsc(map1name, map2name, fobj=None, xmlobj=None):
         fobj.write("resolution (Ang.) \n")
         fobj.write("fsc \n")
         for ibin, fsc1 in enumerate(bin_fsc):
-            fobj.write("{:5d} {:6.2f} {:6.3f}\n".format(ibin, res_arr[ibin], fsc1))
+            fobj.write("{:5d} {:6.2f} {:6.3f}\n".format(
+                ibin, res_arr[ibin], fsc1))
     print("Bin      Resolution     FSC")
     for ibin, fsc2 in enumerate(bin_fsc):
         print("{:5d} {:6.2f} {:6.3f}".format(ibin, res_arr[ibin], fsc2))
@@ -834,10 +837,12 @@ def balbes_data(map1name, map2name, fsccutoff=0.5, mode="half"):
     from emda.ext import xmlclass
 
     if mode == "half":
-        prepare_refmac_data(hf1name=map1name, hf2name=map2name, fsccutoff=fsccutoff)
+        prepare_refmac_data(
+            hf1name=map1name, hf2name=map2name, fsccutoff=fsccutoff)
     else:
         xml = xmlclass.Xml()
-        res_arr, bin_fsc = twomap_fsc(map1name=map1name, map2name=map2name, xmlobj=xml)
+        res_arr, bin_fsc = twomap_fsc(
+            map1name=map1name, map2name=map2name, xmlobj=xml)
 
 
 def singlemap_fsc(map1name, knl=3):
@@ -1020,7 +1025,8 @@ def mask_from_map(
 
     _, arrlp = lowpass_map(uc, arr, resol, filter, order=order)
     # write_mrc(arrlp, "lowpass.mrc", uc, orig)
-    mask = maskmap_class.mapmask(arr=arrlp, uc=uc, kern_rad=kern, prob=prob, itr=itr)
+    mask = maskmap_class.mapmask(
+        arr=arrlp, uc=uc, kern_rad=kern, prob=prob, itr=itr)
     write_mrc(mask, "mapmask.mrc", uc, orig)
     return mask
 
@@ -1510,7 +1516,8 @@ def difference_map(maplist, smax=0.0, mode="ampli", masklist=None):
     elif maplist[0].endswith(((".pdb", ".cif", ".ent"))) and maplist[1].endswith(
         ((".pdb", ".cif", ".ent"))
     ):
-        raise SystemExit("Both are atomic models. I need at least one map file")
+        raise SystemExit(
+            "Both are atomic models. I need at least one map file")
 
     # uc, arr1, origin = read_map(maplist[0])
     # _, arr2, _ = iotools.read_map(maplist[1])
@@ -1538,7 +1545,8 @@ def difference_map(maplist, smax=0.0, mode="ampli", masklist=None):
         list_maps = []
         for i in range(diffmap.shape[3]):
             map = np.real(
-                np.fft.ifftshift(np.fft.ifftn(np.fft.ifftshift(diffmap[:, :, :, i])))
+                np.fft.ifftshift(np.fft.ifftn(
+                    np.fft.ifftshift(diffmap[:, :, :, i])))
             )
             list_maps.append(map)
         # calculate map rmsd
@@ -1551,8 +1559,10 @@ def difference_map(maplist, smax=0.0, mode="ampli", masklist=None):
             diff = (list_maps[1] - masked_mean) * msk2
             rmsd = np.sqrt(np.sum(diff * diff) / np.sum(msk2))
             print("rmsd of diffmap_m1-m2_amp: ", rmsd)
-        iotools.write_mrc(list_maps[0] * msk1, "diffmap_m1-m2_nrm.mrc", uc, origin)
-        iotools.write_mrc(list_maps[1] * msk2, "diffmap_m2-m1_nrm.mrc", uc, origin)
+        iotools.write_mrc(list_maps[0] * msk1,
+                          "diffmap_m1-m2_nrm.mrc", uc, origin)
+        iotools.write_mrc(list_maps[1] * msk2,
+                          "diffmap_m2-m1_nrm.mrc", uc, origin)
         iotools.write_mrc(list_maps[2] * msk1, "map1.mrc", uc, origin)
         iotools.write_mrc(list_maps[3] * msk2, "map2.mrc", uc, origin)
 
@@ -1563,7 +1573,8 @@ def difference_map(maplist, smax=0.0, mode="ampli", masklist=None):
         list_maps = []
         for i in range(diffmap.shape[3]):
             map = np.real(
-                np.fft.ifftshift(np.fft.ifftn(np.fft.ifftshift(diffmap[:, :, :, i])))
+                np.fft.ifftshift(np.fft.ifftn(
+                    np.fft.ifftshift(diffmap[:, :, :, i])))
             )
             list_maps.append(map)
         # calculate map rmsd
@@ -1577,8 +1588,10 @@ def difference_map(maplist, smax=0.0, mode="ampli", masklist=None):
             rmsd = np.sqrt(np.sum(diff * diff) / np.sum(msk2))
             print("rmsd of diffmap_m2-m1_amp: ", rmsd)
         # difference map output
-        iotools.write_mrc(list_maps[0] * msk1, "diffmap_m1-m2_amp.mrc", uc, origin)
-        iotools.write_mrc(list_maps[1] * msk2, "diffmap_m2-m1_amp.mrc", uc, origin)
+        iotools.write_mrc(list_maps[0] * msk1,
+                          "diffmap_m1-m2_amp.mrc", uc, origin)
+        iotools.write_mrc(list_maps[1] * msk2,
+                          "diffmap_m2-m1_amp.mrc", uc, origin)
         iotools.write_mrc(list_maps[2] * msk1, "map1.mrc", uc, origin)
         iotools.write_mrc(list_maps[3] * msk2, "map2.mrc", uc, origin)
 
@@ -1623,7 +1636,8 @@ def bestmap(hf1name, hf2name, outfile, mode=1, knl=5, mask=None):
     f2 = np.fft.fftshift(np.fft.fftn(arr2))  # * msk))
     if mode == 1:
         nbin, res_arr, bin_idx = restools.get_resolution_array(uc, f1)
-        f_map = bestmap.bestmap(f1=f1, f2=f2, bin_idx=bin_idx, nbin=nbin, mode=mode)
+        f_map = bestmap.bestmap(
+            f1=f1, f2=f2, bin_idx=bin_idx, nbin=nbin, mode=mode)
     elif mode == 2:
         f_map = bestmap.bestmap(f1=f1, f2=f2, mode=mode, kernel_size=knl)
     data2write = np.real(np.fft.ifftn(np.fft.ifftshift(f_map))) * msk
@@ -1829,7 +1843,8 @@ def model2map(
     structure.spacegroup_hm = "P 1"
     structure.make_mmcif_document().write_file("model.cif")
     # run refmac using model.cif just created
-    iotools.run_refmac_sfcalc("./model.cif", resol, bfac, lig=lig, ligfile=ligfile)
+    iotools.run_refmac_sfcalc("./model.cif", resol,
+                              bfac, lig=lig, ligfile=ligfile)
     modelmap = maptools.mtz2map("./sfcalc_from_crd.mtz", dim)
     if maporigin is None:
         maporigin = [0, 0, 0]
@@ -1916,7 +1931,7 @@ def set_dim_equal(x):
     if maxdim % 2 != 0:
         maxdim = maxdim + 1
     temp = np.zeros((maxdim, maxdim, maxdim), dtype=x.dtype)
-    temp[0 : xshape[0], 0 : xshape[1], 0 : xshape[2]] = x
+    temp[0: xshape[0], 0: xshape[1], 0: xshape[2]] = x
     x = temp
     return x
 
@@ -2025,7 +2040,8 @@ def get_dim(model, shiftmodel="new1.cif"):
     xc_np = np.asarray(xc)
     yc_np = np.asarray(yc)
     zc_np = np.asarray(zc)
-    distances = np.sqrt(np.power(xc_np, 2) + np.power(yc_np, 2) + np.power(zc_np, 2))
+    distances = np.sqrt(np.power(xc_np, 2) +
+                        np.power(yc_np, 2) + np.power(zc_np, 2))
     dim1 = 2 + (int(np.max(distances)) + 1) * 2
     return dim1
 
@@ -2036,7 +2052,7 @@ def fetch_data(emdbidlist, alldata=False):
     downmap.main(emdbidlist, alldata=alldata)
 
 
-def symaxis_refine(maplist, mapoutvar=False, emdbidlist=None):
+def symaxis_refine(maplist, mapoutvar=False, emdbidlist=None, reslist=None):
     from emda.ext import refine_symaxis
 
     (
@@ -2045,5 +2061,5 @@ def symaxis_refine(maplist, mapoutvar=False, emdbidlist=None):
         final_axes_list,
         fold_list,
         avgfsc_list,
-    ) = refine_symaxis.main(maplist=maplist, emdbidlist=emdbidlist, mapoutvar=mapoutvar)
+    ) = refine_symaxis.main(maplist=maplist, emdbidlist=emdbidlist, mapoutvar=mapoutvar, reslist=reslist)
     return emdcode_list, initial_axes_list, final_axes_list, fold_list, avgfsc_list
