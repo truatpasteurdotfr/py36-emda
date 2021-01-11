@@ -726,7 +726,60 @@ def get_intial_axis(imap):
     return x, y, z, symorder
 
 
-def main(maplist, mapoutvar=False, emdbidlist=None, fobj=None):
+def prime_factors(n):
+    #https://stackoverflow.com/questions/15347174/python-finding-prime-factors
+    i = 2
+    factors = []
+    while i * i <= n:
+        if n % i:
+            i += 1
+        else:
+            n //= i
+            factors.append(i)
+    if n > 1:
+        factors.append(n)
+    return factors
+
+
+def prefilter_order(imap, axis, order, resol=None):
+    # prime factorization
+    factors = prime_factors(order)
+    filtered_order_list = []
+    if len(factors) == 1:
+        filtered_order_list.append(order)
+    else:
+        axis = np.asarray(axis)
+        axis = axis / math.sqrt(np.dot(axis, axis))
+        uc, arr, orig = em.get_data(imap)
+        arr = set_dim_even(arr)
+        f1 = fftshift(fftn(fftshift(arr)))
+        nbin, res_arr, bin_idx = core.restools.get_resolution_array(uc, f1)
+        rotmat_list = []
+        if resol is not None:
+            dist = np.sqrt((res_arr - resol) ** 2)
+            ibin = np.argmin(dist)
+        else:
+            ibin = nbin
+        # cut map
+        e_list = [emmap1.eo_lst[0], emmap1.fo_lst[0]]
+        eout, cBIdx, cbin = cut_resolution_for_linefit(
+            e_list, emmap1.bin_idx, emmap1.res_arr, ibin
+        )
+        for fac in factors:
+            theta = float(360.0 / fac)
+            q = quaternions.get_quaternion([[axis[2], axis[1], axis[0]], [theta]])
+            rotmat = quaternions.get_RM(q)
+            frt = get_FRS(rotmat, f1, interp="linear")[:, :, :, 0]
+            fsc = core.fsc.anytwomaps_fsc_covariance(f1, frt, bin_idx, nbin)[0]
+            avg_fsc = np.average(fsc[:ibin])
+            print('fac, Avg FSC: ', fac, avg_fsc)
+            if avg_fsc > 0.8:
+                filtered_order_list.append(fac)
+    true_order = np.prod(np.asarray(filtered_order_list), dtype='int')
+    return true_order
+
+
+def main(maplist, mapoutvar=False, emdbidlist=None, reslist=None, fobj=None):
     global fold, emdcode, mapout
     mapout = mapoutvar
     print(" ")
@@ -746,8 +799,13 @@ def main(maplist, mapoutvar=False, emdbidlist=None, fobj=None):
     else:
         ids = np.arange(len(maplist))
         emdbidlist = [",".join(item) for item in ids.astype(str)]
-    for imap, emdbid in zip(maplist, emdbidlist):
-        emdcode = "EMD-" + emdbid
+    if reslist is not None:
+        assert len(emdbidlist) == len(reslist)
+    mapresol = None
+    #for imap, emdbid in zip(maplist, emdbidlist):
+    for i, imap in enumerate(maplist):
+        emdcode = "EMD-" + emdbidlist[i]
+        if reslist is not None: mapresol = float(reslist[i])
         print("Map: ", imap)
         print("emdcode: ", emdcode)
         fobj.write("\n")
@@ -765,8 +823,9 @@ def main(maplist, mapoutvar=False, emdbidlist=None, fobj=None):
         fnlaxlst = []
         avgfslst = []
         foldlst = []
-        for ix, iy, iz, fold in zip(x, y, z, symorder):
+        for ix, iy, iz, order in zip(x, y, z, symorder):
             rotaxis = [ix, iy, iz]
+            fold = prefilter_order(imap, rotaxis, order, resol=mapresol)
             # emdcode = "{0}_{1}".format(emdcode, str(i))
             i += 1
             initial_axis, final_axis, avg_fsc = overlay(
