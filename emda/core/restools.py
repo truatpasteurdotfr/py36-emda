@@ -167,3 +167,19 @@ def cut_resolution_for_linefit(f, bin_idx, res_arr, smax):
         dx : dx + 2 * cx, dy : dy + 2 * cx, dz : dz + 2 * cx
     ]
     return fout, cBIdx, cbin
+
+
+def cut_resolution_nmaps(f_list, bin_idx, res_arr, smax):
+    # Making data for map fitting
+    f_arr = np.asarray(f_list, dtype="complex")
+    nx, ny, nz = f_list[0].shape
+    cbin = cx = smax
+    print("fit resolution:", res_arr[cbin])
+    dx = int((nx - 2 * cx) / 2)
+    dy = int((ny - 2 * cx) / 2)
+    dz = int((nz - 2 * cx) / 2)
+    cBIdx = bin_idx[dx : dx + 2 * cx, dy : dy + 2 * cx, dz : dz + 2 * cx]
+    fout = fcodes_fast.cutmap_arr(
+        f_arr, bin_idx, cbin, 0, len(res_arr), nx, ny, nz, len(f_list)
+    )[:, dx : dx + 2 * cx, dy : dy + 2 * cx, dz : dz + 2 * cx]
+    return fout, cBIdx, cbin
