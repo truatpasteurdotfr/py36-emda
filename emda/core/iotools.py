@@ -273,7 +273,7 @@ def write_3d2mtz_refmac(unit_cell, sgrid, fdata, fnoise, bfac, outfile="output.m
     mtz.write_to_file(outfile)
 
 
-def write_mtz2_3d(h, k, l, f, nx, ny, nz):
+""" def write_mtz2_3d(h, k, l, f, nx, ny, nz):
     # Output mtz data into numpy 3D array
     # NEED CAREFUL TEST
     arr = np.zeros((nx * ny * nx), dtype=np.complex)
@@ -285,7 +285,7 @@ def write_mtz2_3d(h, k, l, f, nx, ny, nz):
     arr[lb:ub] = f
     f3d = arr.reshape(nx, ny, nz)
     mapdata = np.fft.ifftn(np.fft.fftshift(f3d))
-    return mapdata
+    return mapdata """
 
 
 def write_mtz2_3d_gemmi(mtzfile, map_size):
