@@ -530,6 +530,16 @@ def mask_by_value_greater(array, masking_value=0.0, filling_value=0.0):
     return array_masked_filled
 
 
+def output_to_table(dataframe, filename="data_emda.txt"):
+    with open(filename, 'a') as f:
+        f.write(
+            dataframe.to_string(header = True, index = False)
+        )
+    print("data_emda.txt file was written!")
+
+
+
+
 ##### below function are not frequently used.#####
 def read_mrc(mapname11):
     file11 = mrc.open(mapname11)
