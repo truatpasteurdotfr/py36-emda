@@ -8,23 +8,32 @@ Mozilla Public License, version 2.0; see LICENSE.
 
 # calcuating bestmap - normalized and FSC weighted map
 
-def bestmap(f1, f2, mode=1, kernel_size=5, bin_idx=None, nbin=None):
+def bestmap(f1, f2, mode=1, kernel_size=5, bin_idx=None, nbin=None, res_arr=None):
     if mode == 1:
         print("bestmap is calculated using FSC in resolution bins")
-        bestmap = bestmap_1dfsc(f1, f2, bin_idx, nbin)
+        bestmap = bestmap_1dfsc(f1, f2, bin_idx, nbin, res_arr)
     elif mode == 2:
         print("bestmap is calculated using local FSC")
         bestmap = bestmap_3dfsc(f1, f2, kernel_size)
     return bestmap
 
 
-def bestmap_1dfsc(f1, f2, bin_idx, nbin):
+def bestmap_1dfsc(f1, f2, bin_idx, nbin, res_arr=None):
     import fcodes_fast
-    from emda.core import fsc
+    from emda.core import fsc, iotools
     import numpy as np
+    import pandas
 
     cx, cy, cz = f1.shape
-    fsc, _, _, _, _, eo = fsc.halfmaps_fsc_variance(f1, f2, bin_idx, nbin)
+    fsc, var_n, var_s, vat_t, _, eo = fsc.halfmaps_fsc_variance(f1, f2, bin_idx, nbin)
+    if res_arr is not None:
+        data = np.column_stack((res_arr, var_n, var_s, fsc))
+    else:
+        idx_arr = np.arange(nbin, dtype='int')
+        data = np.column_stack((idx_arr, var_n, var_s, fsc))
+    columns = ['resol/indx', 'var_n', 'var_s', 'FSC_half']
+    df = pandas.DataFrame(data=data, columns=columns)
+    iotools.output_to_table(df)
     fsc = 2 * fsc / (1 + fsc)
     fsc_grid = fcodes_fast.read_into_grid(bin_idx, fsc, nbin, cx, cy, cz)
     fsc_grid_filtered = np.where(fsc_grid < 0.0, 0.0, fsc_grid)
