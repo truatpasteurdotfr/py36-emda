@@ -1637,7 +1637,7 @@ def bestmap(hf1name, hf2name, outfile, mode=1, knl=5, mask=None):
     if mode == 1:
         nbin, res_arr, bin_idx = restools.get_resolution_array(uc, f1)
         f_map = bestmap.bestmap(
-            f1=f1, f2=f2, bin_idx=bin_idx, nbin=nbin, mode=mode)
+            f1=f1, f2=f2, bin_idx=bin_idx, nbin=nbin, mode=mode, res_arr=res_arr)
     elif mode == 2:
         f_map = bestmap.bestmap(f1=f1, f2=f2, mode=mode, kernel_size=knl)
     data2write = np.real(np.fft.ifftn(np.fft.ifftshift(f_map))) * msk
