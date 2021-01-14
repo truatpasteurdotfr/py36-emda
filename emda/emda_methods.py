@@ -1261,6 +1261,22 @@ def realsp_correlation(
         lgf=lgf,
     )
 
+def b_from_correlation(
+    half1map,
+    half2map,
+    resol,
+    kernel_size=5,
+    mask_map=None,
+):
+    from emda.ext import realsp_local
+
+    realsp_local.bfromcc(
+        half1_map=half1map,
+        half2_map=half2map,
+        kernel_size=kernel_size,
+        resol=resol,
+        mask_map=mask_map,
+    )
 
 def realsp_correlation_mapmodel(
     fullmap,

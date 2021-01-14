@@ -253,6 +253,16 @@ realspc.add_argument(
     "--lgf", required=False, default=None, type=str, help="ligand description file"
 )
 
+bfromcc = subparsers.add_parser("bfromcc", description="local b from real space correlation")
+bfromcc.add_argument("--h1", required=True, help="input halfmap1 map")
+bfromcc.add_argument("--h2", required=True, help="input halfmap2 map")
+bfromcc.add_argument("--res", required=True,
+                     type=float, help="Resolution (A)")
+bfromcc.add_argument("--msk", required=False, help="input mask (mrc/map)")
+bfromcc.add_argument(
+    "--knl", required=False, type=int, default=5, help="Kernel size (pixels)"
+)
+
 mmrealspc = subparsers.add_parser("mmcc", description="real space correlation")
 mmrealspc.add_argument("--map", required=True, help="input full/deposited map")
 mmrealspc.add_argument("--mdl", required=True, help="Input model (cif/pdb)")
@@ -841,6 +851,16 @@ def realsp_corr(args):
         lgf=args.lgf,
     )
 
+def b_from_cc(args):
+    from emda.emda_methods import b_from_correlation
+
+    b_from_correlation(
+        half1map=args.h1,
+        half2map=args.h2,
+        kernel_size=args.knl,
+        resol=args.res,
+        mask_map=args.msk,
+    )
 
 def mmrealsp_corr(args):
     from emda.emda_methods import realsp_correlation_mapmodel
@@ -1123,6 +1143,8 @@ def main(command_line=None):
         resample_data(args)
     if args.command == "rcc":
         realsp_corr(args)
+    if args.command == "bfromcc":
+        b_from_cc(args)
     if args.command == "mmcc":
         mmrealsp_corr(args)
     if args.command == "fcc":
