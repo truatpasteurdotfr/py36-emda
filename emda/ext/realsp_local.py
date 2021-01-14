@@ -239,6 +239,97 @@ def rcc(
         )
         print("Map-model correlation calculated! Maps were writted!")
 
+def make_c_B_table(s_max, dat_out=None):
+    import scipy.special
+    t = lambda B: np.sqrt(np.abs(B)/2)*s_max
+    w = lambda z: np.exp(-z**2)*(1-1j*scipy.special.erfi(-z))
+    fp = lambda x: 3/2*(np.sqrt(np.pi)/2*scipy.special.erf(t(x))-t(x)*np.exp(-t(x)**2))/t(x)**3
+    fn = lambda x: 3/4*np.exp(t(x)**2)*(2*t(x)-np.sqrt(np.pi)*np.imag(w(t(x))))/t(x)**3
+
+    Bn = np.arange(-300,0)
+    cn = fn(Bn)
+    Bp = np.arange(1, 600)
+    cp = fp(Bp)
+
+    Bs = np.concatenate((Bn, [0.], Bp))
+    cs = np.concatenate((cn, [1.], cp))
+
+    order = np.argsort(cs)
+    Bs, cs = Bs[order], cs[order]
+
+    if dat_out:
+      with open(dat_out, "w") as ofs:
+        ofs.write("# s_max= {}\n".format(s_max))
+        ofs.write("c B\n")
+        for i in range(len(Bs)):
+          ofs.write("{:.5e} {:.1f}\n".format(cs[i], Bs[i]))
+
+    return Bs, cs
+
+def bfromcc(
+    half1_map,
+    half2_map,
+    kernel_size,
+    resol,
+    mask_map=None,
+):
+    import emda.emda_methods as em
+
+    hf1, hf2 = None, None
+    bin_idx = None
+    print(
+        "Calculating 3D correlation between half maps. \
+            Please wait..."
+    )
+    uc, arr1, origin = core.iotools.read_map(half1_map)
+    uc, arr2, origin = core.iotools.read_map(half2_map)
+
+    # mask taking into account
+    if mask_map is not None:
+        _, cc_mask, _ = core.iotools.read_map(mask_map)
+    else:
+        # creating ccmask from half data
+        print("Mask is not given. EMDA will generate cc_mask.mrc and be used.")
+        print("Please take a look at this automatic mask. It may be suboptimal.")
+        cc_mask = em.mask_from_halfmaps(uc, arr1, arr2, radius=7, thresh=0.65)
+        em.write_mrc(cc_mask, "cc_mask.mrc", uc, origin)
+
+    cc_mask = cc_mask * (cc_mask > 0.0)
+    # Creating soft-edged mask
+    kern_sphere_soft = core.restools.create_soft_edged_kernel_pxl(kernel_size)
+
+    # Lowpass
+    f_hf1, arr1 = em.lowpass_map(uc=uc, arr1=arr1, resol=resol)
+    f_hf2, arr2 = em.lowpass_map(uc=uc, arr1=arr2, resol=resol)
+
+    # Real space correlation maps
+    print("Calculating 3D correlation...")
+    halfmapscc, fullmapcc = get_3d_realspcorrelation(
+        half1=arr1 * cc_mask, half2=arr2 * cc_mask, kern=kern_sphere_soft
+    )
+
+    overall_cc = np.corrcoef((arr1*cc_mask).flatten(), (arr2*cc_mask).flatten())[1,0]
+    print("Overall CC=", overall_cc)
+
+    c = (1.-overall_cc)/overall_cc * halfmapscc/(1.-halfmapscc)
+    print("c range: {:.4e} to {:.4e}".format(c.min(), c.max()))
+    core.iotools.write_mrc(c,'c_for_localB'+str(kernel_size)+'.mrc',uc,origin)
+
+    table_B, table_c = make_c_B_table(1./resol, dat_out="c_B.dat")
+    print("c to B table made for c= {:.4e} to {:.4e} and B= {:.1f} to {:.1f}".format(min(table_c), max(table_c), min(table_B), max(table_B)))
+    B = np.interp(c, table_c, table_B)
+    print("Writing out local B map")
+    core.iotools.write_mrc(mapdata=B,filename='localB'+str(kernel_size)+'.mrc',unit_cell=uc,map_origin=origin)
+
+    print("Writing out correlation maps")
+    core.iotools.write_mrc(
+        mapdata=halfmapscc * cc_mask,
+        filename="rcc_halfmap_smax" + str(kernel_size) + ".mrc",
+        unit_cell=uc,
+        map_origin=origin,
+        label=True,
+    )
+
 
 def scale_model2map(fullmap, model_arr, uc):
     from emda.ext.scale_maps import scale_twomaps_by_power, transfer_power
