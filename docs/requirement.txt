@@ -1,6 +1,6 @@
 # requirements for doc build by readthedocs
 
-emda
+#emda
 sphinx-argparse
 sphinx
 sphinx-autoapi
