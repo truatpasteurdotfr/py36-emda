@@ -41,6 +41,9 @@ halffsc.add_argument(
 halffsc.add_argument(
     "--out", required=False, default="table_variances.txt", help="output data table"
 )
+halffsc.add_argument(
+    "--phaserand", action="store_true", help="use if phase randomized FSC is calculated"
+)
 
 anyfsc = subparsers.add_parser(
     "fsc", description="Calculates FSC between two maps.")
@@ -648,27 +651,31 @@ def anymap_fsc(args, fobj):
 
 
 def halfmap_fsc(args):
-    from emda.emda_methods import halfmap_fsc
+    from emda.emda_methods import halfmap_fsc, halfmap_fsc_ph
 
-    res_arr, fsc_list = halfmap_fsc(
-        half1name=args.h1, half2name=args.h2, filename=args.out, maskname=args.msk
-    )
-    if len(fsc_list) == 2:
-        plotter.plot_nlines(
-            res_arr,
-            fsc_list,
-            "halfmap_fsc.eps",
-            curve_label=["unmask-FSC", "masked-FSC"],
-            plot_title="Halfmap FSC",
+    if args.phaserand:
+        res_arr, fsc_list = halfmap_fsc_ph(
+            half1name=args.h1, half2name=args.h2, filename=args.out, maskname=args.msk)
+    else:
+        res_arr, fsc_list = halfmap_fsc(
+            half1name=args.h1, half2name=args.h2, filename=args.out, maskname=args.msk
         )
-    elif len(fsc_list) == 1:
-        plotter.plot_nlines(
-            res_arr,
-            fsc_list,
-            "halfmap_fsc.eps",
-            curve_label=["unmask-FSC"],
-            plot_title="Halfmap FSC",
-        )
+        if len(fsc_list) == 2:
+            plotter.plot_nlines(
+                res_arr,
+                fsc_list,
+                "halfmap_fsc.eps",
+                curve_label=["unmask-FSC", "masked-FSC"],
+                plot_title="Halfmap FSC",
+            )
+        elif len(fsc_list) == 1:
+            plotter.plot_nlines(
+                res_arr,
+                fsc_list,
+                "halfmap_fsc.eps",
+                curve_label=["unmask-FSC"],
+                plot_title="Halfmap FSC",
+            )
 
 
 def singlemap_fsc(args):
