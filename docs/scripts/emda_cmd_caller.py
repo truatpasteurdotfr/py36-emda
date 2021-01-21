@@ -10,8 +10,8 @@ import numpy as np
 import argparse
 import sys
 import datetime
-#import emda.config
-#from emda.core import iotools, maptools, restools, plotter, fsc, quaternions
+import emda.config
+from emda.core import iotools, maptools, restools, plotter, fsc, quaternions
 
 cmdl_parser = argparse.ArgumentParser(
     prog="emda",
