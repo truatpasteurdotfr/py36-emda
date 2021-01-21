@@ -3,3 +3,4 @@
 #emda
 sphinx-argparse
 sphinx
+sphinx-autoapi
