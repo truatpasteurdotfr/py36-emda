@@ -1,0 +1,4 @@
+# requirements for doc build by readthedocs
+
+sphinx-argparse
+sphinx
