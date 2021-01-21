@@ -2,3 +2,4 @@
 
 sphinx-argparse
 sphinx
+emda
