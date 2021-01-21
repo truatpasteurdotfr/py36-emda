@@ -52,6 +52,77 @@ def read_mtz(mtzfile):
     return uc, df
 
 
+def get_data(struct, resol=5.0, uc=None, dim=None, maporigin=None):
+    """Returns data of a map or a model into an ndarray.
+
+    Reads map data into an ndarray, or if the structure input is an atomic model,
+    it calculates the map from the model and returns as an ndarray.
+
+    Arguments:
+        Inputs:
+            struct: string
+                CCP4/MRC map file name or PDB/ENT/CIF file
+                resol:  float, optional
+                        resolution to calculates map from model. Default is 5.0 A.
+                uc: float, 1D array
+                    Parameter for modelmap generation. If absent, this will be
+                    determined by dim parameter.
+                dim: sequence (integers), optional
+                    Parameter for modelmap generation. If absent, this will be
+                    determined from the size of the molecule.
+                maporigin: sequence (integers), optional
+                    Parameter for modelmap generation. If present, the calculated map
+                    will be shifted according to this information. If absent, this
+                    parameter is taken as [0, 0, 0].
+
+        Outputs:
+            uc: float, 1D array
+                Unit cell
+            arr: float, 3D array
+                Map values as Numpy array
+            origin: list
+                Map origin list
+    """
+
+    # read map/mrc
+    if struct.endswith((".mrc", ".map")):
+        uc, arr, orig = read_map(struct)
+
+    # read model pdb/ent/cif
+    if struct.endswith((".pdb", ".ent", ".cif")):
+        newmodel = struct
+        if uc is not None:
+            if dim is not None:
+                uc = uc
+                dim = max(dim)
+                orig = [0, 0, 0]
+            if dim is None:
+                dim = get_dim(model=struct, shiftmodel="new1.cif")
+                orig = [0, 0, 0]
+                newmodel = "new1.cif"
+        if uc is None:
+            if dim is not None:
+                dim = max(dim)
+                uc = np.array([dim, dim, dim, 90.0, 90.0, 90.0], dtype="float")
+                orig = [0, 0, 0]
+            if dim is None:
+                dim = get_dim(model=struct, shiftmodel="new1.cif")
+                uc = np.array([dim, dim, dim, 90.0, 90.0, 90.0], dtype="float")
+                orig = [-dim // 2, -dim // 2, -dim // 2]  # [0, 0, 0]
+                newmodel = "new1.cif"
+        if maporigin is None:
+            maporigin = orig
+        modelmap = model2map(
+            modelxyz=newmodel,
+            dim=[dim, dim, dim],
+            resol=resol,
+            cell=uc,
+            maporigin=maporigin,
+        )
+        arr = modelmap
+    return uc, arr, orig
+
+
 def write_mrc(mapdata, filename, unit_cell, map_origin=None):
     """Writes 3D Numpy array into MRC file.
 
@@ -129,7 +200,8 @@ def estimate_map_resol(hfmap1name, hfmap2name):
             map_resol: float
                 Map resolution determined by the halfmap FSC.
     """
-    map_resol = maptools.estimate_map_resol(hfmap1=hfmap1name, hfmap2=hfmap2name)
+    map_resol = maptools.estimate_map_resol(
+        hfmap1=hfmap1name, hfmap2=hfmap2name)
     return map_resol
 
 
@@ -251,7 +323,8 @@ def map2mtzfull(uc, arr1, arr2, mtzname="halfnfull.mtz"):
     """
     hf1 = np.fft.fftshift(np.fft.fftn(arr1))
     hf2 = np.fft.fftshift(np.fft.fftn(arr2))
-    iotools.write_3d2mtz_full(unit_cell=uc, hf1data=hf1, hf2data=hf2, outfile=mtzname)
+    iotools.write_3d2mtz_full(
+        unit_cell=uc, hf1data=hf1, hf2data=hf2, outfile=mtzname)
 
 
 def mtz2map(mtzname, map_size):
@@ -398,12 +471,9 @@ def halfmap_fsc(half1name, half2name, filename=None, maskname=None):
 
     uc, arr1, _ = iotools.read_map(half1name)
     uc, arr2, _ = iotools.read_map(half2name)
-    if maskname is not None:
-        _, mask, _ = read_map(maskname)
-        arr1 = arr1 * mask
-        arr2 = arr2 * mask
     hf1 = np.fft.fftshift(np.fft.fftn(arr1))
     hf2 = np.fft.fftshift(np.fft.fftn(arr2))
+    fsc_list = []
     nbin, res_arr, bin_idx = restools.get_resolution_array(uc, hf1)
     (
         _,
@@ -416,10 +486,38 @@ def halfmap_fsc(half1name, half2name, filename=None, maskname=None):
     ) = fcodes_fast.calc_fsc_using_halfmaps(
         hf1, hf2, bin_idx, nbin, debug_mode, hf1.shape[0], hf1.shape[1], hf1.shape[2]
     )
+    fsc_list.append(bin_fsc)
+    if maskname is not None:
+        _, mask, _ = read_map(maskname)
+        arr1_msk = arr1 * mask
+        arr2_msk = arr2 * mask
+        hf1msk = np.fft.fftshift(np.fft.fftn(arr1_msk))
+        hf2msk = np.fft.fftshift(np.fft.fftn(arr2_msk))
+        (
+            _,
+            _,
+            msk_noisevar,
+            msk_signalvar,
+            msk_totalvar,
+            msk_bin_fsc,
+            msk_bincount,
+        ) = fcodes_fast.calc_fsc_using_halfmaps(
+            hf1msk,
+            hf2msk,
+            bin_idx,
+            nbin,
+            debug_mode,
+            hf1msk.shape[0],
+            hf1msk.shape[1],
+            hf1msk.shape[2],
+        )
+        fsc_list.append(msk_bin_fsc)
     if filename is not None:
         tdata = open(filename, "w")
         tdata.write("halfmap1 file: %s\n" % os.path.abspath(half1name))
         tdata.write("halfmap2 file: %s\n" % os.path.abspath(half2name))
+        tdata.write("\n")
+        tdata.write("***** Unmasked statistics *****\n")
         tdata.write("\n")
         tdata.write("bin # \n")
         tdata.write("resolution (Ang.) \n")
@@ -438,10 +536,155 @@ def halfmap_fsc(half1name, half2name, filename=None, maskname=None):
                     i, res_arr[i], sv, nv, tv, fsci, nfc
                 )
             )
-    print("Bin    Resolution     FSC")
-    for i in range(len(res_arr)):
-        print("{:5d} {:6.2f} {:14.4f}".format(i, res_arr[i], bin_fsc[i]))
-    return res_arr, bin_fsc
+        if maskname is not None:
+            tdata.write("\n")
+            tdata.write("***** Masked statistics *****\n")
+            tdata.write("\n")
+            tdata.write("bin # \n")
+            tdata.write("resolution (Ang.) \n")
+            tdata.write("signal variance \n")
+            tdata.write("noise variance \n")
+            tdata.write("total variance \n")
+            tdata.write("halfmap fsc \n")
+            tdata.write("# reflx \n")
+            i = -1
+            for sv, nv, tv, fsci, nfc in zip(
+                msk_signalvar, msk_noisevar, msk_totalvar, msk_bin_fsc, msk_bincount
+            ):
+                i += 1
+                tdata.write(
+                    "{:-3d} {:-6.2f} {:-14.4f} {:-14.4f} {:-14.4f} {:-14.4f} {:-10d}\n".format(
+                        i, res_arr[i], sv, nv, tv, fsci, nfc
+                    )
+                )
+    if maskname is not None:
+        print("Bin    Resolution     unmasked-FSC   masked-FSC")
+        for i in range(len(res_arr)):
+            print(
+                "{:5d} {:6.2f} {:14.4f} {:14.4f}".format(
+                    i, res_arr[i], bin_fsc[i], msk_bin_fsc[i]
+                )
+            )
+    else:
+        print("Bin    Resolution     FSC")
+        for i in range(len(res_arr)):
+            print("{:5d} {:6.2f} {:14.4f}".format(i, res_arr[i], bin_fsc[i]))
+    return res_arr, fsc_list
+
+
+def halfmap_fsc_ph(half1name, half2name, filename="halffsc.txt", maskname=None):
+    """Computes Fourier Shell Correlation (FSC) using half maps.
+
+    Computes Fourier Shell Correlation (FSC) using half maps.
+    FSC is not corrected for mask effect in this implementation.
+
+    Arguments:
+        Inputs:
+            half1name: string
+                Name of the half map 1.
+            half2name: string
+                Name of the half map 2.
+            filename: string
+                If present, statistics will be printed into this file.
+            maskname: String
+                If present, input maps will be masked before computing FSC.
+
+        Outputs:
+            res_arr: float, 1D array
+                Linear array of resolution in Angstrom units.
+            bin_fsc: float, 1D array
+                Linear array of FSC in each resolution bin.
+    """
+    import os
+
+    tdata = open(filename, "w")
+
+    uc, arr1, _ = iotools.read_map(half1name)
+    uc, arr2, _ = iotools.read_map(half2name)
+    hf1 = np.fft.fftshift(np.fft.fftn(arr1))
+    hf2 = np.fft.fftshift(np.fft.fftn(arr2))
+    fsc_list = []
+    nbin, res_arr, bin_idx = restools.get_resolution_array(uc, hf1)
+    (
+        _,
+        _,
+        noisevar,
+        signalvar,
+        totalvar,
+        bin_fsc,
+        bincount,
+    ) = fcodes_fast.calc_fsc_using_halfmaps(
+        hf1, hf2, bin_idx, nbin, debug_mode, hf1.shape[0], hf1.shape[1], hf1.shape[2]
+    )
+    fsc_list.append(bin_fsc)
+    tdata.write("halfmap1 file: %s\n" % os.path.abspath(half1name))
+    tdata.write("halfmap2 file: %s\n" % os.path.abspath(half2name))
+    tdata.write("\n")
+    tdata.write("***** Unmasked statistics *****\n")
+    tdata.write("\n")
+    tdata.write("bin # \n")
+    tdata.write("resolution (Ang.) \n")
+    tdata.write("signal variance \n")
+    tdata.write("noise variance \n")
+    tdata.write("total variance \n")
+    tdata.write("halfmap fsc \n")
+    tdata.write("# reflx \n")
+    i = -1
+    for sv, nv, tv, fsci, nfc in zip(signalvar, noisevar, totalvar, bin_fsc, bincount):
+        i += 1
+        tdata.write(
+            "{:-3d} {:-6.2f} {:-14.4f} {:-14.4f} {:-14.4f} {:-14.4f} {:-10d}\n".format(
+                i, res_arr[i], sv, nv, tv, fsci, nfc
+            )
+        )
+    if maskname is not None:
+        _, mask, _ = read_map(maskname)
+        from emda.ext.phase_randomize import phase_randomized_fsc
+
+        idx = np.argmin((bin_fsc - 0.8) ** 2)
+        resol_rand = res_arr[idx]
+        fsc_list_ph, msk_bincount = phase_randomized_fsc(
+            arr1=arr1,
+            arr2=arr2,
+            mask=mask,
+            bin_idx=bin_idx,
+            res_arr=res_arr,
+            fobj=tdata,
+            # resol_rand=resol_rand,
+        )
+        fsc_list.append(fsc_list_ph[0])
+        fsc_list.append(fsc_list_ph[1])
+        fsc_list.append(fsc_list_ph[2])
+
+        tdata.write("\n")
+        tdata.write("***** Fourier Shell Correlation *****\n")
+        tdata.write("\n")
+        tdata.write("bin # \n")
+        tdata.write("resolution (Ang.) \n")
+        tdata.write("Unmask FSC \n")
+        tdata.write("Masked FSC \n")
+        tdata.write("Noise FSC \n")
+        tdata.write("True FSC \n")
+        tdata.write("# reflx \n")
+        i = -1
+        for umf, mf, nf, tf, nfc in zip(
+            fsc_list[0], fsc_list[1], fsc_list[2], fsc_list[3], msk_bincount
+        ):
+            i += 1
+            tdata.write(
+                "{:-3d} {:-6.2f} {:-14.4f} {:-14.4f} {:-14.4f} {:-14.4f} {:-10d}\n".format(
+                    i, res_arr[i], umf, mf, nf, tf, nfc
+                )
+            )
+    if len(fsc_list) == 4:
+        plotter.plot_nlines(
+            res_arr,
+            fsc_list,
+            "halfmap_fsc_ph.eps",
+            curve_label=["Unmask", "Masked", "Noise", "Corrected"],
+            plot_title="Halfmap FSC",
+        )
+    return res_arr, fsc_list
 
 
 def get_variance(half1name, half2name, filename=None, maskname=None):
@@ -561,7 +804,8 @@ def twomap_fsc(map1name, map2name, fobj=None, xmlobj=None):
         fobj.write("resolution (Ang.) \n")
         fobj.write("fsc \n")
         for ibin, fsc1 in enumerate(bin_fsc):
-            fobj.write("{:5d} {:6.2f} {:6.3f}\n".format(ibin, res_arr[ibin], fsc1))
+            fobj.write("{:5d} {:6.2f} {:6.3f}\n".format(
+                ibin, res_arr[ibin], fsc1))
     print("Bin      Resolution     FSC")
     for ibin, fsc2 in enumerate(bin_fsc):
         print("{:5d} {:6.2f} {:6.3f}".format(ibin, res_arr[ibin], fsc2))
@@ -593,10 +837,12 @@ def balbes_data(map1name, map2name, fsccutoff=0.5, mode="half"):
     from emda.ext import xmlclass
 
     if mode == "half":
-        prepare_refmac_data(hf1name=map1name, hf2name=map2name, fsccutoff=fsccutoff)
+        prepare_refmac_data(
+            hf1name=map1name, hf2name=map2name, fsccutoff=fsccutoff)
     else:
         xml = xmlclass.Xml()
-        res_arr, bin_fsc = twomap_fsc(map1name=map1name, map2name=map2name, xmlobj=xml)
+        res_arr, bin_fsc = twomap_fsc(
+            map1name=map1name, map2name=map2name, xmlobj=xml)
 
 
 def singlemap_fsc(map1name, knl=3):
@@ -621,7 +867,9 @@ def singlemap_fsc(map1name, knl=3):
                 Linear array of FSC in each resolution bin.
             Outputs reconstituted map as 'fakehalf.mrc'
     """
+    from scipy import interpolate
     from emda.ext import fakehalf
+    from emda.ext.mapfit.mapaverage import set_array
 
     uc, arr1, origin = iotools.read_map(map1name)
     f1 = np.fft.fftshift(np.fft.fftn(np.fft.fftshift(arr1)))
@@ -631,17 +879,56 @@ def singlemap_fsc(map1name, knl=3):
     nbin, res_arr, bin_idx = restools.get_resolution_array(uc, f1)
     bin_fsc, _, _, _, _, _ = fsc.halfmaps_fsc_variance(f1, f2, bin_idx, nbin)
     print("Resolution bin     FSC")
-    for i in range(len(res_arr)):
+    for i, _ in enumerate(res_arr):
         print("{:.2f} {:.4f}".format(res_arr[i], bin_fsc[i]))
     # deciding resolution
-    nbin4 = nbin // 4
-    dist05 = np.sqrt((bin_fsc[nbin4:] - 0.5) ** 2)
-    map_resol = res_arr[nbin4:][np.argmin(dist05)]
+    bin_fsc_trunc = set_array(bin_fsc, thresh=0.15)
+    dist05 = np.sqrt((bin_fsc_trunc - 0.5) ** 2)
+    indx = fakehalf.get_index(dist05)
+    lim1 = bin_fsc[indx]
+    res1 = res_arr[indx]
+    if lim1 > 0.5:
+        lim2 = bin_fsc[indx + 1]
+        res2 = res_arr[indx + 1]
+        fsc_seq = [lim1, lim2]
+        res_seq = [res1, res2]
+    elif lim1 < 0.5:
+        lim2 = bin_fsc[indx - 1]
+        res2 = res_arr[indx - 1]
+        fsc_seq = [lim2, lim1]
+        res_seq = [res2, res1]
+    f = interpolate.interp1d(fsc_seq, res_seq)
+    map_resol = f(0.5)
     print("Map resolution (A): ", map_resol)
     return res_arr, bin_fsc, map_resol
 
 
-def mask_from_halfmaps(uc, half1, half2, radius=9, norm=False, iter=1, thresh=None):
+def get_fsc(arr1, arr2, uc):
+    """Returns FSC as a function of resolution
+
+    Arguments:
+        Inputs:
+            arr1: float, ndarray
+                Density array 1.
+            arr2: float, ndarray
+                Density array 2.
+            uc: float, 1D array
+                Unit cell
+
+        Outputs:
+            res_arr: float, 1D array
+                Linear array of resolution in Angstrom units.
+            bin_fsc: float, 1D array
+                Linear array of FSC in each resolution bin.
+    """
+    fmap1 = np.fft.fftshift(np.fft.fftn(arr1))
+    fmap2 = np.fft.fftshift(np.fft.fftn(arr2))
+    nbin, res_arr, bin_idx = restools.get_resolution_array(uc, fmap1)
+    bin_fsc = fsc.anytwomaps_fsc_covariance(fmap1, fmap2, bin_idx, nbin)[0]
+    return res_arr, bin_fsc
+
+
+def mask_from_halfmaps(uc, half1, half2, radius=9, norm=False, iter=1, thresh=0.5):
     """Generates a mask from half maps.
 
     Generates a mask from half maps based on real space local correlation.
@@ -679,9 +966,14 @@ def mask_from_halfmaps(uc, half1, half2, radius=9, norm=False, iter=1, thresh=No
         arr1, arr2 = realsp_local.hfdata_normalized(hf1=hf1, hf2=hf2, uc=uc)
         write_mrc(arr1, "normarr1.mrc", uc)
     obj_maskmap = maskmap_class.MaskedMaps()
-    obj_maskmap.generate_mask(arr1, arr2, smax=radius, iter=iter, threshold=thresh)
-    mask = obj_maskmap.mask
-    return mask
+    obj_maskmap.smax = radius
+    obj_maskmap.arr1 = arr1
+    obj_maskmap.arr2 = arr2
+    obj_maskmap.iter = iter
+    obj_maskmap.prob = thresh
+    # obj_maskmap.generate_mask(arr1, arr2, smax=radius, iter=iter, threshold=thresh)
+    obj_maskmap.generate_mask()
+    return obj_maskmap.mask
 
 
 def mask_from_map(
@@ -732,8 +1024,9 @@ def mask_from_map(
     from emda.ext import maskmap_class
 
     _, arrlp = lowpass_map(uc, arr, resol, filter, order=order)
-    write_mrc(arrlp, "lowpass.mrc", uc, orig)
-    mask = maskmap_class.mapmask(arr=arrlp, uc=uc, kern_rad=kern, prob=prob, itr=itr)
+    # write_mrc(arrlp, "lowpass.mrc", uc, orig)
+    mask = maskmap_class.mapmask(
+        arr=arrlp, uc=uc, kern_rad=kern, prob=prob, itr=itr)
     write_mrc(mask, "mapmask.mrc", uc, orig)
     return mask
 
@@ -765,6 +1058,8 @@ def overlay_maps(
     tra=None,
     axr=None,
     fobj=None,
+    usemodel=False,
+    fitres=None,
 ):
     """Superimposes several maps.
 
@@ -822,6 +1117,8 @@ def overlay_maps(
         fobj=fobj,
         interp=interp,
         halfmaps=hfm,
+        usemodel=usemodel,
+        fitres=fitres,
     )
 
 
@@ -901,7 +1198,7 @@ def realsp_correlation(
     half2map,
     kernel_size=5,
     norm=False,
-    lig=False,
+    lig=True,
     model=None,
     model_resol=None,
     mask_map=None,
@@ -916,7 +1213,7 @@ def realsp_correlation(
             half1map: string
                 Name of half map 2.
             kernel_size: integer, optional
-                Radius of integration kernal. Default is 5.
+                Radius of integration kernal in pixels. Default is 5.
             norm: bool, optional
                 If True, correlation will be carried out on normalized maps.
                 Default is False.
@@ -934,7 +1231,7 @@ def realsp_correlation(
             lig: bool, optional
                 An argument for model based map calculation using REFMAC.
                 Set True, if there is a ligand in the model, but no description.
-                Default is False.
+                Default is True.
             lgf: string, optional
                 An argument for model based map calculation using REFMAC.
                 Ligand description file (cif).
@@ -964,9 +1261,33 @@ def realsp_correlation(
         lgf=lgf,
     )
 
+def b_from_correlation(
+    half1map,
+    half2map,
+    resol,
+    kernel_size=5,
+    mask_map=None,
+):
+    from emda.ext import realsp_local
+
+    realsp_local.bfromcc(
+        half1_map=half1map,
+        half2_map=half2map,
+        kernel_size=kernel_size,
+        resol=resol,
+        mask_map=mask_map,
+    )
 
 def realsp_correlation_mapmodel(
-    fullmap, model, resol, kernel_size=5, lig=False, trimpx=1, mask_map=None, lgf=None
+    fullmap,
+    model,
+    resol,
+    kernel_size=5,
+    lig=True,
+    norm=False,
+    nomask=False,
+    mask_map=None,
+    lgf=None,
 ):
     """Calculates real space local correlation between map and model.
 
@@ -981,17 +1302,19 @@ def realsp_correlation_mapmodel(
                 An argument for model based map calculation using REFMAC.
                 Resolution to calculate model based map.
             kernel_size: integer, optional
-                Radius of integration kernal. Default is 5.
+                Radius of integration kernal in pixels. Default is 5.
             mask_map: string, optional
-                Mask file to apply on correlation maps. If not given, a spherical mask
-                will be employed. Default radius = (map.shape[0] // 2) - trimpx
-            trimpx: integer, optional
-                Parameter to adjust the radius (in pixels) of the spherical mask
-                in the absence of mask_map argument. default is 1.
+                Mask file to apply on correlation maps.
+            nomask: bool, optional
+                If True, correlation maps are not masked. Otherwise, internally
+                calculated mask is used, if a mask is not supplied.
+            norm: bool, optional
+                If True, correlation will be carried out on normalized maps.
+                Default is False.
             lig: bool, optional
                 An argument for model based map calculation using REFMAC.
                 Set True, if there is a ligand in the model, but no description.
-                Default is False.
+                Default is True.
             lgf: string, optional
                 An argument for model based map calculation using REFMAC.
                 Ligand description file (cif).
@@ -1011,11 +1334,12 @@ def realsp_correlation_mapmodel(
         resol=resol,
         mask_map=mask_map,
         lgf=lgf,
-        trim_px=trimpx,
+        nomask=nomask,
+        norm=norm,
     )
 
 
-def fouriersp_correlation(half1_map, half2_map, kernel_size):
+def fouriersp_correlation(half1_map, half2_map, kernel_size=5, mask=None):
     """Calculates Fourier space local correlation using half maps.
 
     Arguments:
@@ -1038,7 +1362,7 @@ def fouriersp_correlation(half1_map, half2_map, kernel_size):
     from emda.ext import fouriersp_local
 
     fouriersp_local.fcc(
-        half1_map=half1_map, half2_map=half2_map, kernel_size=kernel_size
+        half1_map=half1_map, half2_map=half2_map, kernel_size=kernel_size, maskmap=mask
     )
 
 
@@ -1047,7 +1371,7 @@ def map_model_validate(
     half2map,
     modelfpdb,
     bfac=0.0,
-    lig=False,
+    lig=True,
     model1pdb=None,
     mask=None,
     modelresol=None,
@@ -1081,7 +1405,7 @@ def map_model_validate(
             lig: bool, optional
                 An argument for model based map calculation using REFMAC.
                 Set True, if there is a ligand in the model, but no description.
-                Default is False.
+                Default is True.
             lgf: string, optional
                 An argument for model based map calculation using REFMAC.
                 Ligand description file (cif).
@@ -1113,16 +1437,43 @@ def map_model_validate(
     return fsc_list
 
 
-def difference_map(maplist, masklist, smax, mode="ampli"):
+def mapmodel_fsc(
+    map1,
+    model,
+    fobj,
+    bfac=0.0,
+    modelresol=5.0,
+    lig=True,
+    phaserand=False,
+    mask=None,
+    lgf=None,
+):
+    from emda.ext import map_fsc
+
+    res_arr, bin_fsc = map_fsc.fsc_mapmodel(
+        map1=map1,
+        model=model,
+        model_resol=modelresol,
+        bfac=bfac,
+        lig=lig,
+        mask_map=mask,
+        lgf=lgf,
+        phaserand=phaserand,
+        fobj=fobj,
+    )
+    return res_arr, bin_fsc
+
+
+def difference_map(maplist, smax=0.0, mode="ampli", masklist=None):
     """Calculates difference map.
 
     Arguments:
         Inputs:
             maplist: string
                 List of map names to calculate difference maps.
-            masklist: string
+            masklist: string, optional
                 List of masks to apply on maps.
-            smax: float
+            smax: float, optional
                 Resolution to which difference map be calculated.
             mode: string, optional
                 Different modes to scale maps. Three difference modes are supported.
@@ -1135,21 +1486,73 @@ def difference_map(maplist, masklist, smax, mode="ampli"):
     """
     from emda.ext import difference
 
-    uc, arr1, origin = read_map(maplist[0])
-    _, arr2, _ = iotools.read_map(maplist[1])
-    _, msk1, _ = iotools.read_map(masklist[0])
-    _, msk2, _ = iotools.read_map(masklist[1])
+    msk1 = msk2 = 1.0
+    assert len(maplist) == 2
+    if maplist[0].endswith(((".mrc", ".map"))) and maplist[1].endswith(
+        ((".mrc", ".map"))
+    ):
+        uc, arr1, origin = read_map(maplist[0])
+        _, arr2, _ = iotools.read_map(maplist[1])
+    elif maplist[0].endswith(((".mrc", ".map"))) and maplist[1].endswith(
+        ((".pdb", ".cif", ".ent"))
+    ):
+        uc, arr1, origin = read_map(maplist[0])
+        if (smax - 0.0) < 0.1:
+            raise SystemExit(
+                "Please specify resolution to calculate map from atomic model"
+            )
+        else:
+            # calculate map from model
+            modelmap = model2map(
+                modelxyz=maplist[1],
+                dim=arr1.shape,
+                resol=smax,
+                cell=uc,
+                maporigin=origin,
+            )
+            arr2 = modelmap
+    elif maplist[0].endswith(((".pdb", ".cif", ".ent"))) and maplist[1].endswith(
+        ((".mrc", ".map"))
+    ):
+        uc, arr2, origin = read_map(maplist[1])
+        if (smax - 0.0) < 0.1:
+            raise SystemExit(
+                "Please specify resolution to calculate map from atomic model"
+            )
+        else:
+            # calculate map from model
+            modelmap = model2map(
+                modelxyz=maplist[0],
+                dim=arr2.shape,
+                resol=smax,
+                cell=uc,
+                maporigin=origin,
+            )
+            arr1 = modelmap
+    elif maplist[0].endswith(((".pdb", ".cif", ".ent"))) and maplist[1].endswith(
+        ((".pdb", ".cif", ".ent"))
+    ):
+        raise SystemExit(
+            "Both are atomic models. I need at least one map file")
+
+    # uc, arr1, origin = read_map(maplist[0])
+    # _, arr2, _ = iotools.read_map(maplist[1])
+    if masklist is not None:
+        assert len(maplist) == len(masklist) == 2
+        _, msk1, _ = iotools.read_map(masklist[0])
+        _, msk2, _ = iotools.read_map(masklist[1])
     f1 = np.fft.fftshift(np.fft.fftn(np.fft.fftshift(arr1)))  # * msk1)))
     f2 = np.fft.fftshift(np.fft.fftn(np.fft.fftshift(arr2)))  # * msk2)))
     if mode == "power":
-        dm1_dm2, dm2_dm1 = difference.diffmap_scalebypower(
+        print("This method is obsolate. Try --mod norm or ampli instead.")
+        """ dm1_dm2, dm2_dm1 = difference.diffmap_scalebypower(
             f1=f1, f2=f2, cell=uc, origin=origin, smax=smax
         )
         # calculate map rmsd
         masked_mean = np.sum(dm1_dm2 * msk1) / np.sum(msk1)
         diff = (dm1_dm2 - masked_mean) * msk1
         rmsd = np.sqrt(np.sum(diff * diff) / np.sum(msk1))
-        print("rmsd: ", rmsd)
+        print("rmsd: ", rmsd) """
 
     if mode == "norm":
         diffmap = difference.diffmap_normalisedsf(
@@ -1158,21 +1561,24 @@ def difference_map(maplist, masklist, smax, mode="ampli"):
         list_maps = []
         for i in range(diffmap.shape[3]):
             map = np.real(
-                np.fft.ifftshift(np.fft.ifftn(np.fft.ifftshift(diffmap[:, :, :, i])))
+                np.fft.ifftshift(np.fft.ifftn(
+                    np.fft.ifftshift(diffmap[:, :, :, i])))
             )
             list_maps.append(map)
         # calculate map rmsd
-        masked_mean = np.sum(list_maps[0] * msk1) / np.sum(msk1)
-        diff = (list_maps[0] - masked_mean) * msk1
-        rmsd = np.sqrt(np.sum(diff * diff) / np.sum(msk1))
-        print("rmsd: ", rmsd)
-        masked_mean = np.sum(list_maps[1] * msk2) / np.sum(msk2)
-        diff = (list_maps[1] - masked_mean) * msk2
-        rmsd = np.sqrt(np.sum(diff * diff) / np.sum(msk2))
-        print("rmsd of diffmap_m1-m2_amp: ", rmsd)
-
-        iotools.write_mrc(list_maps[0] * msk1, "diffmap_m1-m2_nrm.mrc", uc, origin)
-        iotools.write_mrc(list_maps[1] * msk2, "diffmap_m2-m1_nrm.mrc", uc, origin)
+        if masklist is not None:
+            masked_mean = np.sum(list_maps[0] * msk1) / np.sum(msk1)
+            diff = (list_maps[0] - masked_mean) * msk1
+            rmsd = np.sqrt(np.sum(diff * diff) / np.sum(msk1))
+            print("rmsd: ", rmsd)
+            masked_mean = np.sum(list_maps[1] * msk2) / np.sum(msk2)
+            diff = (list_maps[1] - masked_mean) * msk2
+            rmsd = np.sqrt(np.sum(diff * diff) / np.sum(msk2))
+            print("rmsd of diffmap_m1-m2_amp: ", rmsd)
+        iotools.write_mrc(list_maps[0] * msk1,
+                          "diffmap_m1-m2_nrm.mrc", uc, origin)
+        iotools.write_mrc(list_maps[1] * msk2,
+                          "diffmap_m2-m1_nrm.mrc", uc, origin)
         iotools.write_mrc(list_maps[2] * msk1, "map1.mrc", uc, origin)
         iotools.write_mrc(list_maps[3] * msk2, "map2.mrc", uc, origin)
 
@@ -1183,21 +1589,25 @@ def difference_map(maplist, masklist, smax, mode="ampli"):
         list_maps = []
         for i in range(diffmap.shape[3]):
             map = np.real(
-                np.fft.ifftshift(np.fft.ifftn(np.fft.ifftshift(diffmap[:, :, :, i])))
+                np.fft.ifftshift(np.fft.ifftn(
+                    np.fft.ifftshift(diffmap[:, :, :, i])))
             )
             list_maps.append(map)
         # calculate map rmsd
-        masked_mean = np.sum(list_maps[0] * msk1) / np.sum(msk1)
-        diff = (list_maps[0] - masked_mean) * msk1
-        rmsd = np.sqrt(np.sum(diff * diff) / np.sum(msk1))
-        print("rmsd of diffmap_m1-m2_amp: ", rmsd)
-        masked_mean = np.sum(list_maps[1] * msk2) / np.sum(msk2)
-        diff = (list_maps[1] - masked_mean) * msk2
-        rmsd = np.sqrt(np.sum(diff * diff) / np.sum(msk2))
-        print("rmsd of diffmap_m2-m1_amp: ", rmsd)
+        if masklist is not None:
+            masked_mean = np.sum(list_maps[0] * msk1) / np.sum(msk1)
+            diff = (list_maps[0] - masked_mean) * msk1
+            rmsd = np.sqrt(np.sum(diff * diff) / np.sum(msk1))
+            print("rmsd of diffmap_m1-m2_amp: ", rmsd)
+            masked_mean = np.sum(list_maps[1] * msk2) / np.sum(msk2)
+            diff = (list_maps[1] - masked_mean) * msk2
+            rmsd = np.sqrt(np.sum(diff * diff) / np.sum(msk2))
+            print("rmsd of diffmap_m2-m1_amp: ", rmsd)
         # difference map output
-        iotools.write_mrc(list_maps[0] * msk1, "diffmap_m1-m2_amp.mrc", uc, origin)
-        iotools.write_mrc(list_maps[1] * msk2, "diffmap_m2-m1_amp.mrc", uc, origin)
+        iotools.write_mrc(list_maps[0] * msk1,
+                          "diffmap_m1-m2_amp.mrc", uc, origin)
+        iotools.write_mrc(list_maps[1] * msk2,
+                          "diffmap_m2-m1_amp.mrc", uc, origin)
         iotools.write_mrc(list_maps[2] * msk1, "map1.mrc", uc, origin)
         iotools.write_mrc(list_maps[3] * msk2, "map2.mrc", uc, origin)
 
@@ -1242,7 +1652,8 @@ def bestmap(hf1name, hf2name, outfile, mode=1, knl=5, mask=None):
     f2 = np.fft.fftshift(np.fft.fftn(arr2))  # * msk))
     if mode == 1:
         nbin, res_arr, bin_idx = restools.get_resolution_array(uc, f1)
-        f_map = bestmap.bestmap(f1=f1, f2=f2, bin_idx=bin_idx, nbin=nbin, mode=mode)
+        f_map = bestmap.bestmap(
+            f1=f1, f2=f2, bin_idx=bin_idx, nbin=nbin, mode=mode, res_arr=res_arr)
     elif mode == 2:
         f_map = bestmap.bestmap(f1=f1, f2=f2, mode=mode, kernel_size=knl)
     data2write = np.real(np.fft.ifftn(np.fft.ifftshift(f_map))) * msk
@@ -1375,24 +1786,44 @@ def prepare_refmac_data(
     )
 
 
-def overall_cc(map1name, map2name, space="real", maskname=None):
+def overall_cc(map1name, map2name, space="real", resol=5, maskname=None):
     from emda.ext import cc
 
-    uc, arr1, origin = iotools.read_map(map1name)
-    uc, arr2, origin = iotools.read_map(map2name)
+    data_found = False
+    if map1name.endswith((".mrc", ".map")):
+        uc, arr1, origin = iotools.read_map(map1name)
+        _, arr2, _ = get_data(
+            struct=map2name, resol=resol, uc=uc, dim=arr1.shape, maporigin=origin
+        )
+    elif map1name.endswith((".pdb", ".ent", ".cif")):
+        if map2name.endswith((".mrc", ".map")):
+            uc, arr2, origin = iotools.read_map(map2name)
+            _, arr1, _ = get_data(
+                struct=map1name, resol=resol, uc=uc, dim=arr2.shape, maporigin=origin
+            )
+    else:
+        uc, arr1, origin = get_data(struct=map1name, resol=resol)
+        _, arr1, _ = get_data(
+            struct=map2name, resol=resol, uc=uc, dim=arr1.shape, maporigin=origin
+        )
     if maskname is not None:
         uc, msk, origin = read_map(maskname)
-        arr1 = arr1 * msk
-        arr2 = arr2 * msk
+        msk = msk * (msk > 0.0)
+    else:
+        msk = None
     if space == "fourier":
         print("Overall CC calculation in Fourier space")
-        f1 = np.fft.fftn(arr1)
-        f2 = np.fft.fftn(arr2)
+        if msk is not None:
+            f1 = np.fft.fftn(arr1 * msk)
+            f2 = np.fft.fftn(arr2 * msk)
+        else:
+            f1 = np.fft.fftn(arr1)
+            f2 = np.fft.fftn(arr2)
         occ, hocc = cc.cc_overall_fouriersp(f1=f1, f2=f2)
         print("Overall Correlation in Fourier space= ", occ)
     else:
         print("Overall CC calculation in Real/Image space")
-        occ, hocc = cc.cc_overall_realsp(map1=arr1, map2=arr2)
+        occ, hocc = cc.cc_overall_realsp(map1=arr1, map2=arr2, mask=msk)
         print("Overall Correlation in real space= ", occ)
     return occ, hocc
 
@@ -1404,7 +1835,9 @@ def mirror_map(mapname):
     iotools.write_mrc(data, "mirror.mrc", uc, origin)
 
 
-def model2map(modelxyz, dim, resol, cell, bfac=0.0, lig=False, ligfile=None):
+def model2map(
+    modelxyz, dim, resol, cell, bfac=0.0, lig=True, maporigin=None, ligfile=None
+):
     import gemmi as gm
 
     # check for valid sampling:
@@ -1423,10 +1856,24 @@ def model2map(modelxyz, dim, resol, cell, bfac=0.0, lig=False, ligfile=None):
     a, b, c = cell[:3]
     structure = gm.read_structure(modelxyz)
     structure.cell.set(a, b, c, 90.0, 90.0, 90.0)
+    structure.spacegroup_hm = "P 1"
     structure.make_mmcif_document().write_file("model.cif")
     # run refmac using model.cif just created
-    iotools.run_refmac_sfcalc("./model.cif", resol, bfac, lig=lig, ligfile=ligfile)
+    iotools.run_refmac_sfcalc("./model.cif", resol,
+                              bfac, lig=lig, ligfile=ligfile)
     modelmap = maptools.mtz2map("./sfcalc_from_crd.mtz", dim)
+    if maporigin is None:
+        maporigin = [0, 0, 0]
+    else:
+        shift_z = modelmap.shape[0] - abs(maporigin[2])
+        shift_y = modelmap.shape[1] - abs(maporigin[1])
+        shift_x = modelmap.shape[2] - abs(maporigin[0])
+        # print(shift_z, shift_y, shift_x)
+        modelmap = np.roll(
+            np.roll(np.roll(modelmap, -shift_z, axis=0), -shift_y, axis=1),
+            -shift_x,
+            axis=2,
+        )
     return modelmap
 
 
@@ -1458,3 +1905,177 @@ def mapmagnification(maplist, rmap):
     # magnification refinement
     maplist.append(rmap)
     magnification.main(maplist=maplist)
+
+
+def set_dim_even(x):
+    """Sets all dimentions even
+
+    This function accepts 3D numpy array and sets its all 3 dims even
+
+    Arguments:
+        Inputs:
+            x: 3D numpy array
+
+        Outputs:
+            x: 3D numpy array with all dims are even
+    """
+    if x.shape[0] % 2 != 0:
+        xshape = list(x.shape)
+        xshape[0] = xshape[0] + 1
+        xshape[1] = xshape[1] + 1
+        xshape[2] = xshape[2] + 1
+        temp = np.zeros(xshape, x.dtype)
+        temp[:-1, :-1, :-1] = x
+        x = temp
+    return x
+
+
+def set_dim_equal(x):
+    """Sets all dimentions equal and even
+
+    This function accepts 3D numpy array and sets its all 3 dims even and equal
+
+    Arguments:
+        Inputs:
+            x: 3D numpy array
+
+        Outputs:
+            x: 3D numpy array with all dims are even and equal
+    """
+    xshape = list(x.shape)
+    maxdim = max(xshape)
+    if maxdim % 2 != 0:
+        maxdim = maxdim + 1
+    temp = np.zeros((maxdim, maxdim, maxdim), dtype=x.dtype)
+    temp[0: xshape[0], 0: xshape[1], 0: xshape[2]] = x
+    x = temp
+    return x
+
+
+def center_of_mass_density(arr):
+    """Returns the center of mass of 3D density array.
+
+    This function accepts density as 3D numpy array and caclulates the
+    center-of-mass.
+
+    Arguments:
+        Inputs:
+            arr: density as 3D numpy array
+
+        Outputs:
+            com: tuple, center-of-mass (x, y, z)
+    """
+    from scipy import ndimage
+
+    return ndimage.measurements.center_of_mass(arr * (arr >= 0.0))
+
+
+def shift_density(arr, shift):
+    """Returns a shifted copy of the input array.
+
+    Shift the array using spline interpolation (order=3). Same as Scipy
+    implementation.
+
+    Arguments:
+        Inputs:
+            arr: density as 3D numpy array
+            shift: sequence. The shifts along the axes.
+
+        Outputs:
+            shifted_arr: ndarray. Shifted array
+    """
+    from scipy import ndimage
+
+    # return ndimage.interpolation.shift(arr, shift)
+    return ndimage.shift(arr, shift, mode="wrap")
+
+
+def rotate_density(arr, rotmat, interp="linear"):
+    """Returns a rotated array of density
+
+    Rotates the array of density using inperpolation.
+
+    Arguments:
+        Inputs:
+            arr: density as 3D numpy array
+            rotmat: 3 x 3 rotation matrix as 2D numpy array.
+            interp: string.
+                    Type of interpolation to use: cubic or linear.
+                    Default is linear
+
+        Outputs:
+            rotated_arr: ndarray. Rotated array.
+    """
+    import fcodes_fast as fcodes
+
+    nx, ny, nz = arr.shape
+    if interp == "cubic":
+        arr = arr.transpose()
+        if arr.ndim == 3:
+            arr = np.expand_dims(arr, axis=3)
+            arr2 = fcodes.tricubic_map(rotmat.transpose(), arr, 1, 1, nx, ny, nz)[
+                :, :, :, 0
+            ]
+        return arr2
+    else:
+        return fcodes.trilinear_map(rotmat.transpose(), arr, debug_mode, nx, ny, nz)
+
+
+def get_dim(model, shiftmodel="new1.cif"):
+    """Returns the box dimension to put the modelmap in.
+
+    Determines the dimension of the box for the model based map.
+
+    Arguments:
+        Inputs:
+            model:  atomic model as .pdb/.cif
+            shiftmodel: name for COM shifted model, optional.
+                    Default name - new1.cif.
+
+        Outputs:
+            dim: integer, dimension of the box.
+    """
+    import gemmi
+
+    st = gemmi.read_structure(model)
+    model = st[0]
+    com = model.calculate_center_of_mass()
+    print(com)
+    xc = []
+    yc = []
+    zc = []
+    for cra in model.all():
+        cra.atom.pos.x -= com.x
+        cra.atom.pos.y -= com.y
+        cra.atom.pos.z -= com.z
+        xc.append(cra.atom.pos.x)
+        yc.append(cra.atom.pos.y)
+        zc.append(cra.atom.pos.z)
+    st.spacegroup_hm = "P 1"
+    st.make_mmcif_document().write_file(shiftmodel)
+    xc_np = np.asarray(xc)
+    yc_np = np.asarray(yc)
+    zc_np = np.asarray(zc)
+    distances = np.sqrt(np.power(xc_np, 2) +
+                        np.power(yc_np, 2) + np.power(zc_np, 2))
+    dim1 = 2 + (int(np.max(distances)) + 1) * 2
+    return dim1
+
+
+def fetch_data(emdbidlist, alldata=False):
+    from emda.ext import downmap
+
+    downmap.main(emdbidlist, alldata=alldata)
+
+
+def symaxis_refine(maplist, mapoutvar=False, emdbidlist=None, reslist=None):
+    from emda.ext import refine_symaxis
+
+    (
+        emdcode_list,
+        initial_axes_list,
+        final_axes_list,
+        fold_list,
+        avgfsc_list,
+    ) = refine_symaxis.main(maplist=maplist, emdbidlist=emdbidlist, mapoutvar=mapoutvar, reslist=reslist)
+    return emdcode_list, initial_axes_list, final_axes_list, fold_list, avgfsc_list
