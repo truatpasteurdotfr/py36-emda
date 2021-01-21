@@ -37,7 +37,8 @@ else:
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = ['sphinx.ext.autodoc', 'sphinxarg.ext', 'autoapi.extension']
-
+autoapi_type = 'python'
+autoapi_dir = './scripts'
 #autodoc_mock_imports = ["emda"]
 
 # Add any paths that contain templates here, relative to this directory.
