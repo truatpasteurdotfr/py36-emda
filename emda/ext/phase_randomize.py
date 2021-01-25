@@ -56,6 +56,50 @@ def get_randomized_sf(bin_idx, rho, rand_idx):
     return f_beyond_random
 
 
+def phase_randomized_fsc(arr1, arr2, mask, bin_idx, res_arr, fobj, resol_rand=None):
+    fsc_list = []
+    nbin = np.max(bin_idx) + 1
+    fmap1 = np.fft.fftshift(np.fft.fftn(arr1 * mask))
+    fmap2 = np.fft.fftshift(np.fft.fftn(arr2 * mask))
+    bin_stats = core.fsc.anytwomaps_fsc_covariance(
+        f1=fmap1, f2=fmap2, bin_idx=bin_idx, nbin=nbin
+    )
+    full_fsc_t, bin_count = bin_stats[0], bin_stats[2]
+    fsc_list.append(full_fsc_t)
+    if resol_rand is None:
+        # resol_rand is taken as the point where half-fsc_masked falls below 0.8 - RELION
+        idx = np.argmin((full_fsc_t - 0.8) ** 2)
+        resol_rand = res_arr[idx]
+    else:
+        idx = np.argmin((res_arr - resol_rand) ** 2)
+    # phase randomization
+    print('phase randomize resolution: ', res_arr[idx])
+    fobj.write('phase randomize resolution: %6.2f\n' % res_arr[idx])
+    f1_randomized = get_randomized_sf(bin_idx, arr1, idx)
+    f2_randomized = get_randomized_sf(bin_idx, arr2, idx)
+    # get phase randomized maps
+    randarr1 = np.real(np.fft.ifftn(np.fft.ifftshift(f1_randomized)))
+    randarr2 = np.real(np.fft.ifftn(np.fft.ifftshift(f2_randomized)))
+    full_fsc_n, _, _, _, _, _ = core.fsc.halfmaps_fsc_variance(
+        np.fft.fftshift(np.fft.fftn(randarr1 * mask)),
+        np.fft.fftshift(np.fft.fftn(randarr2 * mask)),
+        bin_idx,
+        nbin,
+    )
+    fsc_list.append(full_fsc_n)
+    fsc_true = (full_fsc_t - full_fsc_n) / (1 - full_fsc_n)
+    fsc_true[: idx + 2] = full_fsc_t[: idx + 2]
+    fsc_list.append(fsc_true)
+    core.plotter.plot_nlines(
+        res_arr=res_arr,
+        list_arr=fsc_list,
+        mapname="fsc_phaserand.eps",
+        curve_label=["total", "noise", "true"],
+        fscline=0.5,
+    )
+    return fsc_list, bin_count
+
+
 def main():
     args = cmdl_parser.parse_args()
     # Read half maps
