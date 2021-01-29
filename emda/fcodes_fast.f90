@@ -1547,14 +1547,17 @@ subroutine mtz2_3d(h,k,l,f,nobs,nx,ny,nz,f3d)
   return
 end subroutine mtz2_3d
 
-subroutine prepare_hkl(hf1,nx,ny,nz,mode,h,k,l,ampli,phase)
+subroutine prepare_hkl(hf1,bin_idx,cbin,nx,ny,nz,mode,h,k,l,ampli,phase)
   implicit none
   real*8,    parameter :: PI = 3.141592653589793
 
-  integer,                intent(in) :: mode,nx,ny,nz
+  integer, intent(in) :: cbin,mode,nx,ny,nz
   complex*16, dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in)  :: hf1
-  integer, dimension(nx*ny*(ny+2)/2),intent(out) :: h,k,l
-  real*8, dimension(nx*ny*(ny+2)/2),intent(out) :: ampli, phase
+  integer, dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in)  :: bin_idx
+  !integer, dimension(nx*ny*(ny+2)/2),intent(out) :: h,k,l
+  !real*8, dimension(nx*ny*(ny+2)/2),intent(out) :: ampli, phase
+  integer, dimension(4*cbin*cbin*cbin),intent(out) :: h,k,l
+  real*8, dimension(4*cbin*cbin*cbin),intent(out) :: ampli, phase
   ! locals
   integer,   dimension(3)          :: nxyz
   integer    :: xyzmin(3),xyzmax(3)
@@ -1567,12 +1570,8 @@ subroutine prepare_hkl(hf1,nx,ny,nz,mode,h,k,l,ampli,phase)
   !call cpu_time(start)
 
   xyzmin = 0; xyzmax = 0
-
   nxyz = (/ nx, ny, nz /)
-
   h = 0; k = 0; l = 0
-
-
   xyzmin(1) = int(-nxyz(1)/2)
   xyzmin(2) = int(-nxyz(2)/2)
   xyzmin(3) = int(-nxyz(3)/2)
@@ -1580,12 +1579,13 @@ subroutine prepare_hkl(hf1,nx,ny,nz,mode,h,k,l,ampli,phase)
   if(debug) print*, 'xyzmin = ', xyzmin
   if(debug) print*, 'xyzmax = ', xyzmax
 
+  print*, 'cbin= ', cbin
   j = 0
   ! using Friedel's Law
   do i1=xyzmin(1), xyzmax(1)
      do i2=xyzmin(2), xyzmax(2)
         do i3=xyzmin(3), 0 !xyzmax(3)
-           !if(i3 < 0) cycle
+           if(bin_idx(i1,i2,i3) < 0 .or. bin_idx(i1,i2,i3) > cbin) cycle
            j = j + 1
            h(j) = i1
            k(j) = i2
