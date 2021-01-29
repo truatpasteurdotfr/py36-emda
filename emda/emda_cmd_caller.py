@@ -152,6 +152,8 @@ half2full.add_argument(
 conv_map2mtz = subparsers.add_parser(
     "map2mtz", description="Convert MRC/MAP to MTZ.")
 conv_map2mtz.add_argument("--map", required=True, help="input map (mrc/map)")
+conv_map2mtz.add_argument("--res", required=False, type=float,
+                          help="resolution cutoff (A). default Nyquist")
 conv_map2mtz.add_argument(
     "--out", required=False, default="map2mtz.mtz", help="output map (mtz)"
 )
@@ -256,7 +258,8 @@ realspc.add_argument(
     "--lgf", required=False, default=None, type=str, help="ligand description file"
 )
 
-bfromcc = subparsers.add_parser("bfromcc", description="local b from real space correlation")
+bfromcc = subparsers.add_parser(
+    "bfromcc", description="local b from real space correlation")
 bfromcc.add_argument("--h1", required=True, help="input halfmap1 map")
 bfromcc.add_argument("--h2", required=True, help="input halfmap2 map")
 bfromcc.add_argument("--res", required=True,
@@ -754,7 +757,7 @@ def map2mtz(args):
         outfile = args.out
     else:
         outfile = args.out + ".mtz"
-    emda_methods.map2mtz(args.map, outfile)
+    emda_methods.map2mtz(args.map, outfile, resol=args.res)
 
 
 def mtz2map(args):
@@ -858,6 +861,7 @@ def realsp_corr(args):
         lgf=args.lgf,
     )
 
+
 def b_from_cc(args):
     from emda.emda_methods import b_from_correlation
 
@@ -868,6 +872,7 @@ def b_from_cc(args):
         resol=args.res,
         mask_map=args.msk,
     )
+
 
 def mmrealsp_corr(args):
     from emda.emda_methods import realsp_correlation_mapmodel
