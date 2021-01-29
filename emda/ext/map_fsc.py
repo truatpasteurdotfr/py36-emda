@@ -309,23 +309,24 @@ def fsc_mapmodel(
     fobj.write("\n")
     fobj.write("bin number \n")
     fobj.write("resolution (Ang.) \n")
+    fobj.write("reci. resolution (1/Ang.) \n")
     fobj.write("unmask-FSC \n")
     fobj.write("mask-FSC \n")
     fobj.write("number of reflections \n")
     fobj.write("\n")
     print()
-    print("Bin#    Resolution(A)   unmask-FSC   mask-FSC     #reflx")
+    print("Bin#    Resolution(A)  reci.Resol.(1/A)  unmask-FSC   mask-FSC     #reflx")
     i = -1
     for umfsci, mfsci, nfc in zip(fsc_list[0], fsc_list[1], bin_count):
         i += 1
         print(
-            "{:-3d} {:-8.3f} {:-14.4f} {:-14.4f} {:-10d}".format(
-                i, res_arr[i], umfsci, mfsci, nfc
+            "{:-3d} {:-8.3f} {:-8.3f} {:-14.4f} {:-14.4f} {:-10d}".format(
+                i, res_arr[i], 1.0/res_arr[i],umfsci, mfsci, nfc
             )
         )
         fobj.write(
-            "{:-3d} {:-8.3f} {:-14.4f} {:-14.4f} {:-10d}\n".format(
-                i, res_arr[i], umfsci, mfsci, nfc
+            "{:-3d} {:-8.3f} {:-8.3f} {:-14.4f} {:-14.4f} {:-10d}\n".format(
+                i, res_arr[i], 1.0/res_arr[i], umfsci, mfsci, nfc
             )
         )
     core.plotter.plot_nlines(
