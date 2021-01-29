@@ -134,7 +134,7 @@ def write_mrc(mapdata, filename, unit_cell, map_origin=None, factor=1.0, label=F
     file.close()
 
 
-def write_3d2mtz(unit_cell, mapdata, outfile="map2mtz.mtz"):
+def write_3d2mtz(unit_cell, mapdata, outfile="map2mtz.mtz", resol=None):
     """ Writes 3D Numpy array into MTZ file.
 
     Arguments:
@@ -143,13 +143,26 @@ def write_3d2mtz(unit_cell, mapdata, outfile="map2mtz.mtz"):
                 Unit cell params.
             mapdata: complex, 3D array
                 Map values to write.
+            resol: float, optional
+                Map will be output for this resolution.
+                Default is up to Nyquist.
 
         Outputs: 
             outfile: string
             Output file name. Default is map2mtz.mtz.
     """
-    print(mapdata.shape)
+    from emda.core import restools
+
     nx, ny, nz = mapdata.shape
+    assert nx == ny == nz
+    nbin, res_arr, bin_idx = restools.get_resolution_array(unit_cell, mapdata)
+    if resol is None:
+        cbin = nx // 2
+    else:
+        dist = np.sqrt((res_arr - resol) ** 2)
+        cbin = np.argmin(dist) + 1
+        if cbin % 2 != 0: cbin += 1
+        if nbin < cbin: cbin = nbin
     mtz = gemmi.Mtz()
     mtz.spacegroup = gemmi.find_spacegroup_by_name("P 1")
     mtz.cell.set(unit_cell[0], unit_cell[1], unit_cell[2], 90, 90, 90)
@@ -159,7 +172,11 @@ def write_3d2mtz(unit_cell, mapdata, outfile="map2mtz.mtz"):
     mtz.add_column("Fout0", "F")
     mtz.add_column("Pout0", "P")
     # calling fortran function
-    h, k, l, ampli, phase = fcodes_fast.prepare_hkl(mapdata, debug_mode, nx, ny, nz)
+    h,k,l,ampli,phase = fcodes_fast.prepare_hkl(mapdata,bin_idx,cbin,debug_mode,nx,ny,nz)
+    #h, k, l, ampli, phase = fcodes_fast.prepare_hkl(mapdata, debug_mode, nx, ny, nz)
+    print("hmin, hmax ", np.amin(h), np.amax(h))
+    print("kmin, kmax ", np.amin(k), np.amax(k))
+    print("lmin, lmax ", np.amin(l), np.amax(l))
     nrows = len(h)
     ncols = 5  # Change this according to what columns to write
     data = np.ndarray(shape=(nrows, ncols), dtype=object)
@@ -168,7 +185,7 @@ def write_3d2mtz(unit_cell, mapdata, outfile="map2mtz.mtz"):
     data[:, 2] = -h.astype(int)
     data[:, 3] = ampli.astype(np.float32)
     data[:, 4] = phase.astype(np.float32)
-    print(data.shape)
+    #print("data shape: ", data.shape)
     mtz.set_data(data)
     mtz.write_to_file(outfile)
 
