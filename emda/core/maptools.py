@@ -113,13 +113,13 @@ def apply_bfactor_to_map(mapname, bf_arr, mapout):
     return all_mapout
 
 
-def map2mtz(mapname, mtzname="map2mtz.mtz", factor=1.0):
+def map2mtz(mapname, mtzname="map2mtz.mtz", factor=1.0, resol=None):
     uc, ar1, _ = iotools.read_map(mapname)
     uc[0] = uc[0] * factor
     uc[1] = uc[1] * factor
     uc[2] = uc[2] * factor
     hf1 = np.fft.fftshift(np.fft.fftn(ar1))
-    iotools.write_3d2mtz(unit_cell=uc, mapdata=hf1, outfile=mtzname)
+    iotools.write_3d2mtz(unit_cell=uc, mapdata=hf1, outfile=mtzname, resol=resol)
 
 
 def mtz2map(mtzname, map_size):
