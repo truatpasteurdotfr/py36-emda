@@ -145,7 +145,7 @@ def write_mrc(mapdata, filename, unit_cell, map_origin=None):
     )
 
 
-def write_mtz(uc, arr, outfile="map2mtz.mtz"):
+def write_mtz(uc, arr, outfile="map2mtz.mtz", resol=None):
     """Writes 3D Numpy array into MTZ file.
 
     Arguments:
@@ -159,7 +159,7 @@ def write_mtz(uc, arr, outfile="map2mtz.mtz"):
             outfile: string
             Output file name. Default is map2mtz.mtz.
     """
-    iotools.write_3d2mtz(unit_cell=uc, mapdata=arr, outfile=outfile)
+    iotools.write_3d2mtz(unit_cell=uc, mapdata=arr, outfile=outfile, resol=resol)
 
 
 def resample_data(curnt_pix, targt_pix, targt_dim, arr):
@@ -281,7 +281,7 @@ def apply_bfactor_to_map(mapname, bf_arr, mapout):
     return all_mapout
 
 
-def map2mtz(mapname, mtzname="map2mtz.mtz"):
+def map2mtz(mapname, mtzname="map2mtz.mtz", resol=None):
     """Converts a map into MTZ format.
 
     Arguments:
@@ -294,7 +294,7 @@ def map2mtz(mapname, mtzname="map2mtz.mtz"):
         Outputs:
             Outputs MTZ file.
     """
-    maptools.map2mtz(mapname=mapname, mtzname=mtzname)
+    maptools.map2mtz(mapname=mapname, mtzname=mtzname, resol=resol)
 
 
 def map2mtzfull(uc, arr1, arr2, mtzname="halfnfull.mtz"):
