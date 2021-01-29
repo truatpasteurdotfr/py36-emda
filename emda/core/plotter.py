@@ -10,7 +10,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import numpy as np
 import matplotlib
 
-matplotlib.use("TkAgg")
+matplotlib.use("Agg")
 from matplotlib import pyplot as plt
 
 
@@ -65,6 +65,7 @@ def plot_nlines_log(
     ax1.set_xticklabels(np.round(res_arr[pos], decimals=2))
     ax1.set_xlabel(xlabel)
     plt.ylabel(ylabel)
+    ax1.set_ylim([-2, 6])
     font = {"family": "serif", "color": "black", "weight": "bold", "size": 16}
     plt.legend(loc=0)
     font = {"family": "serif", "color": "black", "weight": "bold", "size": 12}
