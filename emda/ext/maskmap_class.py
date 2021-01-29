@@ -197,7 +197,7 @@ def mapmask(arr, uc, itr=3, kern_rad=3, prob=0.99):
     from scipy.ndimage.morphology import binary_dilation
     import matplotlib
 
-    matplotlib.use("TkAgg")
+    matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     arr_tmp = arr
