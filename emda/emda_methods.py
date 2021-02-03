@@ -159,7 +159,8 @@ def write_mtz(uc, arr, outfile="map2mtz.mtz", resol=None):
             outfile: string
             Output file name. Default is map2mtz.mtz.
     """
-    iotools.write_3d2mtz(unit_cell=uc, mapdata=arr, outfile=outfile, resol=resol)
+    iotools.write_3d2mtz(unit_cell=uc, mapdata=arr,
+                         outfile=outfile, resol=resol)
 
 
 def resample_data(curnt_pix, targt_pix, targt_dim, arr):
@@ -1261,6 +1262,7 @@ def realsp_correlation(
         lgf=lgf,
     )
 
+
 def b_from_correlation(
     half1map,
     half2map,
@@ -1277,6 +1279,7 @@ def b_from_correlation(
         resol=resol,
         mask_map=mask_map,
     )
+
 
 def realsp_correlation_mapmodel(
     fullmap,
@@ -1464,152 +1467,64 @@ def mapmodel_fsc(
     return res_arr, bin_fsc
 
 
-def difference_map(maplist, smax=0.0, mode="ampli", masklist=None):
+def difference_map(maplist, diffmapres=3.0, mode="norm", fit=False, usehalfmaps=False, masklist=None):
     """Calculates difference map.
 
     Arguments:
         Inputs:
             maplist: string
                 List of map names to calculate difference maps.
+                If combined with fit parameter, firstmap in the list
+                will be taken as static/reference map. If this list
+                contains coordinate file (PDB/CIF), give it in the second place.
+                Always give MRC/MAP file at the beginning of the list.
+                e.g:
+                    [test1.mrc, test2.mrc] or
+                    [test1.mrc, model1.pdb/cif]
+                If combined with usehalfmaps argument, then halfmaps of the
+                firstmap should be given first and those for second next.
+                e.g:
+                    [map1-halfmap1.mrc, map1-halfmap2.mrc, 
+                     map2-halfmap1.mrc, map2-halfmap2.mrc]
+
             masklist: string, optional
                 List of masks to apply on maps.
-            smax: float, optional
+                All masks should be in MRC/MAP format.
+                e.g:
+                    [mask1.mrc, mask2.mrc]
+
+            diffmapres: float
                 Resolution to which difference map be calculated.
+                If an atomic model involved, this resolution will be used
+                for map calculation from coordinates
+
             mode: string, optional
-                Different modes to scale maps. Three difference modes are supported.
-                'ampli' - scale between maps is based on amplitudes [Default].
-                'power' - scale between maps is based on powers (intensities).
-                'norm' - normalized maps are used to calculate difference map.
+                Different modes to scale maps. Two difference modes are supported.
+                'ampli' - scale between maps is based on amplitudes .
+                'norm' [Default] - normalized maps are used to calculate difference map.
+                If fit is enabled, only norm mode used.
+
+            usehalfmaps: boolean
+                If employed, halfmaps are used for fitting and
+                difference map calculation.
+                Default is False.
+
+            fit: boolean
+                If employed, maps and superimposed before calculating
+                difference map.
+                Default is False.
 
         Outputs:
             Outputs diffence maps and initial maps after scaling in MRC format.
+            Differece maps are labelled as
+                emda_diffmap_m1.mrc, emda_diffmap_m2.mrc
+            Scaled maps are labelled as
+                emda_map1.mrc, emda_map2.mrc
     """
-    from emda.ext import difference
+    from emda.ext import diffmap_with_fit
 
-    msk1 = msk2 = 1.0
-    assert len(maplist) == 2
-    if maplist[0].endswith(((".mrc", ".map"))) and maplist[1].endswith(
-        ((".mrc", ".map"))
-    ):
-        uc, arr1, origin = read_map(maplist[0])
-        _, arr2, _ = iotools.read_map(maplist[1])
-    elif maplist[0].endswith(((".mrc", ".map"))) and maplist[1].endswith(
-        ((".pdb", ".cif", ".ent"))
-    ):
-        uc, arr1, origin = read_map(maplist[0])
-        if (smax - 0.0) < 0.1:
-            raise SystemExit(
-                "Please specify resolution to calculate map from atomic model"
-            )
-        else:
-            # calculate map from model
-            modelmap = model2map(
-                modelxyz=maplist[1],
-                dim=arr1.shape,
-                resol=smax,
-                cell=uc,
-                maporigin=origin,
-            )
-            arr2 = modelmap
-    elif maplist[0].endswith(((".pdb", ".cif", ".ent"))) and maplist[1].endswith(
-        ((".mrc", ".map"))
-    ):
-        uc, arr2, origin = read_map(maplist[1])
-        if (smax - 0.0) < 0.1:
-            raise SystemExit(
-                "Please specify resolution to calculate map from atomic model"
-            )
-        else:
-            # calculate map from model
-            modelmap = model2map(
-                modelxyz=maplist[0],
-                dim=arr2.shape,
-                resol=smax,
-                cell=uc,
-                maporigin=origin,
-            )
-            arr1 = modelmap
-    elif maplist[0].endswith(((".pdb", ".cif", ".ent"))) and maplist[1].endswith(
-        ((".pdb", ".cif", ".ent"))
-    ):
-        raise SystemExit(
-            "Both are atomic models. I need at least one map file")
-
-    # uc, arr1, origin = read_map(maplist[0])
-    # _, arr2, _ = iotools.read_map(maplist[1])
-    if masklist is not None:
-        assert len(maplist) == len(masklist) == 2
-        _, msk1, _ = iotools.read_map(masklist[0])
-        _, msk2, _ = iotools.read_map(masklist[1])
-    f1 = np.fft.fftshift(np.fft.fftn(np.fft.fftshift(arr1)))  # * msk1)))
-    f2 = np.fft.fftshift(np.fft.fftn(np.fft.fftshift(arr2)))  # * msk2)))
-    if mode == "power":
-        print("This method is obsolate. Try --mod norm or ampli instead.")
-        """ dm1_dm2, dm2_dm1 = difference.diffmap_scalebypower(
-            f1=f1, f2=f2, cell=uc, origin=origin, smax=smax
-        )
-        # calculate map rmsd
-        masked_mean = np.sum(dm1_dm2 * msk1) / np.sum(msk1)
-        diff = (dm1_dm2 - masked_mean) * msk1
-        rmsd = np.sqrt(np.sum(diff * diff) / np.sum(msk1))
-        print("rmsd: ", rmsd) """
-
-    if mode == "norm":
-        diffmap = difference.diffmap_normalisedsf(
-            f1=f1, f2=f2, cell=uc, origin=origin, smax=smax
-        )
-        list_maps = []
-        for i in range(diffmap.shape[3]):
-            map = np.real(
-                np.fft.ifftshift(np.fft.ifftn(
-                    np.fft.ifftshift(diffmap[:, :, :, i])))
-            )
-            list_maps.append(map)
-        # calculate map rmsd
-        if masklist is not None:
-            masked_mean = np.sum(list_maps[0] * msk1) / np.sum(msk1)
-            diff = (list_maps[0] - masked_mean) * msk1
-            rmsd = np.sqrt(np.sum(diff * diff) / np.sum(msk1))
-            print("rmsd: ", rmsd)
-            masked_mean = np.sum(list_maps[1] * msk2) / np.sum(msk2)
-            diff = (list_maps[1] - masked_mean) * msk2
-            rmsd = np.sqrt(np.sum(diff * diff) / np.sum(msk2))
-            print("rmsd of diffmap_m1-m2_amp: ", rmsd)
-        iotools.write_mrc(list_maps[0] * msk1,
-                          "diffmap_m1-m2_nrm.mrc", uc, origin)
-        iotools.write_mrc(list_maps[1] * msk2,
-                          "diffmap_m2-m1_nrm.mrc", uc, origin)
-        iotools.write_mrc(list_maps[2] * msk1, "map1.mrc", uc, origin)
-        iotools.write_mrc(list_maps[3] * msk2, "map2.mrc", uc, origin)
-
-    if mode == "ampli":
-        diffmap = difference.diffmap_scalebyampli(
-            f1=f1, f2=f2, cell=uc, origin=origin, smax=smax
-        )
-        list_maps = []
-        for i in range(diffmap.shape[3]):
-            map = np.real(
-                np.fft.ifftshift(np.fft.ifftn(
-                    np.fft.ifftshift(diffmap[:, :, :, i])))
-            )
-            list_maps.append(map)
-        # calculate map rmsd
-        if masklist is not None:
-            masked_mean = np.sum(list_maps[0] * msk1) / np.sum(msk1)
-            diff = (list_maps[0] - masked_mean) * msk1
-            rmsd = np.sqrt(np.sum(diff * diff) / np.sum(msk1))
-            print("rmsd of diffmap_m1-m2_amp: ", rmsd)
-            masked_mean = np.sum(list_maps[1] * msk2) / np.sum(msk2)
-            diff = (list_maps[1] - masked_mean) * msk2
-            rmsd = np.sqrt(np.sum(diff * diff) / np.sum(msk2))
-            print("rmsd of diffmap_m2-m1_amp: ", rmsd)
-        # difference map output
-        iotools.write_mrc(list_maps[0] * msk1,
-                          "diffmap_m1-m2_amp.mrc", uc, origin)
-        iotools.write_mrc(list_maps[1] * msk2,
-                          "diffmap_m2-m1_amp.mrc", uc, origin)
-        iotools.write_mrc(list_maps[2] * msk1, "map1.mrc", uc, origin)
-        iotools.write_mrc(list_maps[3] * msk2, "map2.mrc", uc, origin)
+    diffmap_with_fit.difference_map(maplist=maplist, masklist=masklist,
+                                    diffmapres=diffmapres, mode=mode, fit=fit, usehalfmaps=usehalfmaps)
 
 
 def applymask(mapname, maskname, outname):
