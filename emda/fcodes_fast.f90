@@ -951,39 +951,6 @@ subroutine calc_covar_and_fsc_betwn_anytwomaps(hf1,hf2,bin_idx,nbin,mode,&
 end subroutine calc_covar_and_fsc_betwn_anytwomaps
 
 
-!!$subroutine read_into_grid(bin_idx,bin_fsc,nbin,nx,ny,nz,fsc_weighted_grid)
-!!$  implicit none
-!!$  integer, intent(in) :: nbin,nx,ny,nz
-!!$  real*8,  dimension(0:nbin-1),intent(in) :: bin_fsc
-!!$  integer, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in)  :: bin_idx
-!!$  real*8,  dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(out) :: fsc_weighted_grid
-!!$  ! locals
-!!$  integer,   dimension(3) :: nxyz
-!!$  integer    :: i,j,k,xyzmin(3),xyzmax(3)!,ibin
-!!$  !
-!!$  xyzmin = 0; xyzmax = 0
-!!$  fsc_weighted_grid = 0.0
-!!$
-!!$  nxyz = (/ nx, ny, nz /)
-!!$
-!!$  xyzmin(1) = int(-nxyz(1)/2)
-!!$  xyzmin(2) = int(-nxyz(2)/2)
-!!$  xyzmin(3) = int(-nxyz(3)/2)
-!!$  xyzmax    = -(xyzmin+1)
-!!$  ! using Friedel's law
-!!$  do i=xyzmin(1), xyzmax(1)
-!!$     do j=xyzmin(2), xyzmax(2)
-!!$        do k=xyzmin(3), 0!xyzmax(3)
-!!$           if(bin_idx(i,j,k) < 0 .or. bin_idx(i,j,k) > nbin-1) cycle
-!!$           fsc_weighted_grid(i,j,k) = bin_fsc(bin_idx(i,j,k))
-!!$           if(k == xyzmin(3) .or. j == xyzmin(2) .or. i == xyzmin(1)) cycle
-!!$           fsc_weighted_grid(-i,-j,-k) = bin_fsc(bin_idx(i,j,k))
-!!$        end do
-!!$     end do
-!!$  end do
-!!$
-!!$end subroutine read_into_grid
-
 subroutine read_into_grid(bin_idx,bin_fsc,nbin,nx,ny,nz,fsc_weighted_grid)
   implicit none
   integer, intent(in) :: nbin,nx,ny,nz
@@ -1017,6 +984,43 @@ subroutine read_into_grid(bin_idx,bin_fsc,nbin,nx,ny,nz,fsc_weighted_grid)
   end do
 
 end subroutine read_into_grid
+
+
+subroutine read_into_grid2(bin_idx,bin_fsc,nbin,nx,ny,nz,wgrid)
+  implicit none
+  integer, intent(in) :: nbin,nx,ny,nz
+  real*8,  dimension(0:nbin-1,2),intent(in) :: bin_fsc
+  integer, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in)  :: bin_idx
+  real*8,  dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2,2),intent(out) :: wgrid
+  ! locals
+  integer,   dimension(3) :: nxyz
+  integer    :: i,j,k,xyzmin(3),xyzmax(3),indx,n
+  !
+  xyzmin = 0; xyzmax = 0
+  wgrid = 0.0
+
+  nxyz = (/ nx, ny, nz /)
+
+  xyzmin(1) = int(-nxyz(1)/2)
+  xyzmin(2) = int(-nxyz(2)/2)
+  xyzmin(3) = int(-nxyz(3)/2)
+  xyzmax    = -(xyzmin+1)
+  ! using Friedel's law
+  do i=xyzmin(1), xyzmax(1)
+     do j=xyzmin(2), xyzmax(2)
+        do k=xyzmin(3), 0!xyzmax(3)
+           do n=1, 2
+              indx = bin_idx(k,j,i)
+              if(indx < 0 .or. indx > nbin-1) cycle
+              wgrid(k,j,i,n) = bin_fsc(indx,n)
+              if(k == xyzmin(3) .or. j == xyzmin(2) .or. i == xyzmin(1)) cycle
+              wgrid(-k,-j,-i,n) = bin_fsc(indx,n)
+           end do
+        end do
+     end do
+  end do
+
+end subroutine read_into_grid2
 
 
 subroutine get_resol(uc,h,k,l,resol)
@@ -1896,51 +1900,6 @@ subroutine cutmap_arr(fin,bin_idx,smax,mode,nbin,nx,ny,nz,n,fout)
   if(debug) print*, 'time for Eo calculation(s) = ', finish-start
 end subroutine cutmap_arr
 
-!!$subroutine cutmap(fin,bin_idx,smax,mode,nbin,nx,ny,nz,fout)
-!!$  implicit none
-!!$  integer,   intent(in) :: smax,mode,nbin,nx,ny,nz
-!!$  complex*16, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in)  :: fin
-!!$  integer,   dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in)  :: bin_idx
-!!$  complex*16, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(out) :: fout
-!!$  ! locals
-!!$  integer,   dimension(3) :: nxyz
-!!$  integer,   dimension(0:nbin-1) :: bin_arr_count
-!!$  !
-!!$  real       :: start,finish
-!!$  integer    :: i,j,k,n,xyzmin(3),xyzmax(3),indx
-!!$  logical    :: debug
-!!$  !
-!!$  debug         = .FALSE.
-!!$  if(mode == 1) debug = .TRUE.
-!!$  call cpu_time(start)
-!!$  fout = dcmplx(0.0d0, 0.0d0)
-!!$  xyzmin = 0; xyzmax = 0
-!!$  nxyz = (/ nx, ny, nz /)
-!!$  xyzmin(1) = int(-nxyz(1)/2)
-!!$  xyzmin(2) = int(-nxyz(2)/2)
-!!$  xyzmin(3) = int(-nxyz(3)/2)
-!!$  xyzmax    = -(xyzmin+1)
-!!$  if(debug) print*, 'xyzmin = ', xyzmin
-!!$  if(debug) print*, 'xyzmax = ', xyzmax
-!!$  if(debug) print*, 'nbin=', nbin
-!!$
-!!$  ! Using Friedel's Law
-!!$  do i=xyzmin(1), xyzmax(1)
-!!$     do j=xyzmin(2), xyzmax(2)
-!!$        do k=xyzmin(3), 0 !xyzmax(3)
-!!$           indx = bin_idx(k,j,i)
-!!$           if(indx < 0 .or. indx > nbin-1) cycle
-!!$           if(indx > smax) cycle
-!!$           fout(k,j,i) = fin(k,j,i)
-!!$           if(k==xyzmin(3) .or. j==xyzmin(2) .or. i==xyzmin(1)) cycle
-!!$           fout(-k,-j,-i) = conjg(fout(k,j,i))
-!!$        end do
-!!$     end do
-!!$  end do
-!!$
-!!$  call cpu_time(finish)
-!!$  if(debug) print*, 'time for Eo calculation(s) = ', finish-start
-!!$end subroutine cutmap
 
 subroutine trilinear(RM,F,FRS,ncopies,mode,nx,ny,nz)
   implicit none
@@ -2025,87 +1984,96 @@ subroutine trilinear(RM,F,FRS,ncopies,mode,nx,ny,nz)
   return
 end subroutine trilinear
 
-!!$subroutine trilinear(RM,F,FRS,ncopies,mode,nx,ny,nz)
-!!$  implicit none
-!!$  real*8,intent(in):: RM(3,3)
-!!$  integer,intent(in):: nx,ny,nz,mode,ncopies
-!!$  complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2,ncopies),intent(in):: F
-!!$  complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2,ncopies),intent(out):: FRS
-!!$  ! locals
-!!$  integer :: x0(3),x1(3)
-!!$  integer :: nxyz(3),nxyzmn(3),nxyzmx(3)
-!!$  real*8 :: x(3),xd(3),s(3)
-!!$  complex*16 :: c000,c001,c010,c011,c100,c101,c110,c111,c00,c01,c10,c11,c0,c1,c
-!!$  integer :: h,k,l,i
-!!$  integer :: xmin,xmax,ymin,ymax,zmin,zmax,ic
-!!$
-!!$  FRS = dcmplx(0.0d0, 0.0d0)
-!!$  x = 0.0d0
-!!$  xd = 0.0d0
-!!$
-!!$  nxyz(1) = nx; nxyz(2) = ny; nxyz(3) =nz
-!!$  nxyzmn(1) = -nx/2; nxyzmn(2) = -ny/2; nxyzmn(3) = -nz/2
-!!$  nxyzmx(1) = (nx-2)/2; nxyzmx(2) = (ny-2)/2; nxyzmx(3) = (nz-2)/2
-!!$
-!!$  xmin = int(-nx/2); xmax = -(xmin+1)
-!!$  ymin = int(-ny/2); ymax = -(ymin+1)
-!!$  zmin = int(-nz/2); zmax = -(zmin+1)
-!!$
-!!$  !write(*,*) nxyz,nxyzmn,nxyzmx
-!!$
-!!$  do h = zmin, zmax
-!!$     do k = ymin, ymax
-!!$        outer: do l = xmin, 0!xmax
-!!$           s(1) = h
-!!$           s(2) = k
-!!$           s(3) = l
-!!$           x = matmul(transpose(RM),s)
-!!$           do i = 1, 3
-!!$              !x(i)  = dot_product(RM(:,i),s) ! Note that RM is now transposed
-!!$              x0(i) = floor(x(i))
-!!$              x1(i) = x0(i) + 1
-!!$              if((nxyzmx(i) < x0(i)) .or. (x0(i) < nxyzmn(i)) &
-!!$                   .or. (nxyzmx(i) < x1(i)) .or. (x1(i) < nxyzmn(i)))then
-!!$                 cycle outer
-!!$              end if
-!!$              xd(i) = (x(i)-real(x0(i)))!/(x1(i)-x0(i))
-!!$              if(abs(xd(i)).gt.1.0) then
-!!$                 print*, 'Something is wrong ',xd(i)
-!!$                 stop
-!!$              endif
-!!$           end do
-!!$           !  Careful here: we may get to the outside of the array
-!!$           do i = 1,3
-!!$              x1(i) = min(nxyzmx(i),max(nxyzmn(i),x1(i)))
-!!$           enddo
-!!$           do ic = 1, ncopies
-!!$              c000 = F(x0(3),x0(2),x0(1),ic)
-!!$              c001 = F(x1(3),x0(2),x0(1),ic)
-!!$              c010 = F(x0(3),x1(2),x0(1),ic)
-!!$              c011 = F(x1(3),x1(2),x0(1),ic)
-!!$              c100 = F(x0(3),x0(2),x1(1),ic)
-!!$              c101 = F(x1(3),x0(2),x1(1),ic)
-!!$              c110 = F(x0(3),x1(2),x1(1),ic)
-!!$              c111 = F(x1(3),x1(2),x1(1),ic)
-!!$              ! Interpolation along x direction
-!!$              c00 = c000*(1.0d0-xd(1)) + c100*xd(1)
-!!$              c01 = c001*(1.0d0-xd(1)) + c101*xd(1)
-!!$              c10 = c010*(1.0d0-xd(1)) + c110*xd(1)
-!!$              c11 = c011*(1.0d0-xd(1)) + c111*xd(1)
-!!$              ! Interpolation along y direction
-!!$              c0 = c00*(1.0d0-xd(2)) + c10*xd(2)
-!!$              c1 = c01*(1.0d0-xd(2)) + c11*xd(2)
-!!$              ! Interpolation along z direction
-!!$              c = c0*(1.0d0-xd(3)) + c1*xd(3)
-!!$              FRS(l,k,h,ic) = c
-!!$              if((h == xmin).or.(k == ymin).or.(l == zmin)) cycle
-!!$              FRS(-l,-k,-h,ic) = conjg(c)
-!!$           end do
-!!$        end do outer
-!!$     end do
-!!$  end do
-!!$  return
-!!$end subroutine trilinear
+
+subroutine trilinear2(F,bin_idx,RM,nbin,ncopies,mode,nx,ny,nz,FRS)
+  implicit none
+  real*8,intent(in):: RM(3,3)
+  integer,intent(in):: nx,ny,nz,mode,ncopies,nbin
+  integer, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in)  :: bin_idx
+  complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2,ncopies),intent(in):: F
+  complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2,ncopies),intent(out):: FRS
+  ! locals
+  integer :: x0(3),x1(3)
+  integer :: nxyz(3),nxyzmn(3),nxyzmx(3)
+  real*8 :: x(3),xd(3),s(3)
+  complex*16 :: c000,c001,c010,c011,c100,c101,c110,c111,c00,c01,c10,c11,c0,c1,c
+  integer :: h,k,l,i,indx
+  integer :: xmin,xmax,ymin,ymax,zmin,zmax,ic
+  real      :: start, finish
+
+
+  FRS = dcmplx(0.0d0, 0.0d0)
+  x = 0.0d0
+  xd = 0.0d0
+
+  nxyz(1) = nx; nxyz(2) = ny; nxyz(3) =nz
+  nxyzmn(1) = -nx/2; nxyzmn(2) = -ny/2; nxyzmn(3) = -nz/2
+  nxyzmx(1) = (nx-2)/2; nxyzmx(2) = (ny-2)/2; nxyzmx(3) = (nz-2)/2
+
+  xmin = int(-nx/2); xmax = -(xmin+1)
+  ymin = int(-ny/2); ymax = -(ymin+1)
+  zmin = int(-nz/2); zmax = -(zmin+1)
+
+  !write(*,*) nxyz,nxyzmn,nxyzmx
+  call cpu_time(start)
+  do l = zmin, zmax
+     do k = ymin, ymax
+        outer: do h = xmin, 0!xmax
+           indx = bin_idx(h,k,l)
+           if(indx < 0 .or. indx > nbin-1) cycle
+           s(1) = h
+           s(2) = k
+           s(3) = l
+           x = matmul(transpose(RM),s)
+           do i = 1, 3
+              !x(i)  = dot_product(RM(:,i),s) ! Note that RM is now transposed
+              x0(i) = floor(x(i))
+              x1(i) = x0(i) + 1
+              if((nxyzmx(i) < x0(i)) .or. (x0(i) < nxyzmn(i)) &
+                   .or. (nxyzmx(i) < x1(i)) .or. (x1(i) < nxyzmn(i)))then
+                 cycle outer
+              end if
+              xd(i) = (x(i)-real(x0(i)))!/(x1(i)-x0(i))
+              if(abs(xd(i)).gt.1.0) then
+                 print*, 'Something is wrong ',xd(i)
+                 stop
+              endif
+           end do
+           !  Careful here: we may get to the outside of the array
+           do i = 1,3
+              x1(i) = min(nxyzmx(i),max(nxyzmn(i),x1(i)))
+           enddo
+           do ic = 1, ncopies
+              c000 = F(x0(1),x0(2),x0(3),ic)
+              c001 = F(x0(1),x0(2),x1(3),ic)
+              c010 = F(x0(1),x1(2),x0(3),ic)
+              c011 = F(x0(1),x1(2),x1(3),ic)
+              c100 = F(x1(1),x0(2),x0(3),ic)
+              c101 = F(x1(1),x0(2),x1(3),ic)
+              c110 = F(x1(1),x1(2),x0(3),ic)
+              c111 = F(x1(1),x1(2),x1(3),ic)
+              ! Interpolation along x direction
+              c00 = c000*(1.0d0-xd(1)) + c100*xd(1)
+              c01 = c001*(1.0d0-xd(1)) + c101*xd(1)
+              c10 = c010*(1.0d0-xd(1)) + c110*xd(1)
+              c11 = c011*(1.0d0-xd(1)) + c111*xd(1)
+              ! Interpolation along y direction
+              c0 = c00*(1.0d0-xd(2)) + c10*xd(2)
+              c1 = c01*(1.0d0-xd(2)) + c11*xd(2)
+              ! Interpolation along z direction
+              c = c0*(1.0d0-xd(3)) + c1*xd(3)
+              FRS(h,k,l,ic) = c
+              if((h == xmin).or.(k == ymin).or.(l == zmin)) cycle
+              FRS(-h,-k,-l,ic) = conjg(c)
+           end do
+        end do outer
+     end do
+  end do
+  call cpu_time(finish)
+  !print*, 'time for loop = ', finish-start
+  return
+end subroutine trilinear2
+
                  
 subroutine trilinear_map(RM,arr1,arr2,nx,ny,nz,mode)
   implicit none
