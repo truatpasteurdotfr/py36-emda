@@ -469,7 +469,7 @@ mapaverage.add_argument(
 )
 
 diffmap = subparsers.add_parser(
-    "diffmap", description="difference map using average maps"
+    "diffmap", description="Calculate the difference map"
 )
 diffmap.add_argument(
     "--map", required=True, nargs="+", type=str, help="maplist to diffmap"
@@ -479,18 +479,22 @@ diffmap.add_argument(
 )
 diffmap.add_argument(
     "--res",
-    required=False,
-    default=0.0,
+    required=True,
     type=float,
-    help="diffmap resol. (A) [default=0.0 A]",
+    help="resolution for difference map in Angstroms.",
 )
 diffmap.add_argument(
     "--mod",
     required=False,
     default="norm",
     type=str,
-    help="Choose from ampli, [norm], power",
+    help="scaling method. norm (default) - normalized FC, \
+        ampli - amplitudes in resolution bins",
 )
+diffmap.add_argument("--fit", action="store_true", 
+    help="if used, maps are superimposed before calculating difference map")
+diffmap.add_argument("--usehalfmaps", action="store_true", 
+    help="if used, halfmaps are used to calculate difference map")
 
 
 applymask = subparsers.add_parser(
@@ -989,9 +993,9 @@ def half_to_full(args):
 def diff_map(args):
     from emda.emda_methods import difference_map
 
-    # difference_map(args.m1, args.m2, args.res)
     difference_map(maplist=args.map, masklist=args.msk,
-                   smax=args.res, mode=args.mod)
+                   diffmapres=args.res, mode=args.mod, 
+                   fit=args.fit, usehalfmaps=args.usehalfmaps)
 
 
 def scale_map(args):
