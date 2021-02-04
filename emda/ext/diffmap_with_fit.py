@@ -107,7 +107,8 @@ def calculate_diffmap(emmap1, f_list, resol):
 
 
 def mapoutput(list_maps, uc, origin, masklist=None):
-    if len(masklist) > 0 :
+    #if masklist is not None != len(masklist) > 0 :
+    if masklist is not None:
         for i, msk in enumerate(masklist):
             if i < 2:
                 # calculate rmsd
@@ -260,9 +261,14 @@ def difference_map(maplist, diffmapres=3.0, mode="norm", fit=False, usehalfmaps=
         list_masks = results.masklist
         uc = results.cell
         origin = results.origin
-        for i in range(diffmap.shape[3]):
-            imap = np.real(ifftshift(ifftn(ifftshift(diffmap[:, :, :, i]))))
-            list_maps.append(imap)
+        if fit:
+            for i in range(diffmap.shape[3]):
+                imap = np.real(ifftshift(ifftn(ifftshift(diffmap[:, :, :, i]))))
+                list_maps.append(imap)
+        else:
+            for i in range(diffmap.shape[3]):
+                imap = np.real(ifftn(ifftshift(diffmap[:, :, :, i])))
+                list_maps.append(imap)
         mapoutput(list_maps=list_maps, uc=uc, origin=origin, masklist=list_masks)
 
     if mode == "ampli":
