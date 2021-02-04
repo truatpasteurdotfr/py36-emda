@@ -132,7 +132,7 @@ def main(maplist, results, fit=True, resol=3, masklist=None):
             uc, arr1, origin = iotools.read_map(maplist[i])
             uc, arr2, origin = iotools.read_map(maplist[i+1])
             if masklist is not None:
-                _, msk, _ = iotools.read_map(masklist[i])
+                _, msk, _ = iotools.read_map(masklist[i//2])
                 try:
                     assert arr1.shape == msk.shape
                     msk_list.append(msk)
@@ -197,10 +197,6 @@ def main(maplist, results, fit=True, resol=3, masklist=None):
         diffm1m2 = fout1 - fout2
         diffm2m1 = fout2 - fout1
         diffmap = np.stack((diffm1m2, diffm2m1, fout1, fout2), axis = -1)
-        """ data1 = np.real(np.fft.ifftn(np.fft.ifftshift(diffm1m2)))
-        data2 = np.real(np.fft.ifftn(np.fft.ifftshift(diffm2m1)))
-        iotools.write_mrc(data1, 'diff_m1-m2.mrc', uc, origin)
-        iotools.write_mrc(data2, 'diff_m2-m1.mrc', uc, origin) """
     results.diffmap = diffmap
     return results
 
