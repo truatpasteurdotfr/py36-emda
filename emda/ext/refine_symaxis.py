@@ -758,13 +758,12 @@ def prefilter_order(imap, axis, order, resol=None):
         if resol is not None:
             dist = np.sqrt((res_arr - resol) ** 2)
             ibin = np.argmin(dist)
+            # cut map
+            #f1, bin_idx, nbin = cut_resolution_for_linefit(
+            #[f1], bin_idx, res_arr, ibin)
         else:
             ibin = nbin
-        # cut map
-        e_list = [emmap1.eo_lst[0], emmap1.fo_lst[0]]
-        eout, cBIdx, cbin = cut_resolution_for_linefit(
-            e_list, emmap1.bin_idx, emmap1.res_arr, ibin
-        )
+
         for fac in factors:
             theta = float(360.0 / fac)
             q = quaternions.get_quaternion([[axis[2], axis[1], axis[0]], [theta]])
