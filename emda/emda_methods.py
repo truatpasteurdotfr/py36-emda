@@ -1032,6 +1032,37 @@ def mask_from_map(
     return mask
 
 
+def mask_from_atomic_model(mapname, modelname, atmrad=5):
+    """Generates a mask from atomic coordinates.
+
+    Generates a mask from coordinates. First, atomic positions are
+    mapped onto a 3D grid. Second, each atomic position is convluted
+    with a sphere whose radius is defined by the atmrad paramter.
+    Next, one pixel layer dialtion followed by the smoothening of
+    edges.
+
+    Arguments:
+        Inputs:
+            mapname: string
+                Name of the map file. This is needed to get the
+                sampling, unit cell and origin for the new mask.
+                Allowed formats are - MRC/MAP
+            modelname: string
+                Atomic model name. Allowed formats are - PDB/CIF
+            atmrad: float
+                Radius of the sphere to be placed on atomic positions in Angstroms.
+                Default is 5 A.
+
+        Outputs:
+            mask: float, 3D array
+                3D Numpy array of the mask.
+            Outputs emda_model_mask.mrc.
+    """
+    from emda.ext.maskmap_class import mask_from_coordinates
+
+    return mask_from_coordinates(mapname=mapname, modelname=modelname, atmrad=atmrad)
+
+
 def sphere_kernel_softedge(radius=5):
     """Generates a soft-edged spherical kernel.
 
@@ -1055,6 +1086,7 @@ def overlay_maps(
     res=6,
     interp="linear",
     hfm=False,
+    modelres=5.0,
     masklist=None,
     tra=None,
     axr=None,
@@ -1099,7 +1131,8 @@ def overlay_maps(
         Outputs:
             Outputs a series of overlaid maps (fitted_map_?.mrc).
     """
-    from emda.ext.mapfit import mapoverlay
+    #from emda.ext.mapfit import mapoverlay
+    from emda.ext.overlay import overlay
 
     if axr is None:
         axr = [1, 0, 0]
@@ -1108,7 +1141,7 @@ def overlay_maps(
     if fobj is None:
         fobj = open("EMDA_overlay.txt", "w")
     theta_init = [tuple(axr), rot]
-    mapoverlay.main(
+    """ mapoverlay.main(
         maplist=maplist,
         masklist=masklist,
         ncycles=ncy,
@@ -1120,6 +1153,21 @@ def overlay_maps(
         halfmaps=hfm,
         usemodel=usemodel,
         fitres=fitres,
+    ) """
+    # new overlay function call
+    q = quaternions.get_quaternion(theta_init)
+    rm = quaternions.get_RM(q)
+    emmap1, rotmat_list, trans_list = overlay(
+        maplist=maplist,
+        ncycles=ncy,
+        t_init=tra,
+        rotmat_init=rm,
+        smax=res,
+        interp=interp,
+        masklist=masklist,
+        fobj=fobj,
+        fitres=fitres,
+        modelres=modelres,
     )
 
 
@@ -1789,6 +1837,44 @@ def model2map(
             -shift_x,
             axis=2,
         )
+    return modelmap
+
+
+def model2map_gm(modelxyz, resol, dim, bfac=0.0, cell=None, maporigin=None):
+    import gemmi
+
+    st = gemmi.read_structure(modelxyz)
+    st.spacegroup_hm = "P 1"
+    st.cell.set(cell[0], cell[1], cell[2], 90., 90., 90.)
+    dc = gemmi.DensityCalculatorX()
+    dc.d_min = resol
+    dc.rate = sample_rate = 1.5  # default
+    dc.r_cut = 1.e-5  # default
+    dc.blur = bfac
+    dc.addends.subtract_z()
+    dc.set_grid_cell_and_spacegroup(st)
+    dc.put_model_density_on_grid(st[0])
+    grid = gemmi.transform_map_to_f_phi(dc.grid)
+    asu_data = grid.prepare_asu_data(
+        dmin=resol, mott_bethe=True, unblur=dc.blur)
+    griddata = asu_data.get_f_phi_on_grid(
+        asu_data.get_size_for_hkl(min_size=dim))
+    griddata_np = (np.array(griddata, copy=False)).transpose()
+    modelmap = (np.fft.ifftn(np.conjugate(griddata_np))).real
+    if maporigin is None:
+        maporigin = [0, 0, 0]
+    else:
+        shift_z = modelmap.shape[0] - abs(maporigin[2])
+        shift_y = modelmap.shape[1] - abs(maporigin[1])
+        shift_x = modelmap.shape[2] - abs(maporigin[0])
+        # print(shift_z, shift_y, shift_x)
+        modelmap = np.roll(
+            np.roll(np.roll(modelmap, -shift_z, axis=0), -shift_y, axis=1),
+            -shift_x,
+            axis=2,
+        )
+    """ if cell is not None:
+        em.write_mrc(modelmap, 'modelmap_gm.mrc', cell, maporigin) """
     return modelmap
 
 
