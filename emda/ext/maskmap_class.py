@@ -226,11 +226,49 @@ def mapmask(arr, uc, itr=3, kern_rad=3, prob=0.99):
     return mask
 
 
+def mask_from_coordinates(mapname, modelname, atmrad=3):
+    import scipy.signal
+    from emda.core import iotools, restools
+    from scipy.ndimage.morphology import binary_dilation
+
+    uc, arr, orig = iotools.read_map(mapname)
+    grid_3d = np.zeros((arr.shape), dtype='float')
+    if modelname.endswith((".pdb", ".ent")):
+        iotools.pdb2mmcif(modelname)
+        _, x_np, y_np, z_np, _ = iotools.read_mmcif('out.cif')
+    elif modelname.endswith((".cif")):
+        _, x_np, y_np, z_np, _ = iotools.read_mmcif(modelname)
+    # now map model coords into the 3d grid. (approximate grid positions)
+    x = (x_np * arr.shape[0] / uc[0])
+    y = (y_np * arr.shape[1] / uc[1])
+    z = (z_np * arr.shape[2] / uc[2])
+    for ix, iy, iz in zip(x, y, z):
+        grid_3d[int(round(iz)), 
+                int(round(iy)),
+                int(round(ix))] = 1.0
+    # now convolute with sphere
+    pixsize = uc[0] / arr.shape[0]
+    kern_rad = int(atmrad / pixsize) + 1
+    print("kernel radius: ", kern_rad)
+    grid2 = scipy.signal.fftconvolve(
+        grid_3d, restools.create_binary_kernel(kern_rad), "same")
+    grid2_binary = grid2 > 1e-5
+    # dilate
+    dilate = binary_dilation(grid2_binary, iterations=1)
+    # smoothening
+    mask = scipy.signal.fftconvolve(
+        dilate, restools.softedgekernel_5x5(), "same")
+    mask = mask * (mask >= 0.0)
+    mask = np.where(grid2_binary, 1.0, mask)
+    iotools.write_mrc(mask, "emda_atomic_mask.mrc", uc, orig)
+    return mask
+
+
 if __name__ == "__main__":
-    maplist = [
+    """ maplist = [
         "/Users/ranganaw/MRC/REFMAC/Bianka/EMD-4572/other/run_half1_class001_unfil.mrc",
         "/Users/ranganaw/MRC/REFMAC/Bianka/EMD-4572/other/run_half2_class001_unfil.mrc",
     ]
     obj = MaskedMaps(maplist)
     obj.read_halfmaps()
-    obj.generate_mask(obj.arr1, obj.arr2)
+    obj.generate_mask(obj.arr1, obj.arr2) """
