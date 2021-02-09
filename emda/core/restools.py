@@ -62,6 +62,25 @@ def create_kernel(fResArr, smax):
     return mask
 
 
+def create_binary_kernel(r1):
+    from math import sqrt
+
+    boxsize = 2 * r1 + 1
+    kern_sphere = np.zeros(shape=(boxsize, boxsize, boxsize), dtype="float")
+    kx = ky = kz = boxsize
+    center = boxsize // 2
+    #print("center: ", center)
+    r1 = center
+    for i in range(kx):
+        for j in range(ky):
+            for k in range(kz):
+                dist = sqrt((i - center) ** 2 + (j - center) ** 2 + (k - center) ** 2)
+                if dist < r1:
+                    kern_sphere[i, j, k] = 1
+    #kern_sphere = kern_sphere / np.sum(kern_sphere)
+    return kern_sphere
+
+
 def create_soft_edged_kernel(fResArr, smax):
     # Create soft-edged-kernel. smax is resolution to which the kernel size
     # is defined
@@ -108,10 +127,10 @@ def create_soft_edged_kernel_pxl(r1):
     kern_sphere_soft = np.zeros(shape=(boxsize, boxsize, boxsize), dtype="float")
     kx = ky = kz = boxsize
     center = boxsize // 2
-    print("center: ", center)
+    #print("center: ", center)
     r1 = center
     r0 = r1 - 2
-    print("r1: ", r1, "r0: ", r0)
+    #print("r1: ", r1, "r0: ", r0)
     for i in range(kx):
         for j in range(ky):
             for k in range(kz):
@@ -125,6 +144,30 @@ def create_soft_edged_kernel_pxl(r1):
                         ) / 2.0
     kern_sphere_soft = kern_sphere_soft / np.sum(kern_sphere_soft)
     # contour_nplot2(kern_sphere_soft)
+    return kern_sphere_soft
+
+
+def softedgekernel_5x5():
+    from math import sqrt, cos
+
+    boxsize = 5
+    kern_sphere_soft = np.zeros(shape=(boxsize, boxsize, boxsize), dtype="float")
+    kx = ky = kz = boxsize
+    center = boxsize // 2
+    r1 = center
+    r0 = r1 - 2
+    for i in range(kx):
+        for j in range(ky):
+            for k in range(kz):
+                dist = sqrt((i - center) ** 2 + (j - center) ** 2 + (k - center) ** 2)
+                if dist < r1:
+                    if dist <= r0:
+                        kern_sphere_soft[i, j, k] = 1
+                    else:
+                        kern_sphere_soft[i, j, k] = (
+                            (1 + cos(np.pi * (dist - r0) / (r1 - r0)))
+                        ) / 2.0
+    kern_sphere_soft = kern_sphere_soft / np.sum(kern_sphere_soft)
     return kern_sphere_soft
 
 
