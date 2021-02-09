@@ -6,7 +6,7 @@ from numpy.fft import fftn, ifftn, fftshift, ifftshift
 from emda.core import iotools, quaternions, fsc, plotter
 from emda.ext.mapfit import utils
 from emda.ext.difference import diffmap_normalisedsf
-from emda.ext.overlay import EmmapOverlay, run_fit
+from emda.ext.overlay import EmmapOverlay, run_fit, output_rotated_models
 from emda.ext import diffmap_snr
 
 """ path = "/Users/ranganaw/MRC/REFMAC/Jude/rcc/JUDE/DT72/chains/diffmap_DT72_vs_BRC/"
@@ -173,6 +173,7 @@ def main(maplist, diffmapres=3, fit=False, usehalfmaps=False, masklist=None):
         if fit:
             emmap1, rotmat_list, trans_list = fitmaps(maplist, masklist)
             flist = apply_transformation_on_f(emmap1, rotmat_list, trans_list)
+            output_rotated_models(emmap1=emmap1, maplist=maplist, r_lst=rotmat_list, t_lst=trans_list)
             print("resol: ", diffmapres)
             diffmap = calculate_diffmap(emmap1=emmap1, f_list=flist, resol=diffmapres)
             msk_list = emmap1.msk_lst
