@@ -106,6 +106,12 @@ map_mask.add_argument(
     help="filter type to use: ideal or butterworth",
 )
 
+model_mask = subparsers.add_parser(
+    "modelmask", description="Generate a mask from an atomic model.")
+model_mask.add_argument("--map", required=True, help="input map MRC/MAP")
+model_mask.add_argument("--mdl", required=True, help="input atomic model PDB/CIF")
+model_mask.add_argument("--atmrad", required=False, default=3.0, type=float, help="radius of the atomic sphere in Angstroms")
+
 lowpass = subparsers.add_parser(
     "lowpass", description="Lowpass filter to specified resolution."
 )
@@ -420,6 +426,13 @@ mapoverlay.add_argument(
     type=str,
     help="interpolation method (linear/cubic). default= linear",
 )
+mapoverlay.add_argument(
+    "--modelres",
+    required=False,
+    default=5,
+    type=float,
+    help="model resol. (A). default= 5 A",
+)
 mapoverlay.add_argument("--hfm", action="store_true",
                         help="if use employ half maps")
 mapoverlay.add_argument("--mod", action="store_true",
@@ -491,10 +504,10 @@ diffmap.add_argument(
     help="scaling method. norm (default) - normalized FC, \
         ampli - amplitudes in resolution bins",
 )
-diffmap.add_argument("--fit", action="store_true", 
-    help="if used, maps are superimposed before calculating difference map")
-diffmap.add_argument("--usehalfmaps", action="store_true", 
-    help="if used, halfmaps are used to calculate difference map")
+diffmap.add_argument("--fit", action="store_true",
+                     help="if used, maps are superimposed before calculating difference map")
+diffmap.add_argument("--usehalfmaps", action="store_true",
+                     help="if used, halfmaps are used to calculate difference map")
 
 
 applymask = subparsers.add_parser(
@@ -948,6 +961,7 @@ def map_overlay(args, fobj):
         ncy=args.ncy,
         res=args.res,
         fobj=fobj,
+        modelres=args.modelres,
         interp=args.int,
         hfm=args.hfm,
         usemodel=args.mod,
@@ -994,7 +1008,7 @@ def diff_map(args):
     from emda.emda_methods import difference_map
 
     difference_map(maplist=args.map, masklist=args.msk,
-                   diffmapres=args.res, mode=args.mod, 
+                   diffmapres=args.res, mode=args.mod,
                    fit=args.fit, usehalfmaps=args.usehalfmaps)
 
 
@@ -1066,8 +1080,9 @@ def mirrormap(args):
 
 
 def modeltomap(args):
-    from emda.emda_methods import model2map, write_mrc
+    from emda.emda_methods import model2map, model2map_gm, write_mrc
 
+    # REFMAC sfcalc
     modelmap = model2map(
         modelxyz=args.mdl,
         dim=args.dim,
@@ -1078,7 +1093,10 @@ def modeltomap(args):
         # lig=args.lig,
         ligfile=args.lgf,
     )
-    write_mrc(modelmap, "modelmap.mrc", args.cel, args.org)
+    write_mrc(modelmap, "modelmap_refmac.mrc", args.cel, args.org)
+    """ modelmap = model2map_gm(modelxyz=args.mdl, resol=args.res,
+                            dim=args.dim, bfac=args.bfc, cell=args.cel, maporigin=args.org)
+    write_mrc(modelmap, "modelmap_gm.mrc", args.cel, args.org) """
 
 
 def mask4mmap(args):
@@ -1095,6 +1113,12 @@ def mask4mmap(args):
         prob=args.prb,
         itr=args.itr,
     )
+
+
+def mask4mmodel(args):
+    from emda import emda_methods as em
+
+    _ = em.mask_from_atomic_model(mapname=args.map, modelname=args.mdl, atmrad=args.atmrad)
 
 
 def composite_map(args):
@@ -1206,6 +1230,8 @@ def main(command_line=None):
         maptomtzfull(args)
     if args.command == "mapmask":
         mask4mmap(args)
+    if args.command == "modelmask":
+        mask4mmodel(args)
     if args.command == "composite":
         composite_map(args)
     if args.command == "resamplemap2map":
