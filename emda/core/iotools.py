@@ -556,6 +556,47 @@ def output_to_table(dataframe, filename="data_emda.txt"):
 
 
 
+def apply_transformation_on_model(mmcif_file, rotmat=None, trans=None, outfilename=None):
+    import gemmi
+    import numpy as np
+    
+    doc = gemmi.cif.read_file(mmcif_file)
+    st = gemmi.read_structure(mmcif_file)
+    model = st[0]
+    com = model.calculate_center_of_mass()
+    #print(com)
+    block = doc.sole_block()  # cif file as a single block
+    col_x = block.find_values("_atom_site.Cartn_x")
+    col_y = block.find_values("_atom_site.Cartn_y")
+    col_z = block.find_values("_atom_site.Cartn_z")
+    a = block.find_value("_cell.length_a")
+    b = block.find_value("_cell.length_b")
+    c = block.find_value("_cell.length_c")
+    alf = block.find_value("_cell.angle_alpha")
+    bet = block.find_value("_cell.angle_beta")
+    gam = block.find_value("_cell.angle_gamma")
+    cell = np.array([a, b, c, alf, bet, gam], dtype="float")
+    if rotmat is None:
+        rotmat = np.identity(3)
+    if trans is None:
+        trans = np.zeros(3, dtype='float')
+    if outfilename is None:
+        outfilename = "emda_transformed_model.cif"
+    vec = np.zeros(3, dtype='float')
+    for n, _ in enumerate(col_x):
+        vec[0] = float(col_x[n]) - com.x
+        vec[1] = float(col_y[n]) - com.y
+        vec[2] = float(col_z[n]) - com.z
+        vec_rot = rotmat @ vec
+        col_x[n] = str(vec_rot[0] + com.x + trans[0])
+        col_y[n] = str(vec_rot[1] + com.y + trans[1])
+        col_z[n] = str(vec_rot[2] + com.z + trans[2])
+    x_np = np.array(col_x, dtype="float", copy=False)
+    y_np = np.array(col_y, dtype="float", copy=False)
+    z_np = np.array(col_z, dtype="float", copy=False)
+    doc.write_file(outfilename)
+    return cell, x_np, y_np, z_np
+
 
 ##### below function are not frequently used.#####
 def read_mrc(mapname11):
