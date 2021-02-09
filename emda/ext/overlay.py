@@ -24,9 +24,10 @@ timeit = True
 
 
 class EmmapOverlay:
-    def __init__(self, map_list, mask_list=None):
+    def __init__(self, map_list, modelres=5.0, mask_list=None):
         self.map_list = map_list
         self.mask_list = mask_list
+        self.modelres = modelres
         self.map_unit_cell = None
         self.map_origin = None
         self.map_dim = None
@@ -100,6 +101,7 @@ class EmmapOverlay:
                 else:
                     uc, arr, origin = em.get_data(
                         self.map_list[i],
+                        resol=self.modelres,
                         dim=target_dim,
                         uc=uc_target,
                         maporigin=map_origin,
@@ -172,6 +174,7 @@ class EmmapOverlay:
                 else:
                     uc, arr, origin = em.get_data(
                         self.map_list[i],
+                        resol=self.modelres,
                         dim=target_dim,
                         uc=uc_target,
                         maporigin=map_origin,
@@ -607,8 +610,8 @@ def fsc_between_static_and_transfomed_map(
 
 
 def get_ibin(bin_fsc):
-    print('bin_fsc:')
-    print(bin_fsc)
+    #print('bin_fsc:')
+    #print(bin_fsc)
     # new search from rear end
     for i, ifsc in reversed(list(enumerate(bin_fsc))):
         if ifsc > 0.4:
@@ -630,7 +633,6 @@ def run_fit(
     fobj=None,
     interp=None,
     fitres=None,
-    dfs_full=None,
 ):
     from emda.ext.mapfit import frequency_marching
 
@@ -718,12 +720,6 @@ def run_fit(
         static_cutmap = eout[0, :, :, :]
         moving_cutmap = eout[1, :, :, :]
         cfo = eout[2, :, :, :]
-        if dfs_full is not None:
-            # cut dfs_full for current size
-            dfs = interp_derivatives.cut_dfs4interp(dfs_full, cbin)
-            #
-        else:
-            dfs = None
         emmap1.ceo_lst = [static_cutmap, moving_cutmap]
         emmap1.cfo_lst = [cfo]
         emmap1.cbin_idx = cBIdx
@@ -743,27 +739,22 @@ def run_fit(
 
 def overlay(
     maplist,
-    ncycles=50,
+    ncycles=10,
     t_init=[0.0, 0.0, 0.0],
-    theta_init=0.0,
+    rotmat_init=np.identity(3),
     smax=6,
     interp="linear",
+    modelres=5.0,
     masklist=None,
-    imask=None,
     fobj=None,
-    halfmaps=False,
-    dfs_interp=False,
-    usemodel=False,
-    fitres=3.5,
+    fitres=None,
 ):
     try:
-        emmap1 = EmmapOverlay(maplist, masklist)
+        emmap1 = EmmapOverlay(maplist, modelres, masklist)
     except:
-        emmap1 = EmmapOverlay(maplist)
+        emmap1 = EmmapOverlay(maplist, modelres)
     emmap1.load_maps()
     emmap1.calc_fsc_from_maps()
-    q_overall = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
-    rotmat_init = core.quaternions.get_RM(q_overall)
     t = [itm / emmap1.pixsize for itm in t_init]
     rotmat_lst = []
     transl_lst = []
@@ -795,6 +786,7 @@ def overlay(
         trans_list.append(t)
     # output maps
     output_rotated_maps(emmap1, rotmat_list, trans_list)
+    output_rotated_models(emmap1, maplist, rotmat_list, trans_list)
     return emmap1, rotmat_list, trans_list
 
 
@@ -836,6 +828,28 @@ def output_rotated_maps(emmap1, r_lst, t_lst, Bf_arr=None):
             "{0}_{1}.{2}".format("fsc", str(i), "eps"),
             ["FSC before", "FSC after"],
         )
+
+
+def output_rotated_models(emmap1, maplist, r_lst, t_lst):
+    from emda.core.iotools import apply_transformation_on_model, pdb2mmcif
+
+    pixsize = emmap1.pixsize
+    i = 0
+    for model, t, rotmat in zip(maplist[1:], t_lst, r_lst):
+        print(rotmat)
+        t = t *  pixsize * emmap1.map_dim
+        print(t)
+        i += 1
+        if model.endswith((".mrc", ".map")):
+            continue
+        elif model.endswith((".pdb", ".ent")):
+            pdb2mmcif(model)
+            outcifname = "emda_transformed_model_" + str(i) + ".cif"
+            print(outcifname)
+            _,_,_,_ = apply_transformation_on_model(mmcif_file="./out.cif",rotmat=rotmat, trans=t*pixsize, outfilename=outcifname)
+        elif model.endswith((".cif")):
+            outcifname = "emda_transformed_model_" + str(i) + ".cif"
+            _,_,_,_ = apply_transformation_on_model(mmcif_file=model,rotmat=rotmat, trans=t*pixsize, outfilename=outcifname)
 
 
 if __name__ == "__main__":
