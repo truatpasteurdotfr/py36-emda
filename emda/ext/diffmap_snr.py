@@ -13,6 +13,7 @@ import emda.emda_methods as em
 
 
 mode = 1 # bestmap in resolution bins
+#mode = 2 # bestmap in 3d
 maplist = [
         "/Users/ranganaw/MRC/REFMAC/Vinoth/nat_half1_class001_unfil.map",
         "/Users/ranganaw/MRC/REFMAC/Vinoth/nat_half2_class001_unfil.map",
