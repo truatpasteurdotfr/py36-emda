@@ -8,17 +8,17 @@ Mozilla Public License, version 2.0; see LICENSE.
 
 # calcuating bestmap - normalized and FSC weighted map
 
-def bestmap(f1, f2, mode=1, kernel_size=5, bin_idx=None, nbin=None, res_arr=None):
+def bestmap(f1, f2, mode=1, kernel_size=5, bin_idx=None, nbin=None, res_arr=None, B=None):
     if mode == 1:
         print("bestmap is calculated using FSC in resolution bins")
-        bestmap = bestmap_1dfsc(f1, f2, bin_idx, nbin, res_arr)
+        bestmap = bestmap_1dfsc(f1, f2, bin_idx, nbin, res_arr, B)
     elif mode == 2:
         print("bestmap is calculated using local FSC")
         bestmap = bestmap_3dfsc(f1, f2, kernel_size)
     return bestmap
 
 
-def bestmap_1dfsc(f1, f2, bin_idx, nbin, res_arr=None):
+def bestmap_1dfsc(f1, f2, bin_idx, nbin, res_arr=None, B=None):
     import fcodes_fast
     from emda.core import fsc, iotools
     import numpy as np
@@ -35,9 +35,16 @@ def bestmap_1dfsc(f1, f2, bin_idx, nbin, res_arr=None):
     df = pandas.DataFrame(data=data, columns=columns)
     iotools.output_to_table(df)
     fsc = 2 * fsc / (1 + fsc)
-    fsc_grid = fcodes_fast.read_into_grid(bin_idx, fsc, nbin, cx, cy, cz)
-    fsc_grid_filtered = np.where(fsc_grid < 0.0, 0.0, fsc_grid)
-    return np.sqrt(fsc_grid_filtered) * eo
+
+    if B is None:
+        fsc_grid = fcodes_fast.read_into_grid(bin_idx, fsc, nbin, cx, cy, cz)
+        fsc_grid_filtered = np.where(fsc_grid < 0.0, 0.0, fsc_grid)
+        return np.sqrt(fsc_grid_filtered) * eo
+    else:
+        k2 = np.exp(-B/res_arr**2/2)
+        fac = np.sqrt(k2)*np.sqrt(np.where(fsc<0, 0, fsc))/(1+(k2-1)*fsc)
+        fac_grid = fcodes_fast.read_into_grid(bin_idx, fac, nbin, cx, cy, cz)
+        return fac_grid * eo 
 
 
 def bestmap_3dfsc(f1, f2, kernel_size=5):
