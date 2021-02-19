@@ -260,6 +260,14 @@ def mask_from_coordinates(mapname, modelname, atmrad=3):
         dilate, restools.softedgekernel_5x5(), "same")
     mask = mask * (mask >= 0.0)
     mask = np.where(grid2_binary, 1.0, mask)
+    shift_z = mask.shape[0] - abs(orig[2])
+    shift_y = mask.shape[1] - abs(orig[1])
+    shift_x = mask.shape[2] - abs(orig[0])
+    mask = np.roll(
+        np.roll(np.roll(mask, -shift_z, axis=0), -shift_y, axis=1),
+        -shift_x,
+        axis=2,
+    )
     iotools.write_mrc(mask, "emda_atomic_mask.mrc", uc, orig)
     return mask
 
