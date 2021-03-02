@@ -8,6 +8,7 @@ Mozilla Public License, version 2.0; see LICENSE.
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import sys
 import numpy as np
 import fcodes_fast
 import gemmi, pandas
@@ -43,6 +44,10 @@ def read_map(mapname):
         unit_cell = np.zeros(6, dtype='float')
         cell = file.header.cella[['x', 'y', 'z']]
         unit_cell[:3] = cell.view(('f4', 3))
+        # Swap cell parameters a, b, c to c, b, a
+        tmp = unit_cell[:3]
+        unit_cell[0],  unit_cell[2] = tmp[2], tmp[0]
+        #
         unit_cell[3:] = float(90)
         origin = [
             1 * file.header.nxstart,
@@ -523,6 +528,8 @@ def read_atomsf(atm, fpath=None):
 
 def pdb2mmcif(filename_pdb):
     structure = gemmi.read_structure(filename_pdb)
+    structure.setup_entities()
+    structure.assign_label_seq_id()
     mmcif = structure.make_mmcif_document()
     mmcif.write_file("out.cif")
 
