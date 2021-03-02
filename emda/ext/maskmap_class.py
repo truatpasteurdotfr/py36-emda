@@ -72,7 +72,8 @@ class MaskedMaps:
         from scipy import stats
         from scipy.ndimage.morphology import binary_dilation
         import matplotlib
-        matplotlib.use("Agg")
+        #matplotlib.use("Agg")
+        matplotlib.use(matplotlib.get_backend())
         import matplotlib.pyplot as plt
 
         arr_tmp = arr
@@ -197,7 +198,8 @@ def mapmask(arr, uc, itr=3, kern_rad=3, prob=0.99):
     from scipy.ndimage.morphology import binary_dilation
     import matplotlib
 
-    matplotlib.use("Agg")
+    #matplotlib.use("Agg")
+    matplotlib.use(matplotlib.get_backend())
     import matplotlib.pyplot as plt
 
     arr_tmp = arr
