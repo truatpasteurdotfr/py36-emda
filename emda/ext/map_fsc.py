@@ -284,7 +284,8 @@ def fsc_mapmodel(
     else:
         print("No mask is given. EMDA calculated mask from atomic model is used.\n")
         fobj.write("No mask is given. EMDA calculated mask from atomic model is used.\n")
-        mask = em.mask_from_map(uc, modelmap, kern=9, itr=5)
+        #mask = em.mask_from_map(uc, modelmap, kern=9, itr=5)
+        mask = em.mask_from_atomic_model(mapname=map1, modelname=model, atmrad=3)
     if phaserand:
         print("Phase randomization is carrying out...")
         fobj.write("Phase randomization is carrying out...\n")
