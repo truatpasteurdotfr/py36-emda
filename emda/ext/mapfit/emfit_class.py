@@ -75,43 +75,6 @@ class EmFit:
         fval = np.sum(self.w_grid * self.e0 * np.conjugate(self.ert))
         return fval.real
 
-    """ def get_wght(self, e0, ert):
-        cx, cy, cz = e0.shape
-        start = timer()
-        fsc = core.fsc.anytwomaps_fsc_covariance(
-            e0, ert, self.mapobj.cbin_idx, self.mapobj.cbin
-        )[0]
-        w_grid = fcodes_fast.read_into_grid(
-            self.mapobj.cbin_idx, fsc / (1 - fsc ** 2), self.mapobj.cbin, cx, cy, cz
-        )
-        fsc_sqd = fsc ** 2
-        fsc_combi = fsc_sqd / (1 - fsc_sqd)
-        w2_grid = fcodes_fast.read_into_grid(
-            self.mapobj.cbin_idx, fsc_combi, self.mapobj.cbin, cx, cy, cz
-        )
-        end = timer()
-        if timeit:
-            print("     weight calc time: ", end - start)
-        return w_grid, w2_grid, fsc
-
-    def functional(self, e0, e1, f1=None):
-        start = timer()
-        cx, cy, cz = e0.shape
-        self.st, s1, s2, s3 = fcodes_fast.get_st(cx, cy, cz, self.t)
-        self.sv = np.array([s1, s2, s3])
-        self.ert = get_FRS(self.rotmat, e1 * self.st, interp=self.interp)[:, :, :, 0]
-        if f1 is not None:
-            # translate and then rotate
-            self.frt = get_FRS(self.rotmat, f1 * self.st, interp=self.interp)[
-                :, :, :, 0
-            ]
-        self.w_grid, self.w2_grid, self.fsc = self.get_wght(e0, self.ert)
-        fval = np.sum(self.w_grid * e0 * np.conjugate(self.ert))
-        end = timer()
-        if timeit:
-            print(" functional calc time: ", end - start)
-        return fval.real """
-
     def minimizer(self, ncycles, t_init, rotmat, smax_lf, fobj=None):
         import math
         from emda.ext.mapfit import (
@@ -159,7 +122,6 @@ class EmFit:
                     q_accum = self.q
                     theta2 = np.arccos((np.trace(self.rotmat) - 1) / 2) * 180.0 / np.pi
                     t_accum_previous = t_accum
-                    q_accum_previous = q_accum
                 else:
                     rm_accum = core.quaternions.get_RM(q_accum)
                     theta2 = np.arccos((np.trace(rm_accum) - 1) / 2) * 180.0 / np.pi
@@ -167,19 +129,15 @@ class EmFit:
                         self.rotmat = np.identity(3)
                     else:
                         self.rotmat = core.quaternions.get_RM(self.q)
-
-                # check FSC and return parameters accordingly  
-                self.fsc = self.calc_fsc()  
-                if np.average(self.fsc) > 0.99:
+ 
+                self.fsc = self.calc_fsc() 
+                if np.average(self.fsc) > 0.999:
                     fval = np.sum(self.e0 * np.conjugate(self.ert))
                     print("fval, FSC_avg ", fval.real, np.average(self.fsc))
                     self.rotmat = core.quaternions.get_RM(q_accum)
                     self.t_accum = t_accum_previous  # final translation
                     self.fsc_lst = fsc_lst
-                    t_accum_angstrom = self.t_accum * self.pixsize#self.cell[:3]
-                    translation_vec = np.sqrt(
-                        np.sum(t_accum_angstrom * t_accum_angstrom)
-                    )
+                    translation_vec = trans_in_angstrom(self.t_accum, self.pixsize, self.cut_dim)
                     theta2 = np.arccos((np.trace(self.rotmat) - 1) / 2) * 180.0 / np.pi
                     print("thets2, trans: ", theta2, translation_vec)
                     break
@@ -188,7 +146,6 @@ class EmFit:
                 fval_list.append(fval)
                 q_list.append(q_accum)
                 t_list.append(t_accum)
-                #fval = self.functional(self.e0, self.e1)
                 if math.isnan(theta2):
                     print("Cannot find a solution! Stopping now...")
                     exit()
@@ -198,10 +155,6 @@ class EmFit:
                     fsc_lst.append(fsc)
                 if i > 0 and fval_previous < fval or i == ncycles - 1:
                     fsc = self.fsc
-                    #print(i, fval_previous, fval)
-                    #print(
-                    #    "average FSC: before after", np.mean(fsc_lst[0]), np.mean(fsc)
-                    #)
                 """ if i > 0 and fval < fval_previous or i == ncycles - 1:
                     rotmat = core.quaternions.get_RM(q_accum_previous)
                     fsc_lst.append(fsc)
@@ -217,15 +170,11 @@ class EmFit:
                     break """
                 if i > 0 and i == ncycles - 1:
                     # search for max fval in the fval_list
-                    loc = np.argmax(fval_list)
                     self.rotmat = core.quaternions.get_RM(q_list[-1])
                     self.q = q_list[-1]
                     self.t_accum = t_list[-1]
                     self.fsc_lst = fsc_lst
-                    t_accum_angstrom = self.t_accum * self.pixsize#self.cell[:3]
-                    translation_vec = np.sqrt(
-                        np.sum(t_accum_angstrom * t_accum_angstrom)
-                    )
+                    translation_vec = trans_in_angstrom(t_accum, self.pixsize, self.cut_dim)
                     theta2 = np.arccos((np.trace(self.rotmat) - 1) / 2) * 180.0 / np.pi
                     print("thets2, trans: ", theta2, translation_vec)
                     break
@@ -261,7 +210,6 @@ class EmFit:
                 elif self.dfs is None:
                     dFRs = None
                 t_accum_previous = t_accum
-                q_accum_previous = q_accum
                 self.step, _ = derivatives.new_derivatives(
                     self.e0,
                     self.ert,
@@ -289,17 +237,13 @@ class EmFit:
                 # translation
                 self.t = self.step[:3] * alpha[0]
                 t_accum = t_accum + self.t
-                t_accum_angstrom = t_accum * self.pixsize#self.cell[:3]
-                translation_vec = np.sqrt(np.sum(t_accum_angstrom * t_accum_angstrom))
+                translation_vec = trans_in_angstrom(t_accum, self.pixsize, self.cut_dim)
                 # rotation
                 tmp = np.insert(self.step[3:] * alpha[1], 0, 0.0)
                 q_accum = q_accum + tmp
                 q_accum = q_accum / np.sqrt(np.dot(q_accum, q_accum))
                 rm_accum = core.quaternions.get_RM(q_accum)
                 theta2 = np.arccos((np.trace(rm_accum) - 1) / 2) * 180.0 / np.pi
-                #if theta2 < 0.01:
-                #    tmp = q_init  # revert to no-rotation
-                #else:
                 tmp = tmp + q_init
                 q = tmp / np.sqrt(np.dot(tmp, tmp))
                 self.q = q
@@ -308,3 +252,7 @@ class EmFit:
                 if timeit:
                     print("time for one cycle:", end - start)
 
+
+def trans_in_angstrom(t, pixsize, dim):
+    t_angs = t * pixsize * np.asarray(dim)
+    return np.sqrt(np.sum(t_angs * t_angs))
