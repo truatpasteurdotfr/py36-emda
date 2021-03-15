@@ -222,6 +222,7 @@ class EmmapOverlay:
         self.cbin = None
         self.com = True
         self.com1 = None
+        self.comlist = []
         self.box_centr = None
         self.fhf_lst = None
         self.nbin = None
@@ -266,6 +267,7 @@ class EmmapOverlay:
                         print("COM: ", com1)
                         box_centr = (nx // 2, ny // 2, nz // 2)
                         self.com1, self.box_centr = com1, box_centr
+                        self.comlist.append(com1)
                         arr_mvd = shift(arr, np.subtract(box_centr, com1))
                         self.arr_lst.append(arr_mvd * corner_mask)
                         fhf_lst.append(fftshift(fftn(fftshift(arr_mvd * corner_mask))))
@@ -297,6 +299,7 @@ class EmmapOverlay:
                     if com:
                         com1 = ndimage.measurements.center_of_mass(arr * (arr >= 0.0))
                         print("COM: ", com1)
+                        self.comlist.append(com1)
                         arr = shift(arr, np.subtract(box_centr, com1))
                     self.arr_lst.append(arr * corner_mask)
                     fhf_lst.append(fftshift(fftn(fftshift(arr * corner_mask))))
