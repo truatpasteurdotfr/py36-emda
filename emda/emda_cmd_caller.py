@@ -531,7 +531,7 @@ bestmap.add_argument("--h1", required=True, help="input halfmap1 map")
 bestmap.add_argument("--h2", required=True, help="input halfmap2 map")
 bestmap.add_argument("--msk", required=False,
                      default=None, help="mask to be applied")
-bestmap.add_argument("-B", required=False, type=float, help="relative B")
+bestmap.add_argument("--B", required=False, type=float, help="relative B")
 bestmap.add_argument(
     "--knl", required=False, default=5, type=int, help="kernel radius (pixels)"
 )
