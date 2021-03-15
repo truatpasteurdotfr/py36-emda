@@ -24,7 +24,7 @@ timeit = True
 
 
 class EmmapOverlay:
-    def __init__(self, map_list, modelres=5.0, mask_list=None):
+    def __init__(self, map_list, modelres=5.0, com=False, mask_list=None):
         self.map_list = map_list
         self.mask_list = mask_list
         self.modelres = modelres
@@ -40,7 +40,7 @@ class EmmapOverlay:
         self.cbin_idx = None
         self.cdim = None
         self.cbin = None
-        self.com = False
+        self.com = com
         self.com1 = None
         self.comlist = []
         self.box_centr = None
@@ -238,7 +238,7 @@ def cut_resolution_for_linefit(f_list, bin_idx, res_arr, smax):
     f_arr = np.asarray(f_list, dtype='complex')
     nx, ny, nz = f_list[0].shape
     cbin = cx = smax
-    print("Cut data at ", res_arr[cbin], " A")
+    #print("Cut data at ", res_arr[cbin], " A")
     dx = int((nx - 2 * cx) / 2)
     dy = int((ny - 2 * cx) / 2)
     dz = int((nz - 2 * cx) / 2)
@@ -320,7 +320,7 @@ class linefit:
         f = self.func_t
         res = minimize_scalar(f, method="brent")
         end = timer()
-        print("time for trans linefit: ", end-start)
+        #print("time for trans linefit: ", end-start)
         return res.x
 
 
@@ -410,7 +410,7 @@ def derivatives_translation(e0, e1, wgrid, w2grid, sv):
     ddf_inv = np.linalg.pinv(ddf)
     step = ddf_inv.dot(-df)
     end = timer()
-    print("time for trans deriv. ", end-start)
+    #print("time for trans deriv. ", end-start)
     return step
 
 
@@ -567,7 +567,8 @@ class EmFit:
                     [self.e0, self.e1], self.mapobj.cbin_idx, self.mapobj.res_arr, smax_lf
                 ) """
                 if i == 1:
-                    f_list = [self.e0, self.e1]
+                    #f_list = [self.e0, self.e1]
+                    f_list = [self.e0, self.ert]
                     fout, lbinindx, lnbin = cut_resolution_for_linefit(f_list, self.mapobj.cbin_idx, self.mapobj.res_arr, smax_lf)
                     self.le0 = fout[0,:,:,:]
                     self.le1 = fout[1,:,:,:]
@@ -593,8 +594,8 @@ class EmFit:
             )
 
             end = timer()
-            if timeit:
-                print("time for one cycle:", end - start)
+            #if timeit:
+                #print("time for one cycle:", end - start)
 
 
 def fsc_between_static_and_transfomed_map(
@@ -610,9 +611,7 @@ def fsc_between_static_and_transfomed_map(
 
 
 def get_ibin(bin_fsc):
-    #print('bin_fsc:')
-    #print(bin_fsc)
-    # new search from rear end
+    # search from rear end
     for i, ifsc in reversed(list(enumerate(bin_fsc))):
         if ifsc > 0.4:
             ibin = i
@@ -648,7 +647,9 @@ def run_fit(
     if fitres is None:
         fitbin = len(emmap1.res_arr) - 1
     fsc_lst = []
-    for i in range(5):
+    nmarchingcycles = 10
+    for i in range(nmarchingcycles):
+        print("Frequency marching cycle # ", i)
         if i == 0:
             f1f2_fsc = fsc_between_static_and_transfomed_map(
                 staticmap=emmap1.fo_lst[0],
@@ -659,7 +660,6 @@ def run_fit(
                 cell=emmap1.map_unit_cell,
                 nbin=emmap1.nbin,
             )
-
             ibin = get_ibin(f1f2_fsc)
             if fitbin < ibin:
                 ibin = fitbin
@@ -682,7 +682,7 @@ def run_fit(
                 break
         else:
             # Apply initial rotation and translation to calculate fsc
-            f1f2_fsc = fsc_between_static_and_transfomed_map(
+            """ f1f2_fsc = fsc_between_static_and_transfomed_map(
                 emmap1.fo_lst[0],
                 emmap1.fo_lst[ifit],
                 emmap1.bin_idx,
@@ -690,13 +690,14 @@ def run_fit(
                 t,
                 emmap1.map_unit_cell,
                 emmap1.nbin,
-            )
+            ) """
+            f1f2_fsc = core.fsc.anytwomaps_fsc_covariance(emmap1.fo_lst[0], frt, emmap1.bin_idx, emmap1.nbin)[0]
             ibin = get_ibin(f1f2_fsc)
             if fitbin < ibin:
                 ibin = fitbin
             print("Fitting resolution: ", emmap1.res_arr[ibin], " (A)")
             print("FSC(ibin): ", f1f2_fsc[ibin])
-            if ibin_old == ibin:
+            if ibin_old == ibin or i == nmarchingcycles-1:
                 fsc_lst.append(f1f2_fsc)
                 q_final = quaternions.rot2quart(rotmat)
                 print("\n***FSC between static and moving maps***\n")
@@ -731,9 +732,12 @@ def run_fit(
         #slf = min([ibin, slf])
         slf = ibin
         rfit.minimizer(ncycles, t, rotmat, ifit, smax_lf=slf, fobj=fobj)
-        ncycles = ncycles  # tweaking this you can change later # cycles
         t = rfit.t
         rotmat = quaternions.get_RM(rfit.q)
+        # apply transformation on data for next cycle
+        nx, ny, nz = emmap1.map_dim
+        st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
+        frt = utils.get_FRS(rotmat, emmap1.fo_lst[ifit] * st, interp="linear")[:, :, :, 0] 
     return t, q_final
 
 
@@ -745,14 +749,15 @@ def overlay(
     smax=6,
     interp="linear",
     modelres=5.0,
+    usecom=False,
     masklist=None,
     fobj=None,
     fitres=None,
 ):
     try:
-        emmap1 = EmmapOverlay(maplist, modelres, masklist)
+        emmap1 = EmmapOverlay(maplist, modelres, usecom, masklist)
     except:
-        emmap1 = EmmapOverlay(maplist, modelres)
+        emmap1 = EmmapOverlay(maplist, modelres, usecom)
     emmap1.load_maps()
     emmap1.calc_fsc_from_maps()
     t = [itm / emmap1.pixsize for itm in t_init]
