@@ -107,8 +107,9 @@ def calculate_diffmap(emmap1, f_list, resol):
 
 
 def mapoutput(list_maps, uc, origin, masklist=None):
-    #if masklist is not None != len(masklist) > 0 :
-    if masklist is not None:
+    if masklist is None: 
+        masklist = []
+    if len(masklist) > 0:
         for i, msk in enumerate(masklist):
             if i < 2:
                 # calculate rmsd
