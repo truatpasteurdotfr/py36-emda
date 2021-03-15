@@ -1131,8 +1131,8 @@ def overlay_maps(
         Outputs:
             Outputs a series of overlaid maps (fitted_map_?.mrc).
     """
-    #from emda.ext.mapfit import mapoverlay
-    from emda.ext.overlay import overlay
+    from emda.ext.mapfit import mapoverlay
+    #from emda.ext.overlay import overlay
 
     if axr is None:
         axr = [1, 0, 0]
@@ -1141,7 +1141,7 @@ def overlay_maps(
     if fobj is None:
         fobj = open("EMDA_overlay.txt", "w")
     theta_init = [tuple(axr), rot]
-    """ mapoverlay.main(
+    mapoverlay.main(
         maplist=maplist,
         masklist=masklist,
         ncycles=ncy,
@@ -1153,9 +1153,9 @@ def overlay_maps(
         halfmaps=hfm,
         usemodel=usemodel,
         fitres=fitres,
-    ) """
+    )
     # new overlay function call
-    q = quaternions.get_quaternion(theta_init)
+    """ q = quaternions.get_quaternion(theta_init)
     rm = quaternions.get_RM(q)
     emmap1, rotmat_list, trans_list = overlay(
         maplist=maplist,
@@ -1168,7 +1168,7 @@ def overlay_maps(
         fobj=fobj,
         fitres=fitres,
         modelres=modelres,
-    )
+    ) """
 
 
 def average_maps(
