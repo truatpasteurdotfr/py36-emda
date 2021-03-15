@@ -21,7 +21,7 @@ def output_rotated_maps(emmap1, r_lst, t_lst, Bf_arr=None):
 
     if Bf_arr is None:
         Bf_arr = [0.0]
-    emmap1.com = False
+    #emmap1.com = False
     if emmap1.com:
         com = emmap1.com1
     fo_lst = emmap1.fo_lst
@@ -152,7 +152,7 @@ def main(
             )
         else:
             dfs_full = None
-        rotmat, t = run_fit.run_fit(
+        rotmat, translation = run_fit.run_fit(
             emmap1=emmap1,
             smax=smax,
             rotmat=rotmat,
@@ -166,9 +166,9 @@ def main(
             fitres=fitres,
         )
         rotmat_lst.append(rotmat)
-        transl_lst.append(t)
+        transl_lst.append(translation)
         end_fit = timer()
-        fobj.write("Final Translation: " + str(t) + " \n")
+        fobj.write("Final Translation: " + str(translation) + " \n")
         fobj.write("Final Rotation matrix: " + str(rotmat) + " \n")
         print("time for fitting: ", end_fit - start_fit)
 
