@@ -27,16 +27,13 @@ def fsc_between_static_and_transfomed_map(
 
 
 def get_ibin(bin_fsc):
-    if bin_fsc[len(bin_fsc) - 1] > 0.5:
-        ibin = len(bin_fsc) - 2
-        print("ibin: ", ibin)
-    else:
-        bin_fsc = bin_fsc[bin_fsc > 0.1]
-        dist = np.sqrt((bin_fsc - 0.3) ** 2)
-        ibin = np.argmin(dist) + 1
-        if ibin % 2 != 0:
-            ibin = ibin - 1
-        ibin = min([len(dist), ibin])
+    # search from rear end
+    for i, ifsc in reversed(list(enumerate(bin_fsc))):
+        if ifsc > 0.3:
+            ibin = i
+            if ibin % 2 != 0:
+                ibin = ibin - 1
+            break
     return ibin
 
 
@@ -54,6 +51,7 @@ def run_fit(
     dfs_full=None,
 ):
     from emda.ext.mapfit import emfit_class, frequency_marching, interp_derivatives
+    from emda.ext.overlay import cut_resolution_for_linefit
 
     if fitres is not None:
         if fitres <= emmap1.res_arr[-1]:
@@ -69,8 +67,7 @@ def run_fit(
     fsc_lst = []
     for i in range(5):
         if i == 0:
-            smax = smax  # A
-            if emmap1.res_arr[0] < smax:
+            """ if emmap1.res_arr[0] < smax:
                 ibin = 2
                 print("Fitting starts at ", emmap1.res_arr[ibin], " (A) instead!")
             else:
@@ -79,8 +76,8 @@ def run_fit(
                 if ibin % 2 != 0:
                     ibin = ibin - 1
                 ibin = min([len(dist), ibin])
-                print("Fitting starts at ", emmap1.res_arr[ibin], " (A)")
-            ibin_old = ibin
+                print("Fitting starts at ", emmap1.res_arr[ibin], " (A)") """
+            #ibin_old = ibin
             f1f2_fsc = fsc_between_static_and_transfomed_map(
                 staticmap=emmap1.fo_lst[0],
                 movingmap=emmap1.fo_lst[ifit],
@@ -91,20 +88,9 @@ def run_fit(
                 nbin=emmap1.nbin,
             )
             fsc_lst.append(f1f2_fsc)
-            if np.average(f1f2_fsc) > 0.99:
-                f1f2_fsc = fsc_between_static_and_transfomed_map(
-                    staticmap=emmap1.fo_lst[0],
-                    movingmap=emmap1.fo_lst[ifit],
-                    bin_idx=emmap1.bin_idx,
-                    rm=np.array(
-                        [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
-                        dtype="float",
-                    ),
-                    t=np.array([0.0, 0.0, 0.0], dtype="float"),
-                    cell=emmap1.map_unit_cell,
-                    nbin=emmap1.nbin,
-                )
-                fsc_lst.append(f1f2_fsc)
+            ibin = get_ibin(f1f2_fsc)
+            ibin_old = ibin
+            if np.average(f1f2_fsc) > 0.999:
                 fobj.write("\n")
                 fobj.write("FSC between static and moving maps\n")
                 fobj.write("\n")
@@ -118,15 +104,18 @@ def run_fit(
                 for j in range(len(emmap1.res_arr)):
                     print(
                         "{:5d} {:6.2f} {:8.4f} {:8.4f}".format(
-                            j, emmap1.res_arr[j], fsc_lst[1][j], fsc_lst[0][j]
+                            j, emmap1.res_arr[j], fsc_lst[0][j], fsc_lst[0][j]
                         )
                     )
                     fobj.write(
                         "{:5d} {:6.2f} {:8.4f} {:8.4f}\n".format(
-                            j, emmap1.res_arr[j], fsc_lst[1][j], fsc_lst[0][j]
+                            j, emmap1.res_arr[j], fsc_lst[0][j], fsc_lst[0][j]
                         )
                     )
                 break
+            if fitbin < ibin:
+                ibin = fitbin
+            print("Fitting starts at ", emmap1.res_arr[ibin], " (A)")            
         else:
             # Apply initial rotation and translation to calculate fsc
             f1f2_fsc = fsc_between_static_and_transfomed_map(
@@ -141,6 +130,7 @@ def run_fit(
             ibin = get_ibin(f1f2_fsc)
             if fitbin < ibin:
                 ibin = fitbin
+            print("Fitting starts at ", emmap1.res_arr[ibin], " (A)")
             if ibin_old == ibin:
                 fsc_lst.append(f1f2_fsc)
                 fobj.write("\n")
@@ -166,45 +156,36 @@ def run_fit(
                         )
                     )
                 break
-            else:
-                ibin_old = ibin
+            ibin_old = ibin
         if ibin == 0:
-            print("Cannot find a solution! Stopping now...")
-            exit()
-        static_cutmap, cBIdx, cbin = frequency_marching.frequency_marching(
+            print('ibin = 0')
+            raise SystemExit("Cannot proceed! Stopping now...")
+        """ static_cutmap, cBIdx, cbin = frequency_marching.frequency_marching(
             emmap1.eo_lst[0], emmap1.bin_idx, emmap1.res_arr, bmax=ibin
         )
         moving_cutmap, _, _ = frequency_marching.frequency_marching(
             emmap1.eo_lst[ifit], emmap1.bin_idx, emmap1.res_arr, bmax=ibin
-        )
-        """ static_cutmap_f0, _, _ = frequency_marching.frequency_marching(
-            emmap1.fo_lst[0], emmap1.bin_idx, emmap1.res_arr, bmax=ibin
-        )
-        moving_cutmap_f1, _, _ = frequency_marching.frequency_marching(
-            emmap1.fo_lst[ifit], emmap1.bin_idx, emmap1.res_arr, bmax=ibin
         ) """
-        if dfs_full is not None:
-            # cut dfs_full for current size
-            dfs = interp_derivatives.cut_dfs4interp(dfs_full, cbin)
-            #
-        else:
-            dfs = None
+
+        e_list = [emmap1.eo_lst[0], emmap1.eo_lst[ifit], emmap1.fo_lst[ifit]]
+        eout, cBIdx, cbin = cut_resolution_for_linefit(
+            e_list, emmap1.bin_idx, emmap1.res_arr, ibin
+        )
+        static_cutmap = eout[0, :, :, :]
+        moving_cutmap = eout[1, :, :, :]
+        #cfo = eout[2, :, :, :]
+
         assert static_cutmap.shape == moving_cutmap.shape
-        # emmap1.cfo_lst = [static_cutmap_f0, moving_cutmap_f1]
         emmap1.ceo_lst = [static_cutmap, moving_cutmap]
         emmap1.cbin_idx = cBIdx
         emmap1.cdim = moving_cutmap.shape
         emmap1.cbin = cbin
-        fit = emfit_class.EmFit(emmap1, interp=interp, dfs=dfs)
+        fit = emfit_class.EmFit(emmap1, interp=interp)
         if ibin < slf or slf == 0:
             slf = ibin
-        slf = min([ibin, slf])
+        #slf = min([ibin, slf])
+        slf = min([ibin, 30]) # use 30 bins for linefit - hard coded
         fit.minimizer(ncycles, t, rotmat, smax_lf=slf, fobj=fobj)
-        ncycles = ncycles  # tweaking this you can change later # cycles
         t = fit.t_accum
         rotmat = fit.rotmat
-        q_final = fit.q
-        x, y, z, ang = quaternions.quart2axis(q_final)
-        print("x, y, z and angle:")
-        print(x, y, z, np.rad2deg(ang))
     return rotmat, t
