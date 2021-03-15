@@ -184,8 +184,8 @@ def main(maplist, diffmapres=3, fit=False, usehalfmaps=False, masklist=None):
         else:
             uc, arr1, origin = em.get_data(maplist[0])
             _, arr2, _ = em.get_data(maplist[1])
-            f1 = fftshift(fftn(fftshift(arr1)))
-            f2 = fftshift(fftn(fftshift(arr2)))
+            f1 = fftshift(fftn(arr1))
+            f2 = fftshift(fftn(arr2))
             diffmap = diffmap_normalisedsf(f1, f2, uc, smax=diffmapres, origin=origin)
             results.diffmap = diffmap
             results.cell = uc
@@ -299,7 +299,7 @@ def difference_map(maplist, diffmapres=3.0, mode="norm", fit=False, usehalfmaps=
 
         f1 = np.fft.fftshift(np.fft.fftn(np.fft.fftshift(arr1)))
         f2 = np.fft.fftshift(np.fft.fftn(np.fft.fftshift(arr2)))
-
+        list_masks = None
         if masklist is not None:
             assert len(maplist) == len(masklist) == 2
             _, msk1, _ = iotools.read_map(masklist[0])
