@@ -437,6 +437,8 @@ mapoverlay.add_argument("--hfm", action="store_true",
                         help="if use employ half maps")
 mapoverlay.add_argument("--mod", action="store_true",
                         help="if use calls model overlay")
+mapoverlay.add_argument("--usecom", action="store_true",
+                     help="if used, center-of-mass is used to superimpose maps")
 
 
 mapaverage = subparsers.add_parser(
@@ -506,6 +508,16 @@ diffmap.add_argument(
 )
 diffmap.add_argument("--fit", action="store_true",
                      help="if used, maps are superimposed before calculating difference map")
+diffmap.add_argument(
+    "--fitres",
+    required=False,
+    default=0.0,
+    type=float,
+    help="final fit resol. (A). default= 0.0 A",
+)
+diffmap.add_argument("--usecom", action="store_true",
+                     help="if used, center-of-mass is used to superimpose maps")
+
 diffmap.add_argument("--usehalfmaps", action="store_true",
                      help="if used, halfmaps are used to calculate difference map")
 
@@ -967,6 +979,7 @@ def map_overlay(args, fobj):
         hfm=args.hfm,
         usemodel=args.mod,
         fitres=args.fitres,
+        usecom=args.usecom,
     )
 
 
@@ -1010,7 +1023,7 @@ def diff_map(args):
 
     difference_map(maplist=args.map, masklist=args.msk,
                    diffmapres=args.res, mode=args.mod,
-                   fit=args.fit, usehalfmaps=args.usehalfmaps)
+                   fit=args.fit, usehalfmaps=args.usehalfmaps, usecom=args.usecom, fitres=args.fitres)
 
 
 def scale_map(args):
