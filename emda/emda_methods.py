@@ -1093,6 +1093,7 @@ def overlay_maps(
     fobj=None,
     usemodel=False,
     fitres=None,
+    usecom=False,
 ):
     """Superimposes several maps.
 
@@ -1132,7 +1133,7 @@ def overlay_maps(
             Outputs a series of overlaid maps (fitted_map_?.mrc).
     """
     from emda.ext.mapfit import mapoverlay
-    #from emda.ext.overlay import overlay
+    from emda.ext.overlay import overlay
 
     if axr is None:
         axr = [1, 0, 0]
@@ -1141,7 +1142,7 @@ def overlay_maps(
     if fobj is None:
         fobj = open("EMDA_overlay.txt", "w")
     theta_init = [tuple(axr), rot]
-    mapoverlay.main(
+    """ mapoverlay.main(
         maplist=maplist,
         masklist=masklist,
         ncycles=ncy,
@@ -1153,9 +1154,9 @@ def overlay_maps(
         halfmaps=hfm,
         usemodel=usemodel,
         fitres=fitres,
-    )
+    ) """
     # new overlay function call
-    """ q = quaternions.get_quaternion(theta_init)
+    q = quaternions.get_quaternion(theta_init)
     rm = quaternions.get_RM(q)
     emmap1, rotmat_list, trans_list = overlay(
         maplist=maplist,
@@ -1168,7 +1169,8 @@ def overlay_maps(
         fobj=fobj,
         fitres=fitres,
         modelres=modelres,
-    ) """
+        usecom=usecom,
+    )
 
 
 def average_maps(
@@ -1515,7 +1517,7 @@ def mapmodel_fsc(
     return res_arr, bin_fsc
 
 
-def difference_map(maplist, diffmapres=3.0, mode="norm", fit=False, usehalfmaps=False, masklist=None):
+def difference_map(maplist, diffmapres=3.0, mode="norm", fit=False, usehalfmaps=False, usecom=False, fitres=None, masklist=None):
     """Calculates difference map.
 
     Arguments:
@@ -1572,7 +1574,7 @@ def difference_map(maplist, diffmapres=3.0, mode="norm", fit=False, usehalfmaps=
     from emda.ext import diffmap_with_fit
 
     diffmap_with_fit.difference_map(maplist=maplist, masklist=masklist,
-                                    diffmapres=diffmapres, mode=mode, fit=fit, usehalfmaps=usehalfmaps)
+                                    diffmapres=diffmapres, mode=mode, fit=fit, usecom=usecom, fitres=fitres, usehalfmaps=usehalfmaps)
 
 
 def applymask(mapname, maskname, outname):
