@@ -509,6 +509,9 @@ diffmap.add_argument(
 diffmap.add_argument("--fit", action="store_true",
                      help="if used, maps are superimposed before calculating difference map")
 diffmap.add_argument(
+    "--ncy", required=False, default=5, type=int, help="number of fitting cycles"
+)
+diffmap.add_argument(
     "--fitres",
     required=False,
     default=0.0,
@@ -1022,7 +1025,7 @@ def diff_map(args):
     from emda.emda_methods import difference_map
 
     difference_map(maplist=args.map, masklist=args.msk,
-                   diffmapres=args.res, mode=args.mod,
+                   diffmapres=args.res, mode=args.mod, ncy=args.ncy,
                    fit=args.fit, usehalfmaps=args.usehalfmaps, usecom=args.usecom, fitres=args.fitres)
 
 
