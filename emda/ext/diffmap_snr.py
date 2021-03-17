@@ -27,7 +27,7 @@ def get_bestmap(arr1, arr2, bin_idx, nbin, mode):
     f_map = bestmap.bestmap(f1=f1, f2=f2, bin_idx=bin_idx, nbin=nbin, mode=mode)
     return f_map
 
-def fitmaps(emmap1, smax=6, nc=5):
+def fitmaps(emmap1, smax=6, ncy=5, fitres=None):
     rotmat_init = np.identity(3)
     t_init=[0.0, 0.0, 0.0]
     t = [itm / emmap1.pixsize for itm in t_init]
@@ -46,9 +46,10 @@ def fitmaps(emmap1, smax=6, nc=5):
             rotmat=rotmat_init,
             t=t,
             slf=slf,
-            ncycles=nc,
+            ncycles=ncy,
             ifit=ifit,
             interp="linear",
+            fitres=fitres,
         )
         rotmat = quaternions.get_RM(q_final)
         rotmat_list.append(rotmat)
@@ -100,7 +101,7 @@ def check_sampling(arr, tpix, cpix, target_dim):
     return resampled_arr
 
 
-def main(maplist, results, fit=True, resol=3, masklist=None):
+def main(maplist, results, fit=True, resol=3, ncy=5, usecom=False, fitres=None, masklist=None):
     bestmap_list = []
     msk_list = []
     nmaps = len(maplist)
@@ -179,7 +180,8 @@ def main(maplist, results, fit=True, resol=3, masklist=None):
                 t = np.array([0.5, 0.5, 0.5], dtype='float')
                 st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
             maps.append(imap * st)
-        emmap1 = EmmapOverlay(maplist)
+        # TO DO: INCLUDE USECOM FOR FIT
+        emmap1 = EmmapOverlay(map_list=maplist)
         emmap1.map_dim = maps[0].shape
         emmap1.map_unit_cell = uc
         emmap1.pixsize = uc[0] / emmap1.map_dim[0]
@@ -189,7 +191,7 @@ def main(maplist, results, fit=True, resol=3, masklist=None):
         emmap1.res_arr = res_arr
         emmap1.fo_lst = maps
         emmap1.eo_lst = maps
-        emmap1, rotmat_list, trans_list = fitmaps(emmap1)
+        emmap1, rotmat_list, trans_list = fitmaps(emmap1, ncy=ncy, fitres=fitres)
         diffmap = output_rotated_maps(emmap1, rotmat_list, trans_list, bin_diffmap)
     else:
         # difference map without fit
