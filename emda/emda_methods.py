@@ -1517,7 +1517,7 @@ def mapmodel_fsc(
     return res_arr, bin_fsc
 
 
-def difference_map(maplist, diffmapres=3.0, mode="norm", fit=False, usehalfmaps=False, usecom=False, fitres=None, masklist=None):
+def difference_map(maplist, diffmapres=3.0, ncy=5, mode="norm", fit=False, usehalfmaps=False, usecom=False, fitres=None, masklist=None):
     """Calculates difference map.
 
     Arguments:
@@ -1574,7 +1574,7 @@ def difference_map(maplist, diffmapres=3.0, mode="norm", fit=False, usehalfmaps=
     from emda.ext import diffmap_with_fit
 
     diffmap_with_fit.difference_map(maplist=maplist, masklist=masklist,
-                                    diffmapres=diffmapres, mode=mode, fit=fit, usecom=usecom, fitres=fitres, usehalfmaps=usehalfmaps)
+                                    diffmapres=diffmapres, mode=mode, ncy=ncy, fit=fit, usecom=usecom, fitres=fitres, usehalfmaps=usehalfmaps)
 
 
 def applymask(mapname, maskname, outname):
