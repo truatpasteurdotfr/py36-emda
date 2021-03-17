@@ -56,7 +56,7 @@ class EmmapOverlay:
         from scipy import ndimage
         from scipy.ndimage.interpolation import shift
 
-        com = self.com
+        #com = self.com
         cmask = False
         fhf_lst = []
         full_fhf_lst = []
@@ -83,7 +83,7 @@ class EmmapOverlay:
                         corner_mask = utils.remove_unwanted_corners(uc, target_dim)
                     else:
                         corner_mask = 1.0
-                    if com:
+                    if self.com:
                         com1 = ndimage.measurements.center_of_mass(arr * (arr >= 0.0))
                         print("COM: ", com1)
                         box_centr = (nx // 2, ny // 2, nz // 2)
@@ -128,7 +128,7 @@ class EmmapOverlay:
                         targt_dim=target_dim,
                         arr=mask,
                     )
-                    if com:
+                    if self.com:
                         com1 = ndimage.measurements.center_of_mass(arr * (arr >= 0.0))
                         print("COM: ", com1)
                         self.comlist.append(com1)
@@ -153,9 +153,10 @@ class EmmapOverlay:
                     uc_target = uc
                     target_dim = arr.shape
                     target_pix_size = uc_target[0] / target_dim[0]
-                    if com:
+                    if self.com:
                         com1 = ndimage.measurements.center_of_mass(arr * (arr >= 0.0))
                         print("COM before centering: ", com1)
+                        self.comlist.append(com1)
                         box_centr = (nx // 2, ny // 2, nz // 2)
                         print("BOX center: ", box_centr)
                         self.com1 = com1
@@ -189,9 +190,10 @@ class EmmapOverlay:
                         targt_dim=target_dim,
                         arr=arr,
                     )
-                    if com:
+                    if self.com:
                         com1 = ndimage.measurements.center_of_mass(arr * (arr >= 0.0))
                         print("COM: ", com1)
+                        self.comlist.append(com1)
                         arr = shift(arr, np.subtract(box_centr, com1))
                         core.iotools.write_mrc(
                             arr, "moving_centered.mrc", uc_target, map_origin
@@ -755,9 +757,9 @@ def overlay(
     fitres=None,
 ):
     try:
-        emmap1 = EmmapOverlay(maplist, modelres, usecom, masklist)
+        emmap1 = EmmapOverlay(map_list=maplist, modelres=modelres, com=usecom, mask_list=masklist)
     except:
-        emmap1 = EmmapOverlay(maplist, modelres, usecom)
+        emmap1 = EmmapOverlay(map_list=maplist, modelres=modelres, com=usecom)
     emmap1.load_maps()
     emmap1.calc_fsc_from_maps()
     t = [itm / emmap1.pixsize for itm in t_init]
@@ -804,12 +806,16 @@ def output_rotated_maps(emmap1, r_lst, t_lst, Bf_arr=None):
         Bf_arr = [0.0]
     fo_lst = emmap1.fo_lst
     cell = emmap1.map_unit_cell
+    comlist = emmap1.comlist
     bin_idx = emmap1.bin_idx
     nbin = emmap1.nbin
     imap_f = 0
     f_static = fo_lst[0]
     nx, ny, nz = f_static.shape
     data2write = np.real(ifftshift(ifftn(ifftshift(f_static))))
+    print("COM list: ", comlist)
+    if len(comlist) > 0:
+        data2write = em.shift_density(data2write, shift=np.subtract(comlist[0], emmap1.box_centr))
     core.iotools.write_mrc(data2write, "static_map.mrc", cell)
     i = 0
     for fo, t, rotmat in zip(fo_lst[1:], t_lst, r_lst):
@@ -820,6 +826,9 @@ def output_rotated_maps(emmap1, r_lst, t_lst, Bf_arr=None):
         st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
         frt = utils.get_FRS(rotmat, fo * st, interp="cubic")[:, :, :, 0]
         data2write = np.real(ifftshift(ifftn(ifftshift(frt))))
+        # apply reverse shift to density
+        if len(comlist) > 0:
+            data2write = em.shift_density(data2write, shift=np.subtract(comlist[0], emmap1.box_centr))
         core.iotools.write_mrc(
             data2write,
             "{0}_{1}.{2}".format("fitted_map", str(i), "mrc"),
@@ -842,7 +851,7 @@ def output_rotated_models(emmap1, maplist, r_lst, t_lst):
     i = 0
     for model, t, rotmat in zip(maplist[1:], t_lst, r_lst):
         print(rotmat)
-        t = t *  pixsize * emmap1.map_dim
+        t = np.asarray(t, 'float') *  pixsize * np.asarray(emmap1.map_dim, 'int')
         print(t)
         i += 1
         if model.endswith((".mrc", ".map")):
@@ -851,10 +860,10 @@ def output_rotated_models(emmap1, maplist, r_lst, t_lst):
             pdb2mmcif(model)
             outcifname = "emda_transformed_model_" + str(i) + ".cif"
             print(outcifname)
-            _,_,_,_ = apply_transformation_on_model(mmcif_file="./out.cif",rotmat=rotmat, trans=t*pixsize, outfilename=outcifname)
+            _,_,_,_ = apply_transformation_on_model(mmcif_file="./out.cif",rotmat=rotmat, trans=t, outfilename=outcifname)
         elif model.endswith((".cif")):
             outcifname = "emda_transformed_model_" + str(i) + ".cif"
-            _,_,_,_ = apply_transformation_on_model(mmcif_file=model,rotmat=rotmat, trans=t*pixsize, outfilename=outcifname)
+            _,_,_,_ = apply_transformation_on_model(mmcif_file=model,rotmat=rotmat, trans=t, outfilename=outcifname)
 
 
 if __name__ == "__main__":
