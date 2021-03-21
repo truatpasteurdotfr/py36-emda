@@ -260,7 +260,7 @@ def mask_from_coordinates(mapname, modelname, atmrad=3):
     # smoothening
     mask = scipy.signal.fftconvolve(
         dilate, restools.softedgekernel_5x5(), "same")
-    mask = mask * (mask >= 0.0)
+    mask = mask * (mask >= 1.e-5)
     mask = np.where(grid2_binary, 1.0, mask)
     shift_z = mask.shape[0] - abs(orig[2])
     shift_y = mask.shape[1] - abs(orig[1])
