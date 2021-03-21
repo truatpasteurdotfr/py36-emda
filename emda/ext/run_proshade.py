@@ -59,13 +59,17 @@ def get_symmops_from_proshade(mapname):
     pStruct.computeSphericalHarmonics(pSet)
 
     ### Compute self-rotation function
-    pStruct.getRotationFunction(pSet)
+    pStruct.computeRotationFunction(pSet)
 
     ### Detect symmetry
-    pStruct.detectSymmetryInStructurePython(pSet)
+    #pStruct.detectSymmetryInStructurePython(pSet)
+    pStruct.detectSymmetryInStructure(pSet)
     recSymmetryType = pStruct.getRecommendedSymmetryType(pSet)
     recSymmetryFold = pStruct.getRecommendedSymmetryFold(pSet)
-    recSymmetryAxes = proshade.getRecommendedSymmetryAxesPython(pStruct, pSet)
+    #recSymmetryAxes = proshade.getRecommendedSymmetryAxesPython(pStruct, pSet)
+    #recSymmetryAxes = pStruct.getRecommendedSymmetryAxes(pSet) # works
+    recSymmetryAxes = pStruct.getAllCSyms(pSet)
+    #recSymmetryAxes = proshade.getSymmetryAxis(pStruct, pSet)
 
     ### Print results
     print("Detected " + str(recSymmetryType) + "-" + str(recSymmetryFold) + " symetry.")
