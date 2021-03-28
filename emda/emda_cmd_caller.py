@@ -109,8 +109,10 @@ map_mask.add_argument(
 model_mask = subparsers.add_parser(
     "modelmask", description="Generate a mask from an atomic model.")
 model_mask.add_argument("--map", required=True, help="input map MRC/MAP")
-model_mask.add_argument("--mdl", required=True, help="input atomic model PDB/CIF")
-model_mask.add_argument("--atmrad", required=False, default=3.0, type=float, help="radius of the atomic sphere in Angstroms")
+model_mask.add_argument("--mdl", required=True,
+                        help="input atomic model PDB/CIF")
+model_mask.add_argument("--atmrad", required=False, default=3.0,
+                        type=float, help="radius of the atomic sphere in Angstroms")
 
 lowpass = subparsers.add_parser(
     "lowpass", description="Lowpass filter to specified resolution."
@@ -438,7 +440,7 @@ mapoverlay.add_argument("--hfm", action="store_true",
 mapoverlay.add_argument("--mod", action="store_true",
                         help="if use calls model overlay")
 mapoverlay.add_argument("--usecom", action="store_true",
-                     help="if used, center-of-mass is used to superimpose maps")
+                        help="if used, center-of-mass is used to superimpose maps")
 
 
 mapaverage = subparsers.add_parser(
@@ -659,7 +661,7 @@ fetchdata.add_argument("--emd", required=True, nargs="+",
 fetchdata.add_argument("--all", action="store_true",
                        help="Use to download all data (mask, map, halfdata, model)")
 
-symaxref = subparsers.add_parser(
+""" symaxref = subparsers.add_parser(
     "symref", description="refine symmetry axis of a group")
 symaxref.add_argument("--map", required=True, nargs="+",
                       type=str, help="list of maps to find symmetry axes")
@@ -668,7 +670,45 @@ symaxref.add_argument("--emd", required=False, nargs="+",
 symaxref.add_argument("--res", required=False, nargs="+",
                       type=float, help="list of resolution of maps (A)")
 symaxref.add_argument("--mapout", action="store_true",
-                      help="Use to output maps")
+                      help="Use to output maps") """
+
+
+pointg = subparsers.add_parser(
+    "pointgroup", description="detect point group from the map")
+pointg.add_argument("--map", required=True, nargs="+",
+                    type=str, help="list of maps to find point groups")
+pointg.add_argument("--res", required=True, nargs="+",
+                    type=float, help="list of resolution of maps (A)")
+pointg.add_argument("--emd", required=False, nargs="+",
+                    type=str, help="list of emdbid of maps")
+pointg.add_argument("--peak_cutoff", required=False, default=0.8,
+                    type=float, help="cutoff for Proshade peak height. default= 0.8")
+pointg.add_argument("--use_fsc", action="store_true",
+                    help="if used, FSC is used in place for proshade peakheight to decide point group")
+pointg.add_argument("--fsc_cutoff", required=False, default=0.7,
+                    type=float, help="cutoff for Proshade peak height, default= 0.7")
+pointg.add_argument("--ang_tol", required=False, default=5.0,
+                    type=float, help="angle tolerence between two axes for determining point group. default= 5 deg.")
+
+
+symmap = subparsers.add_parser(
+    "symmetrise", description="symmetrize map using point group symmetry")
+symmap.add_argument("--map", required=True, nargs="+",
+                    type=str, help="list of maps to find point groups")
+symmap.add_argument("--res", required=True, nargs="+",
+                    type=float, help="list of resolution of maps (A)")
+symmap.add_argument("--emd", required=False, nargs="+",
+                    type=str, help="list of emdbid of maps")
+symmap.add_argument("--pointgroup", required=False, nargs="+",
+                    type=str, help="list of point groups")
+symmap.add_argument("--peak_cutoff", required=False, default=0.8,
+                    type=float, help="cutoff for Proshade peak height. default= 0.8")
+symmap.add_argument("--use_fsc", action="store_true",
+                    help="if used, FSC is used in place for proshade peakheight to decide point group")
+symmap.add_argument("--fsc_cutoff", required=False, default=0.7,
+                    type=float, help="cutoff for Proshade peak height, default= 0.7")
+symmap.add_argument("--ang_tol", required=False, default=5.0,
+                    type=float, help="angle tolerence between two axes for determining point group. default= 5 deg.")
 
 
 def apply_mask(args):
@@ -1136,7 +1176,8 @@ def mask4mmap(args):
 def mask4mmodel(args):
     from emda import emda_methods as em
 
-    _ = em.mask_from_atomic_model(mapname=args.map, modelname=args.mdl, atmrad=args.atmrad)
+    _ = em.mask_from_atomic_model(
+        mapname=args.map, modelname=args.mdl, atmrad=args.atmrad)
 
 
 def composite_map(args):
@@ -1167,11 +1208,44 @@ def fetch_data(args):
     em.fetch_data(args.emd, args.all)
 
 
-def symaxis_refinement(args):
+""" def symaxis_refinement(args):
     from emda import emda_methods as em
 
     _, _, _, _, _ = em.symaxis_refine(
-        maplist=args.map, emdbidlist=args.emd, mapoutvar=args.mapout, reslist=args.res)
+        maplist=args.map, emdbidlist=args.emd, mapoutvar=args.mapout, reslist=args.res) """
+
+
+def pointgroup(args, fobj):
+    from emda import emda_methods as em
+
+    _ = em.get_map_pointgroup(
+        maplist=args.map,
+        reslist=args.res,
+        use_peakheight=True,  # args.use_peakheight,
+        peak_cutoff=args.peak_cutoff,
+        use_fsc=args.use_fsc,
+        fsc_cutoff=args.fsc_cutoff,
+        ang_tol=args.ang_tol,
+        emdlist=args.emd,
+        fobj=fobj,
+    )
+
+
+def symmetrize(args, fobj):
+    from emda import emda_methods as em
+
+    _ = em.symmetry_average(
+        maplist=args.map,
+        reslist=args.res,
+        use_peakheight=True,  # args.use_peakheight,
+        peak_cutoff=args.peak_cutoff,
+        use_fsc=args.use_fsc,
+        fsc_cutoff=args.fsc_cutoff,
+        ang_tol=args.ang_tol,
+        emdlist=args.emd,
+        pglist=args.pointgroup,
+        fobj=fobj,
+    )
 
 
 def main(command_line=None):
@@ -1260,8 +1334,12 @@ def main(command_line=None):
         center_of_mass(args)
     if args.command == "fetch":
         fetch_data(args)
-    if args.command == "symref":
-        symaxis_refinement(args)
+    """ if args.command == "symref":
+        symaxis_refinement(args) """
+    if args.command == "pointgroup":
+        pointgroup(args, f)
+    if args.command == "symmetrise":
+        symmetrize(args, f)
 
 
 if __name__ == "__main__":
