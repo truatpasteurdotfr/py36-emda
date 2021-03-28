@@ -1142,7 +1142,7 @@ def overlay_maps(
     if fobj is None:
         fobj = open("EMDA_overlay.txt", "w")
     theta_init = [tuple(axr), rot]
-    """ mapoverlay.main(
+    mapoverlay.main(
         maplist=maplist,
         masklist=masklist,
         ncycles=ncy,
@@ -1154,9 +1154,9 @@ def overlay_maps(
         halfmaps=hfm,
         usemodel=usemodel,
         fitres=fitres,
-    ) """
+    )
     # new overlay function call
-    q = quaternions.get_quaternion(theta_init)
+    """ q = quaternions.get_quaternion(theta_init)
     rm = quaternions.get_RM(q)
     emmap1, rotmat_list, trans_list = overlay(
         maplist=maplist,
@@ -1170,7 +1170,7 @@ def overlay_maps(
         fitres=fitres,
         modelres=modelres,
         usecom=usecom,
-    )
+    ) """
 
 
 def average_maps(
@@ -2071,7 +2071,7 @@ def fetch_data(emdbidlist, alldata=False):
     downmap.main(emdbidlist, alldata=alldata)
 
 
-def symaxis_refine(maplist, mapoutvar=False, emdbidlist=None, reslist=None):
+""" def symaxis_refine(maplist, mapoutvar=False, emdbidlist=None, reslist=None):
     from emda.ext import refine_symaxis
 
     (
@@ -2081,4 +2081,40 @@ def symaxis_refine(maplist, mapoutvar=False, emdbidlist=None, reslist=None):
         fold_list,
         avgfsc_list,
     ) = refine_symaxis.main(maplist=maplist, emdbidlist=emdbidlist, mapoutvar=mapoutvar, reslist=reslist)
-    return emdcode_list, initial_axes_list, final_axes_list, fold_list, avgfsc_list
+    return emdcode_list, initial_axes_list, final_axes_list, fold_list, avgfsc_list """
+
+
+def get_map_pointgroup(maplist, reslist, use_peakheight=True, peak_cutoff=0.8,
+                   use_fsc=False, fsc_cutoff=0.7, ang_tol=5.0, emdlist=None,
+                   fobj=None):
+    from emda.ext.sym.symmetry import get_pointgroup
+
+    pglist = get_pointgroup(
+        maplist=maplist,
+        reslist=reslist,
+        use_peakheight=use_peakheight,
+        peak_cutoff=peak_cutoff,
+        use_fsc=use_fsc,
+        fsc_cutoff=fsc_cutoff,
+        ang_tol=ang_tol,
+        emdlist=emdlist,
+        fobj=fobj)
+    return pglist
+
+
+def symmetry_average(maplist, reslist, use_peakheight=True, peak_cutoff=0.8,
+                   use_fsc=False, fsc_cutoff=0.7, ang_tol=5.0, pglist=None,
+                   emdlist=None, fobj=None):
+    from emda.ext.sym.symmetry import symmetrise_map
+
+    symavgmaplist = symmetrise_map(
+        maplist=maplist,
+        reslist=reslist,
+        use_peakheight=use_peakheight,
+        peak_cutoff=peak_cutoff,
+        use_fsc=use_fsc,
+        fsc_cutoff=fsc_cutoff,
+        ang_tol=ang_tol,
+        pglist=pglist,
+        emdlist=emdlist)
+    return symavgmaplist
