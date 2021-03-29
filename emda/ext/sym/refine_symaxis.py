@@ -712,8 +712,9 @@ def overlay(
 
 
 def get_intial_axis(imap):
-    fold, x, y, z, peakh = proshade.get_symmops_from_proshade(imap)
-    return fold, x, y, z, peakh
+    #fold, x, y, z, peakh = proshade.get_symmops_from_proshade(imap)
+    results = proshade.get_symmops_from_proshade(imap)
+    return results
 
 
 def prime_factors(n):
