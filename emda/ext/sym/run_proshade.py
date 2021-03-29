@@ -74,6 +74,8 @@ def get_symmops_from_proshade(mapname):
 
     ### Print results
     print("Detected " + str(recSymmetryType) + "-" + str(recSymmetryFold) + " symetry.")
+    proshade_pg = str(recSymmetryType) + str(recSymmetryFold)
+    print("Proshade point group: ", proshade_pg)
     print("Fold      x         y         z       Angle     Height")
     print(type(recSymmetryAxes))
     for iter in range(0, len(recSymmetryAxes)):
@@ -96,5 +98,5 @@ def get_symmops_from_proshade(mapname):
         z.append(row[3])
         theta.append(row[4])
         peakh.append(row[5])
-    return fold, x, y, z, peakh
+    return [fold, x, y, z, peakh, proshade_pg]
 
