@@ -745,12 +745,12 @@ def filter_axes(imap, resol, use_proshade_peakheight=True, use_fsc=False,
     ibin = np.argmin(dist)
     # get initial axes list from ProSHADE
     proshade_results = get_intial_axis(imap)
-    symorder = results[0]
-    x = results[1]
-    y = results[2]
-    z = results[3]
-    peakh = results[4]
-    proshade_pg = results[5]
+    symorder = proshade_results[0]
+    x = proshade_results[1]
+    y = proshade_results[2]
+    z = proshade_results[3]
+    peakh = proshade_results[4]
+    proshade_pg = proshade_results[5]
     #symorder, x, y, z, peakh = get_intial_axis(imap)
     fobj.write("ProSHADE peak table \n")
     if len(symorder) < 1:
