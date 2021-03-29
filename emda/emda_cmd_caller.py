@@ -1218,7 +1218,7 @@ def fetch_data(args):
 def pointgroup(args, fobj):
     from emda import emda_methods as em
 
-    _ = em.get_map_pointgroup(
+    _, _ = em.get_map_pointgroup(
         maplist=args.map,
         reslist=args.res,
         use_peakheight=True,  # args.use_peakheight,
