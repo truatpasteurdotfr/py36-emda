@@ -2118,3 +2118,9 @@ def symmetry_average(maplist, reslist, use_peakheight=True, peak_cutoff=0.8,
         pglist=pglist,
         emdlist=emdlist)
     return symavgmaplist
+
+
+def symmetry_average_using_ops(imap, ops, outmapname=None):
+    from emda.ext.sym.symmetrize_map import symmetrize_map_using_ops
+
+    return symmetrize_map_using_ops(imap=imap, ops=ops, outmapname=outmapname)[0]
