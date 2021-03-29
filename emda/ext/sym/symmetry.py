@@ -36,6 +36,7 @@ class Symmetry:
         self.use_fsc = False
         self.emdid = None
         self.point_gp = None
+        self.proshade_point_gp = None
         self.generator_orders = None
         self.generator_axes = None
         self.refined_orders = None
@@ -56,9 +57,10 @@ class Symmetry:
             fobj=self.fobj,
             )
         if len(results) > 0:
-            self.point_gp = results[0]
-            self.generator_orders = results[1]
-            self.generator_axes = results[2]
+            self.proshade_point_gp = results[0]
+            self.point_gp = results[1]
+            self.generator_orders = results[2]
+            self.generator_axes = results[3]
 
     def refine_gp_generators(self):
         self.refine_axes = True
@@ -115,6 +117,7 @@ def get_pointgroup(maplist, reslist, use_peakheight=True, peak_cutoff=0.8,
     if fobj is None:
         fobj = open("EMDA_pointgroup_detection.txt", "w")
     pointgroup_list = []
+    proshade_pointgroup_list = []
     for i, imap in enumerate(maplist):
         if i > 0:
             fobj.write("\n")
@@ -132,7 +135,8 @@ def get_pointgroup(maplist, reslist, use_peakheight=True, peak_cutoff=0.8,
         obj.ang_tol = ang_tol
         obj.detect_point_gp()
         pointgroup_list.append(obj.point_gp)
-    return pointgroup_list
+        proshade_pointgroup_list.append(obj.proshade_point_gp)
+    return pointgroup_list, proshade_pointgroup_list
 
 
 def tetrahedral(imap, foldlst, fnlaxlst, outmapname=None):
