@@ -745,6 +745,10 @@ def filter_axes(imap, resol, use_proshade_peakheight=True, use_fsc=False,
     # get initial axes list from ProSHADE
     symorder, x, y, z, peakh = get_intial_axis(imap)
     fobj.write("ProSHADE peak table \n")
+    if len(symorder) < 1:
+        print("proshade peak table is empty.")
+        return []
+        #SystemExit()
     for i, odr in enumerate(symorder):
         fobj.write(str(symorder[i]) +" ["+ str(x[i]) +" "+ str(y[i]) 
             +" "+ str(z[i]) +"] "+ str(peakh[i]) + "\n")
@@ -1188,6 +1192,8 @@ def get_pg(imap, resol, use_peakheight, peak_cutoff, use_fsc, fsc_cutoff, ang_to
                           fsc_cutoff=fsc_cutoff,
                           ang_tol=ang_tol,
                           fobj=fobj)
+    if len(results) < 1:
+        return []
     cleaned_axlist, cleaned_odrlist = results[0], results[1]
     pg, gp_generators = decide_pointgroup(
         axeslist=cleaned_axlist, orderlist=cleaned_odrlist)
