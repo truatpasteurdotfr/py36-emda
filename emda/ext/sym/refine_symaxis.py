@@ -743,7 +743,14 @@ def filter_axes(imap, resol, use_proshade_peakheight=True, use_fsc=False,
     dist = np.sqrt((res_arr - resol) ** 2)
     ibin = np.argmin(dist)
     # get initial axes list from ProSHADE
-    symorder, x, y, z, peakh = get_intial_axis(imap)
+    proshade_results = get_intial_axis(imap)
+    symorder = results[0]
+    x = results[1]
+    y = results[2]
+    z = results[3]
+    peakh = results[4]
+    proshade_pg = results[5]
+    #symorder, x, y, z, peakh = get_intial_axis(imap)
     fobj.write("ProSHADE peak table \n")
     if len(symorder) < 1:
         print("proshade peak table is empty.")
@@ -752,6 +759,7 @@ def filter_axes(imap, resol, use_proshade_peakheight=True, use_fsc=False,
     for i, odr in enumerate(symorder):
         fobj.write(str(symorder[i]) +" ["+ str(x[i]) +" "+ str(y[i]) 
             +" "+ str(z[i]) +"] "+ str(peakh[i]) + "\n")
+    fobj.write("Proshade Point group: "+ proshade_pg + "\n")
     #
     # find the peak_cutoff if igen cutoff is too high
     peakcutoff_np = np.asarray(peakh, 'float')
@@ -824,7 +832,7 @@ def filter_axes(imap, resol, use_proshade_peakheight=True, use_fsc=False,
             cleaned_axlist.append(ax)
             cleaned_odrlist.append(sorted_odrlist[i])
             cleaned_fsclist.append(sorted_fsclist[i])
-    return [cleaned_axlist, cleaned_odrlist, cleaned_fsclist, f1, ibin, nbin, bin_idx]
+    return [cleaned_axlist, cleaned_odrlist, cleaned_fsclist, f1, ibin, nbin, bin_idx, proshade_pg]
 
 
 def prefilter_order(f1, axis, order, ibin, nbin, bin_idx):
@@ -1195,13 +1203,14 @@ def get_pg(imap, resol, use_peakheight, peak_cutoff, use_fsc, fsc_cutoff, ang_to
     if len(results) < 1:
         return []
     cleaned_axlist, cleaned_odrlist = results[0], results[1]
+    proshade_pg = results[7]
     pg, gp_generators = decide_pointgroup(
         axeslist=cleaned_axlist, orderlist=cleaned_odrlist)
     print("Point group detected from the map: ", pg)
     fobj.write("Point group detected from the map: " + str(pg) + "\n")
     gen_axlist = [gp_generators[2], gp_generators[3]]
     gen_odrlist = [gp_generators[0], gp_generators[1]]
-    return [pg, gen_odrlist, gen_axlist]
+    return [proshade_pg, pg, gen_odrlist, gen_axlist]
 
 
 def refine_pg_generator_axes(imap, axlist, odrlist, fobj, fitres=5.0, fitfsc=0.7, emdid=None):
