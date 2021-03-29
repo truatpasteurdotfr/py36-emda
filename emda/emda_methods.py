@@ -2121,6 +2121,20 @@ def symmetry_average(maplist, reslist, use_peakheight=True, peak_cutoff=0.8,
 
 
 def symmetry_average_using_ops(imap, ops, outmapname=None):
+    """Returns symmetry averaged map using given operators.
+
+    This function can be used to average a map by a given set of symmetry operators.
+
+    Arguments:
+        Inputs:
+            imap:  3D-EM map in mrc/map format.
+            ops: List of symmetry operators to be applied on the map.
+                 List should not contain the identity.
+                 An operator must be a 3x3 matrix.
+
+        Outputs:
+            Results in a list: [symmetry-averaged-density, unit-cell, map-origin]
+    """
     from emda.ext.sym.symmetrize_map import symmetrize_map_using_ops
 
-    return symmetrize_map_using_ops(imap=imap, ops=ops, outmapname=outmapname)[0]
+    return symmetrize_map_using_ops(imap=imap, ops=ops, outmapname=outmapname)
