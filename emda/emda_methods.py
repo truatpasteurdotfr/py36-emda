@@ -2089,7 +2089,7 @@ def get_map_pointgroup(maplist, reslist, use_peakheight=True, peak_cutoff=0.8,
                    fobj=None):
     from emda.ext.sym.symmetry import get_pointgroup
 
-    pglist = get_pointgroup(
+    pglist, ppglist = get_pointgroup(
         maplist=maplist,
         reslist=reslist,
         use_peakheight=use_peakheight,
@@ -2099,7 +2099,7 @@ def get_map_pointgroup(maplist, reslist, use_peakheight=True, peak_cutoff=0.8,
         ang_tol=ang_tol,
         emdlist=emdlist,
         fobj=fobj)
-    return pglist
+    return pglist, ppglist
 
 
 def symmetry_average(maplist, reslist, use_peakheight=True, peak_cutoff=0.8,
