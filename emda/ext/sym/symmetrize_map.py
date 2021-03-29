@@ -9,7 +9,8 @@ from emda.ext.sym.GenerateOperators_v9_ky4 import from_two_axes_to_group_v2, ope
 
 
 def apply_op(f1, op, bin_idx, nbin):
-    nz, ny, nx = f1.shape
+    assert op.ndim == 2
+    assert op.shape[0] == op.shape[1] == 3
     tmp = np.zeros(op.shape, 'float')
     rm = np.zeros(op.shape, 'float')
     tmp[:,0] = op[:,2]
@@ -17,7 +18,8 @@ def apply_op(f1, op, bin_idx, nbin):
     tmp[:,2] = op[:,0]
     rm[0, :] = tmp[2, :]
     rm[1, :] = tmp[1, :]
-    rm[2, :] = tmp[0, :]   
+    rm[2, :] = tmp[0, :]  
+    nz, ny, nx = f1.shape 
     frs = fcodes_fast.trilinear2(f1,bin_idx,rm,nbin,0,1,nz,ny,nx)[:,:,:,0]
     return frs
 
@@ -50,11 +52,6 @@ def rebox_map(arr1):
     return reboxed_map
 
 
-""" def symmetrize_map_unknown_pg(imap, resol):
-    pg, _, _ = refine_symaxis.get_pg(imap, resol)
-    return symmetrize_map_known_pg(imap, pg) """
-
-
 def symmetrize_map_known_pg(imap, pg, outmapname=None):
     if outmapname is None:
         outmapname = "emda_sym_averaged_map.mrc"
@@ -74,6 +71,24 @@ def symmetrize_map_known_pg(imap, pg, outmapname=None):
     em.write_mrc(avgmap, outmapname, uc, orig)
     return [avgmap, uc, orig]
 
+
+def symmetrize_map_using_ops(imap, ops, outmapname=None):
+    if outmapname is None:
+        outmapname = "emda_sym_averaged_map.mrc"
+    uc, arr, orig = em.get_data(imap)
+    arr2 = double_the_axes(arr)
+    f1 = fftshift(fftn(fftshift(arr2)))
+    nbin, res_arr, bin_idx = get_resolution_array(uc, f1)
+    frs_sum = f1
+    print("Symmetrising map...")
+    for op in ops:
+        frs = apply_op(f1, op, bin_idx, nbin)
+        frs_sum += frs
+    avg_f = frs_sum / (len(ops) + 1)
+    avgmap = ifftshift(np.real(ifftn(ifftshift(avg_f))))
+    avgmap = rebox_map(avgmap)
+    em.write_mrc(avgmap, outmapname, uc, orig)
+    return [avgmap, uc, orig]
 
 
 
