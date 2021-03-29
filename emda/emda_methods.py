@@ -2193,14 +2193,9 @@ def symmetry_average(maplist, reslist, use_peakheight=True, peak_cutoff=0.8,
             pglist: list of strings
             List of point groups
 
-
         Outputs:
-            pglist: list of strings
-            Point group list decided by EMDA
-
-            ppglist: list of strings
-            Point group kist decided by ProSHADE
-
+            symavgmaplist: list of maps
+            List of symmetry averaged maps
     """
     from emda.ext.sym.symmetry import symmetrise_map
 
