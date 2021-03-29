@@ -55,9 +55,10 @@ class Symmetry:
             ang_tol=self.ang_tol,
             fobj=self.fobj,
             )
-        self.point_gp = results[0]
-        self.generator_orders = results[1]
-        self.generator_axes = results[2]
+        if len(results) > 0:
+            self.point_gp = results[0]
+            self.generator_orders = results[1]
+            self.generator_axes = results[2]
 
     def refine_gp_generators(self):
         self.refine_axes = True
