@@ -2087,6 +2087,48 @@ def fetch_data(emdbidlist, alldata=False):
 def get_map_pointgroup(maplist, reslist, use_peakheight=True, peak_cutoff=0.8,
                    use_fsc=False, fsc_cutoff=0.7, ang_tol=5.0, emdlist=None,
                    fobj=None):
+    """Returns the point group of map.
+
+    This function determines the point group of an EM map using ProSHADE and EMDA.
+
+    Arguments:
+        Inputs:
+            maplist: list of strings
+            List of map names in mrc/map format.
+
+            reslist: float
+            List of map resolutions
+
+            use_peakheight: bool
+            ProSHADE peaklist is used to decide the point group. Default option.
+
+            peak_cutoff: float
+            Cutoff for peak heights in the peaklist. Default is 0.8.
+            However, if the highest peak is lower than this threshold then the
+            cutoff is chosen such that highest - 0.1.
+
+            use_fsc: bool
+            If true, FSC is used in place of Proshade peak list to decide the point group.
+
+            fsc_cutoff: float
+            Cutoff for FSC. Default is 0.7.
+
+            ang_tol: float
+            Tolerence for angle between two axes in the proshade axes list.
+            Default is 5.0 degrees.
+
+            emdlist: list of strings
+            EMDB-id list to keep the correspondence in results.
+
+
+        Outputs:
+            pglist: list of strings
+            Point group list decided by EMDA
+
+            ppglist: list of strings
+            Point group kist decided by ProSHADE
+
+    """
     from emda.ext.sym.symmetry import get_pointgroup
 
     pglist, ppglist = get_pointgroup(
@@ -2105,6 +2147,61 @@ def get_map_pointgroup(maplist, reslist, use_peakheight=True, peak_cutoff=0.8,
 def symmetry_average(maplist, reslist, use_peakheight=True, peak_cutoff=0.8,
                    use_fsc=False, fsc_cutoff=0.7, ang_tol=5.0, pglist=None,
                    emdlist=None, fobj=None):
+    """Returns symmetry averaged map.
+
+    This function does three difference things:
+        1. Determines the point group of a map using ProSHADE.
+        2. Identify group generators and refine them.
+        3. Generate the full finite point group operators and use them to average the map.
+    If point groups are supplied, then they are used for symmetry averaging in
+    C, D and O groups. Averaging in T and I groups is done using operators
+    from refined axes.
+    This function can be used to average maps, whose point groups
+    and symmetry operators are not known a priori.
+    NOTE: Current axis refinement for T and I groups may include numerical
+    inaccuracies and so the symmetry averaged map may not be the optimal.
+
+    Arguments:
+        Inputs:
+            maplist: list of strings
+            List of map names in mrc/map format.
+
+            reslist: float
+            List of map resolutions
+
+            use_peakheight: bool
+            ProSHADE peaklist is used to decide the point group. Default option.
+
+            peak_cutoff: float
+            Cutoff for peak heights in the peaklist. Default is 0.8.
+            However, if the highest peak is lower than this threshold then the
+            cutoff is chosen such that highest - 0.1.
+
+            use_fsc: bool
+            If true, FSC is used in place of Proshade peak list to decide the point group.
+
+            fsc_cutoff: float
+            Cutoff for FSC. Default is 0.7.
+
+            ang_tol: float
+            Tolerence for angle between two axes in the proshade axes list.
+            Default is 5.0 degrees.
+
+            emdlist: list of strings
+            EMDB-id list to keep the correspondence in results.
+
+            pglist: list of strings
+            List of point groups
+
+
+        Outputs:
+            pglist: list of strings
+            Point group list decided by EMDA
+
+            ppglist: list of strings
+            Point group kist decided by ProSHADE
+
+    """
     from emda.ext.sym.symmetry import symmetrise_map
 
     symavgmaplist = symmetrise_map(
