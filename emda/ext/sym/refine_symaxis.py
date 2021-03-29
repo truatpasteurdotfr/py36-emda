@@ -749,6 +749,13 @@ def filter_axes(imap, resol, use_proshade_peakheight=True, use_fsc=False,
         fobj.write(str(symorder[i]) +" ["+ str(x[i]) +" "+ str(y[i]) 
             +" "+ str(z[i]) +"] "+ str(peakh[i]) + "\n")
     #
+    # find the peak_cutoff if igen cutoff is too high
+    peakcutoff_np = np.asarray(peakh, 'float')
+    peakcutoff_best = np.max(peakcutoff_np) - 0.1
+    if peak_cutoff > np.max(peakcutoff_np):
+        peak_cutoff = peakcutoff_best
+        print("new peak cutoff: ", peak_cutoff)
+        fobj.write("new peak cutoff: "+ str(peak_cutoff) + "\n")
     axes_list = []
     order_list = []
     avgfsc_list = []
