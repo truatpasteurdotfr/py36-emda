@@ -1,4 +1,4 @@
-emda\_methods module
+emda methods module
 ====================
 
 .. automodule:: emda_methods
