@@ -1,4 +1,4 @@
-emda\_cmd\_caller module
+emda command line module
 ========================
 
 .. argparse::
