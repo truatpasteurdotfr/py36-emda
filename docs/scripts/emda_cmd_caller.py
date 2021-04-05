@@ -10,8 +10,8 @@ import numpy as np
 import argparse
 import sys
 import datetime
-import emda.config
-from emda.core import iotools, maptools, restools, plotter, fsc, quaternions
+#import emda.config
+#from emda.core import iotools, maptools, restools, plotter, fsc, quaternions
 
 cmdl_parser = argparse.ArgumentParser(
     prog="emda",
@@ -19,9 +19,9 @@ cmdl_parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
 )
 
-cmdl_parser.add_argument(
-    "--version", action="version", version="%(prog)s-" + emda.config.__version__
-)
+#cmdl_parser.add_argument(
+#    "--version", action="version", version="%(prog)s-" + emda.config.__version__
+#)
 
 subparsers = cmdl_parser.add_subparsers(dest="command")
 
@@ -106,6 +106,14 @@ map_mask.add_argument(
     help="filter type to use: ideal or butterworth",
 )
 
+model_mask = subparsers.add_parser(
+    "modelmask", description="Generate a mask from an atomic model.")
+model_mask.add_argument("--map", required=True, help="input map MRC/MAP")
+model_mask.add_argument("--mdl", required=True,
+                        help="input atomic model PDB/CIF")
+model_mask.add_argument("--atmrad", required=False, default=3.0,
+                        type=float, help="radius of the atomic sphere in Angstroms")
+
 lowpass = subparsers.add_parser(
     "lowpass", description="Lowpass filter to specified resolution."
 )
@@ -152,6 +160,8 @@ half2full.add_argument(
 conv_map2mtz = subparsers.add_parser(
     "map2mtz", description="Convert MRC/MAP to MTZ.")
 conv_map2mtz.add_argument("--map", required=True, help="input map (mrc/map)")
+conv_map2mtz.add_argument("--res", required=False, type=float,
+                          help="resolution cutoff (A). default Nyquist")
 conv_map2mtz.add_argument(
     "--out", required=False, default="map2mtz.mtz", help="output map (mtz)"
 )
@@ -256,7 +266,8 @@ realspc.add_argument(
     "--lgf", required=False, default=None, type=str, help="ligand description file"
 )
 
-bfromcc = subparsers.add_parser("bfromcc", description="local b from real space correlation")
+bfromcc = subparsers.add_parser(
+    "bfromcc", description="local b from real space correlation")
 bfromcc.add_argument("--h1", required=True, help="input halfmap1 map")
 bfromcc.add_argument("--h2", required=True, help="input halfmap2 map")
 bfromcc.add_argument("--res", required=True,
@@ -417,10 +428,19 @@ mapoverlay.add_argument(
     type=str,
     help="interpolation method (linear/cubic). default= linear",
 )
+mapoverlay.add_argument(
+    "--modelres",
+    required=False,
+    default=5,
+    type=float,
+    help="model resol. (A). default= 5 A",
+)
 mapoverlay.add_argument("--hfm", action="store_true",
                         help="if use employ half maps")
 mapoverlay.add_argument("--mod", action="store_true",
                         help="if use calls model overlay")
+mapoverlay.add_argument("--usecom", action="store_true",
+                        help="if used, center-of-mass is used to superimpose maps")
 
 
 mapaverage = subparsers.add_parser(
@@ -466,7 +486,7 @@ mapaverage.add_argument(
 )
 
 diffmap = subparsers.add_parser(
-    "diffmap", description="difference map using average maps"
+    "diffmap", description="Calculate the difference map"
 )
 diffmap.add_argument(
     "--map", required=True, nargs="+", type=str, help="maplist to diffmap"
@@ -476,18 +496,35 @@ diffmap.add_argument(
 )
 diffmap.add_argument(
     "--res",
-    required=False,
-    default=0.0,
+    required=True,
     type=float,
-    help="diffmap resol. (A) [default=0.0 A]",
+    help="resolution for difference map in Angstroms.",
 )
 diffmap.add_argument(
     "--mod",
     required=False,
     default="norm",
     type=str,
-    help="Choose from ampli, [norm], power",
+    help="scaling method. norm (default) - normalized FC, \
+        ampli - amplitudes in resolution bins",
 )
+diffmap.add_argument("--fit", action="store_true",
+                     help="if used, maps are superimposed before calculating difference map")
+diffmap.add_argument(
+    "--ncy", required=False, default=5, type=int, help="number of fitting cycles"
+)
+diffmap.add_argument(
+    "--fitres",
+    required=False,
+    default=0.0,
+    type=float,
+    help="final fit resol. (A). default= 0.0 A",
+)
+diffmap.add_argument("--usecom", action="store_true",
+                     help="if used, center-of-mass is used to superimpose maps")
+
+diffmap.add_argument("--usehalfmaps", action="store_true",
+                     help="if used, halfmaps are used to calculate difference map")
 
 
 applymask = subparsers.add_parser(
@@ -511,6 +548,7 @@ bestmap.add_argument("--h1", required=True, help="input halfmap1 map")
 bestmap.add_argument("--h2", required=True, help="input halfmap2 map")
 bestmap.add_argument("--msk", required=False,
                      default=None, help="mask to be applied")
+bestmap.add_argument("--B", required=False, type=float, help="relative B")
 bestmap.add_argument(
     "--knl", required=False, default=5, type=int, help="kernel radius (pixels)"
 )
@@ -623,7 +661,7 @@ fetchdata.add_argument("--emd", required=True, nargs="+",
 fetchdata.add_argument("--all", action="store_true",
                        help="Use to download all data (mask, map, halfdata, model)")
 
-symaxref = subparsers.add_parser(
+""" symaxref = subparsers.add_parser(
     "symref", description="refine symmetry axis of a group")
 symaxref.add_argument("--map", required=True, nargs="+",
                       type=str, help="list of maps to find symmetry axes")
@@ -632,584 +670,43 @@ symaxref.add_argument("--emd", required=False, nargs="+",
 symaxref.add_argument("--res", required=False, nargs="+",
                       type=float, help="list of resolution of maps (A)")
 symaxref.add_argument("--mapout", action="store_true",
-                      help="Use to output maps")
+                      help="Use to output maps") """
+
+
+pointg = subparsers.add_parser(
+    "pointgroup", description="detect point group from the map")
+pointg.add_argument("--map", required=True, nargs="+",
+                    type=str, help="list of maps to find point groups")
+pointg.add_argument("--res", required=True, nargs="+",
+                    type=float, help="list of resolution of maps (A)")
+pointg.add_argument("--emd", required=False, nargs="+",
+                    type=str, help="list of emdbid of maps")
+pointg.add_argument("--peak_cutoff", required=False, default=0.8,
+                    type=float, help="cutoff for Proshade peak height. default= 0.8")
+pointg.add_argument("--use_fsc", action="store_true",
+                    help="if used, FSC is used in place for proshade peakheight to decide point group")
+pointg.add_argument("--fsc_cutoff", required=False, default=0.7,
+                    type=float, help="cutoff for Proshade peak height, default= 0.7")
+pointg.add_argument("--ang_tol", required=False, default=5.0,
+                    type=float, help="angle tolerence between two axes for determining point group. default= 5 deg.")
+
+
+symmap = subparsers.add_parser(
+    "symmetrise", description="symmetrize map using point group symmetry")
+symmap.add_argument("--map", required=True, nargs="+",
+                    type=str, help="list of maps to find point groups")
+symmap.add_argument("--res", required=True, nargs="+",
+                    type=float, help="list of resolution of maps (A)")
+symmap.add_argument("--emd", required=False, nargs="+",
+                    type=str, help="list of emdbid of maps")
+symmap.add_argument("--pointgroup", required=False, nargs="+",
+                    type=str, help="list of point groups")
+symmap.add_argument("--peak_cutoff", required=False, default=0.8,
+                    type=float, help="cutoff for Proshade peak height. default= 0.8")
+symmap.add_argument("--use_fsc", action="store_true",
+                    help="if used, FSC is used in place for proshade peakheight to decide point group")
+symmap.add_argument("--fsc_cutoff", required=False, default=0.7,
+                    type=float, help="cutoff for Proshade peak height, default= 0.7")
+symmap.add_argument("--ang_tol", required=False, default=5.0,
+                    type=float, help="angle tolerence between two axes for determining point group. default= 5 deg.")
 
-
-def apply_mask(args):
-    from emda.emda_methods import applymask
-
-    applymask(args.map, args.msk, args.out)
-
-
-def map_info(args):
-    from emda.emda_methods import read_map
-
-    uc, arr, origin = read_map(args.map)
-    print("Unit cell: ", uc)
-    print("Sampling: ", arr.shape)
-    print("Pixel size: ", round(uc[0] / arr.shape[0], 3))
-    print("Origin: ", origin)
-
-
-def anymap_fsc(args, fobj):
-    from emda.emda_methods import twomap_fsc
-
-    res_arr, bin_fsc = twomap_fsc(args.map1, args.map2, fobj=fobj)
-    plotter.plot_nlines(
-        res_arr, [bin_fsc], "twomap_fsc.eps", curve_label=["twomap_fsc"]
-    )
-
-
-def halfmap_fsc(args):
-    from emda.emda_methods import halfmap_fsc, halfmap_fsc_ph
-
-    if args.phaserand:
-        res_arr, fsc_list = halfmap_fsc_ph(
-            half1name=args.h1, half2name=args.h2, filename=args.out, maskname=args.msk)
-    else:
-        res_arr, fsc_list = halfmap_fsc(
-            half1name=args.h1, half2name=args.h2, filename=args.out, maskname=args.msk
-        )
-        if len(fsc_list) == 2:
-            plotter.plot_nlines(
-                res_arr,
-                fsc_list,
-                "halfmap_fsc.eps",
-                curve_label=["unmask-FSC", "masked-FSC"],
-                plot_title="Halfmap FSC",
-            )
-        elif len(fsc_list) == 1:
-            plotter.plot_nlines(
-                res_arr,
-                fsc_list,
-                "halfmap_fsc.eps",
-                curve_label=["unmask-FSC"],
-                plot_title="Halfmap FSC",
-            )
-
-
-def singlemap_fsc(args):
-    from emda.emda_methods import singlemap_fsc as sfsc
-
-    res_arr, bin_fsc, _ = sfsc(map1name=args.h1, knl=args.knl)
-    plotter.plot_nlines(res_arr, [bin_fsc],
-                        "map_fsc.eps", curve_label=["map_fsc"])
-
-
-def cc_mask(args):
-    from emda import emda_methods as em
-
-    maskname = "halfmap_mask.mrc"
-    uc, arr1, origin = em.read_map(args.h1)
-    uc, arr2, origin = em.read_map(args.h2)
-    ccmask = em.mask_from_halfmaps(
-        uc=uc,
-        half1=arr1,
-        half2=arr2,
-        radius=args.knl,
-        norm=args.nrm,
-        iter=args.itr,
-        thresh=args.thr,
-    )
-    em.write_mrc(ccmask, maskname, uc, origin)
-
-
-def lowpass_map(args):
-    from emda import emda_methods as em
-
-    uc, map1, orig = em.read_map(args.map)
-    _, map_lwp = em.lowpass_map(
-        uc=uc, arr1=map1, resol=args.res, filter=args.fil)
-    if args.fil == "butterworth":
-        outname = "{0}_{1}.{2}".format("lowpass_bw", str(args.res), "mrc")
-    else:
-        outname = "{0}_{1}.{2}".format("lowpass", str(args.res), "mrc")
-    em.write_mrc(map_lwp, outname, uc, orig)
-
-
-def power_map(args):
-    from emda.emda_methods import get_map_power
-
-    res_arr, power_spectrum = get_map_power(args.map)
-    plotter.plot_nlines_log(
-        res_arr,
-        [power_spectrum],
-        curve_label=["Power"],
-        mapname="map_power.eps",
-        plot_title="Rotationally averaged power spectrum",
-    )
-
-
-def mapresol(args):
-    from emda.emda_methods import estimate_map_resol
-
-    resol = estimate_map_resol(args.h1, args.h2)
-    print("Map resolution (A):", resol)
-
-
-def map2mtz(args):
-    from emda import emda_methods
-
-    if args.out.endswith((".mtz")):
-        outfile = args.out
-    else:
-        outfile = args.out + ".mtz"
-    emda_methods.map2mtz(args.map, outfile)
-
-
-def mtz2map(args):
-    from emda import emda_methods
-
-    uc, ar, origin = iotools.read_map(args.map)
-    dat = emda_methods.mtz2map(args.mtz, ar.shape)
-    if args.out.endswith((".mrc")):
-        outfile = args.out
-    else:
-        outfile = args.out + ".mrc"
-    iotools.write_mrc(dat, outfile, uc, origin)
-
-
-def resample_data(args):
-    import numpy as np
-    from emda.emda_methods import read_map, resample_data, write_mrc
-    import emda.ext.mapfit.utils as utils
-
-    uc, arr, org = read_map(args.map)
-    arr = utils.set_dim_even(arr)
-    curnt_pix = float(round(uc[0] / arr.shape[0], 3))
-    if args.cel:
-        target_uc = args.cel
-    if args.pix is None:
-        targt_pix = curnt_pix
-    else:
-        targt_pix = float(round(args.pix, 3))
-    # print('pixel size [current, target]: ', curnt_pix,targt_pix)
-    if args.dim is None:
-        if args.cel:
-            dim = int(round(target_uc[0] / targt_pix))
-            new_arr = resample_data(
-                curnt_pix=curnt_pix,
-                targt_pix=targt_pix,
-                targt_dim=[dim, dim, dim],
-                arr=arr,
-            )
-        else:
-            dim = int(round(uc[0] / targt_pix))
-            new_arr = resample_data(
-                curnt_pix=curnt_pix,
-                targt_pix=targt_pix,
-                targt_dim=[dim, dim, dim],
-                arr=arr,
-            )
-            target_uc = uc
-    if args.dim is not None:
-        if args.cel:
-            if abs(targt_pix - round(target_uc[0] / args.dim[0], 3)) < 10e-3:
-                new_arr = resample_data(
-                    curnt_pix=curnt_pix,
-                    targt_pix=targt_pix,
-                    targt_dim=args.dim,
-                    arr=arr,
-                )
-            else:
-                print(
-                    "target pixel size does not match \
-                    with given cell and dims."
-                )
-                exit()
-        else:
-            target_uc = round(targt_pix, 3) * np.asarray(args.dim, dtype="int")
-            print("New cell: ", target_uc)
-            new_arr = resample_data(
-                curnt_pix=curnt_pix, targt_pix=targt_pix, targt_dim=args.dim, arr=arr
-            )
-    write_mrc(new_arr, args.out, target_uc, org)
-
-
-def resample2maps(args):
-    # Resampling one map2 on map1
-    from emda.emda_methods import read_map, resample_data, write_mrc
-    import emda.ext.mapfit.utils as utils
-
-    uc1, arr1, org1 = read_map(args.map1)
-    uc2, arr2, org2 = read_map(args.map2)
-    arr1 = utils.set_dim_even(arr1)
-    arr2 = utils.set_dim_even(arr2)
-    curnt_pix = round(uc2[0] / arr2.shape[0], 3)
-    targt_pix = round(uc1[0] / arr1.shape[0], 3)
-    new_arr = resample_data(
-        curnt_pix=curnt_pix, targt_pix=targt_pix, targt_dim=arr1.shape, arr=arr2
-    )
-    write_mrc(new_arr, args.out, uc1, org1)
-
-
-def realsp_corr(args):
-    from emda.emda_methods import realsp_correlation
-
-    realsp_correlation(
-        half1map=args.h1,
-        half2map=args.h2,
-        kernel_size=args.knl,
-        norm=args.nrm,
-        # lig=args.lig,
-        model=args.mdl,
-        model_resol=args.res,
-        mask_map=args.msk,
-        lgf=args.lgf,
-    )
-
-def b_from_cc(args):
-    from emda.emda_methods import b_from_correlation
-
-    b_from_correlation(
-        half1map=args.h1,
-        half2map=args.h2,
-        kernel_size=args.knl,
-        resol=args.res,
-        mask_map=args.msk,
-    )
-
-def mmrealsp_corr(args):
-    from emda.emda_methods import realsp_correlation_mapmodel
-
-    realsp_correlation_mapmodel(
-        fullmap=args.map,
-        kernel_size=args.knl,
-        # lig=args.lig,
-        model=args.mdl,
-        resol=args.res,
-        mask_map=args.msk,
-        nomask=args.nomask,
-        # trimpx=args.tpx,
-        norm=args.nrm,
-        lgf=args.lgf,
-    )
-
-
-def fouriersp_corr(args):
-    from emda.emda_methods import fouriersp_correlation
-
-    # half1_map, half2_map, kernel_size=5, mask=None
-    fouriersp_correlation(
-        half1_map=args.h1, half2_map=args.h2, kernel_size=args.knl, mask=args.msk
-    )
-
-
-def validate_mapmodel(args):
-    from emda.emda_methods import map_model_validate
-
-    _ = map_model_validate(
-        half1map=args.h1,
-        half2map=args.h2,
-        modelfpdb=args.mdf,
-        model1pdb=args.md1,
-        mask=args.msk,
-        modelresol=args.res,
-        bfac=args.bfc,
-        # lig=args.lig,
-        lgf=args.lgf,
-    )
-
-
-def mapmodel_fsc(args, fobj):
-    import emda.emda_methods as em
-
-    _, _ = em.mapmodel_fsc(
-        map1=args.map,
-        model=args.mdl,
-        bfac=args.bfc,
-        # lig=args.lig,
-        mask=args.msk,
-        modelresol=args.res,
-        lgf=args.lgf,
-        phaserand=args.phaserand,
-        fobj=fobj,
-    )
-
-
-def map_overlay(args, fobj):
-    from emda.emda_methods import overlay_maps
-
-    overlay_maps(
-        maplist=args.map,
-        masklist=args.msk,
-        tra=args.tra,
-        rot=args.rot,
-        axr=args.axr,
-        ncy=args.ncy,
-        res=args.res,
-        fobj=fobj,
-        interp=args.int,
-        hfm=args.hfm,
-        usemodel=args.mod,
-        fitres=args.fitres,
-    )
-
-
-def map_transform(args):
-    from emda.emda_methods import map_transform
-
-    map_transform(args.map, args.tra, args.rot, args.axr, args.out)
-
-
-def map_average(args, fobj):
-    from emda.emda_methods import average_maps
-
-    fobj.write("***** Map Average *****\n")
-    average_maps(
-        maplist=args.map,
-        masklist=args.msk,
-        tra=args.tra,
-        rot=args.rot,
-        axr=args.axr,
-        ncy=args.ncy,
-        res=args.res,
-        fobj=fobj,
-        interp=args.int,
-    )
-
-
-def apply_bfac(args):
-    from emda.emda_methods import apply_bfactor_to_map
-
-    all_maps = apply_bfactor_to_map(args.map, args.bfc, args.out)
-
-
-def half_to_full(args):
-    from emda.emda_methods import half2full
-
-    fullmap = half2full(args.h1, args.h2, args.out)
-
-
-def diff_map(args):
-    from emda.emda_methods import difference_map
-
-    # difference_map(args.m1, args.m2, args.res)
-    difference_map(maplist=args.map, masklist=args.msk,
-                   smax=args.res, mode=args.mod)
-
-
-def scale_map(args):
-    from emda.emda_methods import scale_map2map
-
-    scaled_map = scale_map2map(args.m1, args.m2, args.out)
-
-
-def best_map(args):
-    from emda.emda_methods import bestmap
-
-    bestmap(
-        hf1name=args.h1,
-        hf2name=args.h2,
-        outfile=args.out,
-        mode=args.mod,
-        knl=args.knl,
-        mask=args.msk,
-    )
-
-
-def pred_fsc(args):
-    from emda.emda_methods import predict_fsc
-    import numpy as np
-
-    # npa = np.asarray(args.npa, dtype='float')
-    fsc_lst, res_arr, bin_idx, nbin = predict_fsc(
-        hf1name=args.h1,
-        hf2name=args.h2,
-        nparticles=args.npa,
-        bfac=args.bfc,
-        mask=args.msk,
-    )
-
-
-def refmac_data(args):
-    from emda.emda_methods import prepare_refmac_data
-
-    prepare_refmac_data(
-        hf1name=args.h1,
-        hf2name=args.h2,
-        maskname=args.msk,
-        bfac=args.bfc,
-        outfile=args.out,
-    )
-
-
-def maptomtzfull(args):
-    from emda.emda_methods import read_map, map2mtzfull
-
-    uc, arr1, orig = read_map(args.h1)
-    uc, arr2, orig = read_map(args.h2)
-    map2mtzfull(uc=uc, arr1=arr1, arr2=arr2, mtzname=args.out)
-
-
-def overallcc(args):
-    from emda.emda_methods import overall_cc
-
-    occ, hocc = overall_cc(
-        map1name=args.m1, map2name=args.m2, maskname=args.msk, space=args.spc
-    )
-
-
-def mirrormap(args):
-    from emda.emda_methods import mirror_map
-
-    mirror_map(args.map)
-
-
-def modeltomap(args):
-    from emda.emda_methods import model2map, write_mrc
-
-    modelmap = model2map(
-        modelxyz=args.mdl,
-        dim=args.dim,
-        resol=args.res,
-        bfac=args.bfc,
-        cell=args.cel,
-        maporigin=args.org,
-        # lig=args.lig,
-        ligfile=args.lgf,
-    )
-    write_mrc(modelmap, "modelmap.mrc", args.cel, args.org)
-
-
-def mask4mmap(args):
-    from emda import emda_methods as em
-
-    uc, arr, orig = em.read_map(args.map)
-    _ = em.mask_from_map(
-        uc=uc,
-        arr=arr,
-        orig=orig,
-        kern=args.knl,
-        resol=args.res,
-        filter=args.fil,
-        prob=args.prb,
-        itr=args.itr,
-    )
-
-
-def composite_map(args):
-    from emda import emda_methods as em
-
-    em.compositemap(maps=args.map, masks=args.msk)
-
-
-def magnification(args):
-    from emda import emda_methods as em
-
-    em.mapmagnification(maplist=args.map, rmap=args.ref)
-
-
-def center_of_mass(args):
-    from emda import emda_methods as em
-
-    uc, arr, orig = em.get_data(args.map)
-    if args.msk is not None:
-        _, mask, _ = em.get_data(args.msk)
-        assert arr.shape == mask.shape
-        arr = arr * mask
-    print(em.center_of_mass_density(arr))
-
-
-def fetch_data(args):
-    from emda import emda_methods as em
-    em.fetch_data(args.emd, args.all)
-
-
-def symaxis_refinement(args):
-    from emda import emda_methods as em
-
-    _, _, _, _, _ = em.symaxis_refine(
-        maplist=args.map, emdbidlist=args.emd, mapoutvar=args.mapout, reslist=args.res)
-
-
-def main(command_line=None):
-    f = open("EMDA.txt", "w")
-    f.write("EMDA session recorded at %s.\n\n" % (datetime.datetime.now()))
-    args = cmdl_parser.parse_args(command_line)
-    if args.command == "info":
-        map_info(args)
-    if args.command == "fsc":
-        anymap_fsc(args, f)
-        f.close()
-    if args.command == "halffsc":
-        halfmap_fsc(args)
-    if args.command == "ccmask":
-        cc_mask(args)
-    if args.command == "lowpass":
-        lowpass_map(args)
-    if args.command == "power":
-        power_map(args)
-    if args.command == "resol":
-        mapresol(args)
-    if args.command == "map2mtz":
-        map2mtz(args)
-    if args.command == "mtz2map":
-        mtz2map(args)
-    if args.command == "resample":
-        resample_data(args)
-    if args.command == "rcc":
-        realsp_corr(args)
-    if args.command == "bfromcc":
-        b_from_cc(args)
-    if args.command == "mmcc":
-        mmrealsp_corr(args)
-    if args.command == "fcc":
-        fouriersp_corr(args)
-    if args.command == "mapmodelvalidate":
-        validate_mapmodel(args)
-    if args.command == "mapmodelfsc":
-        mapmodel_fsc(args, f)
-        f.close()
-    if args.command == "overlay":
-        map_overlay(args, f)
-        f.close()
-    if args.command == "average":
-        map_average(args, f)
-        f.close()
-    if args.command == "transform":
-        map_transform(args)
-    if args.command == "bfac":
-        apply_bfac(args)
-    if args.command == "singlemapfsc":
-        singlemap_fsc(args)
-    if args.command == "half2full":
-        half_to_full(args)
-    if args.command == "diffmap":
-        diff_map(args)
-    if args.command == "applymask":
-        apply_mask(args)
-    if args.command == "scalemap":
-        scale_map(args)
-    if args.command == "bestmap":
-        best_map(args)
-    if args.command == "predfsc":
-        pred_fsc(args)
-    if args.command == "refmac":
-        refmac_data(args)
-    if args.command == "occ":
-        overallcc(args)
-    if args.command == "mirror":
-        mirrormap(args)
-    if args.command == "model2map":
-        modeltomap(args)
-    if args.command == "map2mtzfull":
-        maptomtzfull(args)
-    if args.command == "mapmask":
-        mask4mmap(args)
-    if args.command == "composite":
-        composite_map(args)
-    if args.command == "resamplemap2map":
-        resample2maps(args)
-    if args.command == "magref":
-        magnification(args)
-    if args.command == "com":
-        center_of_mass(args)
-    if args.command == "fetch":
-        fetch_data(args)
-    if args.command == "symref":
-        symaxis_refinement(args)
-
-
-if __name__ == "__main__":
-    main()
