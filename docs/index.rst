@@ -56,7 +56,7 @@ There are two ways to access EMDA’s underlying functionalities. EMDA is availa
 
 .. toctree::
    :maxdepth: 4
-   :caption: Contents:
+   :caption: Table of Contents:
 
    rst/emda_methods
    rst/emda_cmd_caller
