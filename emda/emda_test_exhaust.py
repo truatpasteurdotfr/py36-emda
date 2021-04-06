@@ -77,7 +77,7 @@ def main():
     em.difference_map(
         maplist=[map1name, "modelmap.mrc"],
         masklist=["mask.mrc", "mask.mrc"],
-        smax=resol,
+        diffmapres=resol,
         mode="ampli"
     )
 
