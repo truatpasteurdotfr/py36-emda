@@ -11,6 +11,7 @@ from timeit import default_timer as timer
 import numpy as np
 import fcodes_fast
 from emda.core import fsc as fsctools
+from emda.core import quaternions
 from emda.ext.mapfit.utils import get_FRS, create_xyz_grid, get_xyz_sum
 
 np.set_printoptions(suppress=True)  # Suppress insignificant values for clarity
@@ -123,18 +124,18 @@ class EmFit:
                     theta2 = np.arccos((np.trace(self.rotmat) - 1) / 2) * 180.0 / np.pi
                     t_accum_previous = t_accum
                 else:
-                    rm_accum = core.quaternions.get_RM(q_accum)
+                    rm_accum = quaternions.get_RM(q_accum)
                     theta2 = np.arccos((np.trace(rm_accum) - 1) / 2) * 180.0 / np.pi
                     if theta2 < 0.01:
                         self.rotmat = np.identity(3)
                     else:
-                        self.rotmat = core.quaternions.get_RM(self.q)
+                        self.rotmat = quaternions.get_RM(self.q)
  
                 self.fsc = self.calc_fsc() 
                 if np.average(self.fsc) > 0.999:
                     fval = np.sum(self.e0 * np.conjugate(self.ert))
                     print("fval, FSC_avg ", fval.real, np.average(self.fsc))
-                    self.rotmat = core.quaternions.get_RM(q_accum)
+                    self.rotmat = quaternions.get_RM(q_accum)
                     self.t_accum = t_accum_previous  # final translation
                     self.fsc_lst = fsc_lst
                     translation_vec = trans_in_angstrom(self.t_accum, self.pixsize, self.cut_dim)
@@ -170,7 +171,7 @@ class EmFit:
                     break """
                 if i > 0 and i == ncycles - 1:
                     # search for max fval in the fval_list
-                    self.rotmat = core.quaternions.get_RM(q_list[-1])
+                    self.rotmat = quaternions.get_RM(q_list[-1])
                     self.q = q_list[-1]
                     self.t_accum = t_list[-1]
                     self.fsc_lst = fsc_lst
@@ -242,7 +243,7 @@ class EmFit:
                 tmp = np.insert(self.step[3:] * alpha[1], 0, 0.0)
                 q_accum = q_accum + tmp
                 q_accum = q_accum / np.sqrt(np.dot(q_accum, q_accum))
-                rm_accum = core.quaternions.get_RM(q_accum)
+                rm_accum = quaternions.get_RM(q_accum)
                 theta2 = np.arccos((np.trace(rm_accum) - 1) / 2) * 180.0 / np.pi
                 tmp = tmp + q_init
                 q = tmp / np.sqrt(np.dot(tmp, tmp))
