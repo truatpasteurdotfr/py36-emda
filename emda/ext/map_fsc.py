@@ -111,7 +111,7 @@ def map_model_fsc(
         model_list = [modelf_pdb]
 
     # if maps are in MRC format
-    if half1_map.endswith((".mrc", ".mrcs", ".map")):
+    if half1_map.endswith((".mrc", ".map")):
         uc, arr1, origin = core.iotools.read_map(half1_map)
         uc, arr2, _ = core.iotools.read_map(half2_map)
     # mask taking into account
