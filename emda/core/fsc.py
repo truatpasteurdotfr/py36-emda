@@ -43,8 +43,8 @@ def anytwomaps_fsc_covariance(f1, f2, bin_idx, nbin):
     binstats, bin_arr_count = fcodes_fast.calc_fsc(
         f1, f2, bin_idx, nbin, debug_mode, nx, ny, nz
     )
-    f1f2_covar = binstats[:,0]
-    bin_fsc = binstats[:,1]
+    f1f2_covar = binstats[:, 0]
+    bin_fsc = binstats[:, 1]
 
     """ f1f2_covar, bin_fsc, bincount = fcodes_fast.calc_covar_and_fsc_betwn_anytwomaps(
         f1, f2, bin_idx, nbin, debug_mode, nx, ny, nz
