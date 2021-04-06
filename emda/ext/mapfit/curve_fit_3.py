@@ -16,6 +16,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import numpy as np
 import fcodes_fast
 from emda import core
+from emda.core import restools, fsc, iotools
 
 
 def model(x, f2, s):
@@ -56,15 +57,17 @@ def lsq(f1, f2, s, x0):
 
 def get_resolution(fhf_lst, uc):
     assert fhf_lst[0].shape == fhf_lst[1].shape
-    nbin, res_arr, bin_idx = core.restools.get_resolution_array(uc, fhf_lst[0])
-    bin_fsc = core.fsc.anytwomaps_fsc_covariance(
+    nbin, res_arr, bin_idx = restools.get_resolution_array(uc, fhf_lst[0])
+    bin_fsc = fsc.anytwomaps_fsc_covariance(
         fhf_lst[0], fhf_lst[1], bin_idx, nbin
     )[0]
     bin_fsc = bin_fsc[bin_fsc > 0.1]
     if len(bin_fsc) > 0:
         dist = np.sqrt((bin_fsc - 0.143) ** 2)
-    resol = res_arr[np.argmin(dist)]
-    return resol
+        resol = res_arr[np.argmin(dist)]
+        return resol
+    else:
+        raise SystemExit("Length of resolution array is zero!!!")
 
 
 def main(fhf_lst, uc, resol=5.0):
@@ -95,7 +98,7 @@ if __name__ == "__main__":
     #'/Users/ranganaw/MRC/Map_superposition/testmaps/apply_bfac/avgmap__sharp50.mrc']
     fhf_lst = []
     for imap in maplist:
-        uc, arr, _ = core.iotools.read_map(imap)
+        uc, arr, _ = iotools.read_map(imap)
         fhf_lst.append(np.fft.fftshift(np.fft.fftn(np.fft.fftshift(arr))))
     resol = get_resolution(fhf_lst, uc)
     main(fhf_lst, uc, resol)
