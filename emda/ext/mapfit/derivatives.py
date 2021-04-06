@@ -9,9 +9,10 @@ Mozilla Public License, version 2.0; see LICENSE.
 from __future__ import absolute_import, division, print_function, unicode_literals
 import numpy as np
 import math
+import sys
+import fcodes_fast
 from emda.core.quaternions import derivatives_wrt_q, quart2axis
 from timeit import default_timer as timer
-
 
 timeit = False
 
@@ -35,9 +36,6 @@ def get_dqda(q):
 
 
 def new_derivatives(e0, e1, w_grid, w2_grid, q, sv, xyz, xyz_sum, vol, dfrs=None):
-    import sys
-    import fcodes_fast
-
     nx, ny, nz = e0.shape
     start = timer()
     sv_np = np.zeros((nx, ny, nz, 3), dtype=np.float64)
@@ -45,13 +43,12 @@ def new_derivatives(e0, e1, w_grid, w2_grid, q, sv, xyz, xyz_sum, vol, dfrs=None
         sv_np[:, :, :, i] = sv[i]
     dRdq = derivatives_wrt_q(q)
     if dfrs is None:
-        # print('Calculating derivatives...')
         start = timer()
         dFRs = new_dFs2(np.real(np.fft.ifftn(np.fft.ifftshift(e1))), xyz, vol)
         end = timer()
         if timeit:
             print(" time for dFRs calculation: ", end - start)
-    if dfrs is not None:
+    else:
         print("Interpolated DFRs are used!")
         dFRs = dfrs
     start = timer()
@@ -63,17 +60,13 @@ def new_derivatives(e0, e1, w_grid, w2_grid, q, sv, xyz, xyz_sum, vol, dfrs=None
         print(" time for derivative calculation: ", end - start)
     if np.linalg.cond(ddf_val) < 1 / sys.float_info.epsilon:
         ddf_val_inv = np.linalg.pinv(ddf_val)
+        step = ddf_val_inv.dot(-df_val)
+        return step, df_val
     else:
-        print("Derivative matrix is non-invertible! Stopping now...")
-        exit()
-    step = ddf_val_inv.dot(-df_val)
-    return step, df_val
+        raise SystemExit("Derivative matrix is non-invertible! Stopping now...")
 
 
 def new_derivatives2(e0, e1, w_grid, w2_grid, q, sv, xyz, xyz_sum, vol, dfrs=None):
-    import sys
-    import fcodes_fast
-
     nx, ny, nz = e0.shape
     start = timer()
     sv_np = np.zeros((nx, ny, nz, 3), dtype=np.float64)
@@ -83,13 +76,12 @@ def new_derivatives2(e0, e1, w_grid, w2_grid, q, sv, xyz, xyz_sum, vol, dfrs=Non
     dqda = get_dqda(q)
     dqda_x = np.array([1.0, 1.0, 1.0], dtype='float')
     if dfrs is None:
-        # print('Calculating derivatives...')
         start = timer()
         dFRs = new_dFs2(np.real(np.fft.ifftn(np.fft.ifftshift(e1))), xyz, vol)
         end = timer()
         if timeit:
             print(" time for dFRs calculation: ", end - start)
-    if dfrs is not None:
+    else:
         print("Interpolated DFRs are used!")
         dFRs = dfrs
     start = timer()
@@ -101,27 +93,22 @@ def new_derivatives2(e0, e1, w_grid, w2_grid, q, sv, xyz, xyz_sum, vol, dfrs=Non
         print(" time for derivative calculation: ", end - start)
     if np.linalg.cond(ddf_val) < 1 / sys.float_info.epsilon:
         ddf_val_inv = np.linalg.pinv(ddf_val)
+        step = ddf_val_inv.dot(-df_val)
+        # calculating step on axes
+        df_ax = np.zeros(3, dtype='float')
+        ddf_ax = np.zeros((3,3), dtype='float')
+        for i in range(len(dqda)):
+            df_ax[i] = df_val[3+i] * dqda[i]
+            for j in range(len(dqda)):
+                ddf_ax[i,j] = ddf_val[3+i,3+j] * dqda[i] * dqda[j]
+        ddf_ax_inv = np.linalg.pinv(ddf_ax)
+        step_ax = ddf_ax_inv.dot(-df_ax)
+        return step, step_ax
     else:
-        print("Derivative matrix is non-invertible! Stopping now...")
-        exit()
-    ddf_val_inv = np.linalg.pinv(ddf_val)
-    step = ddf_val_inv.dot(-df_val)
-    # explicit multiplication
-    df_ax = np.zeros(3, dtype='float')
-    ddf_ax = np.zeros((3,3), dtype='float')
-    for i in range(len(dqda)):
-        df_ax[i] = df_val[3+i] * dqda[i]
-        for j in range(len(dqda)):
-            ddf_ax[i,j] = ddf_val[3+i,3+j] * dqda[i] * dqda[j]
-    ddf_ax_inv = np.linalg.pinv(ddf_ax)
-    step_ax = ddf_ax_inv.dot(-df_ax)
-    return step, step_ax
+        raise SystemExit("Derivative matrix is non-invertible! Stopping now...")
 
 
 def axis_derivatives(e0, e1, w_grid, w2_grid, q, sv, xyz, xyz_sum, vol, dfrs=None, axis=None):
-    import sys
-    import fcodes_fast
-
     nx, ny, nz = e0.shape
     start = timer()
     sv_np = np.zeros((nx, ny, nz, 3), dtype=np.float64)
@@ -138,7 +125,7 @@ def axis_derivatives(e0, e1, w_grid, w2_grid, q, sv, xyz, xyz_sum, vol, dfrs=Non
         end = timer()
         if timeit:
             print(" time for dFRs calculation: ", end - start)
-    if dfrs is not None:
+    else:
         print("Interpolated DFRs are used!")
         dFRs = dfrs
     start = timer()
@@ -151,9 +138,7 @@ def axis_derivatives(e0, e1, w_grid, w2_grid, q, sv, xyz, xyz_sum, vol, dfrs=Non
     if np.linalg.cond(ddf_val) < 1 / sys.float_info.epsilon:
         ddf_val_inv = np.linalg.pinv(ddf_val)
     else:
-        print("Derivative matrix is non-invertible! Stopping now...")
-        exit()
-    
+        raise SystemExit("Derivative matrix is non-invertible! Stopping now...")
     df_daz = df_val[3] * dqda[0] + df_val[5] * (az/ax) * dqda[2]
     df_day = df_val[4] * dqda[1] + df_val[5] * (ay/ax) * dqda[2]
     ddf_zz = (ddf_val[3,3] - 2 * ddf_val[3,5] * (az/ax) + ddf_val[5,5] * (az/ax)*(az/ax)) * dqda[0] * dqda[0]
@@ -169,9 +154,6 @@ def axis_derivatives(e0, e1, w_grid, w2_grid, q, sv, xyz, xyz_sum, vol, dfrs=Non
     ddf_axis[0,1] = ddf_zy
     ddf_axis[1,0] = ddf_yz
     ddf_axis[1,1] = ddf_yy
-
-    #print(df_axis)
-    #print(ddf_axis)
     ddf_axis_inv = np.linalg.pinv(ddf_axis)
     step_axis = ddf_axis_inv.dot(-df_axis)
     step = ddf_val_inv.dot(-df_val)
