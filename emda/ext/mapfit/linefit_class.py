@@ -7,7 +7,7 @@ Mozilla Public License, version 2.0; see LICENSE.
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
 import numpy as np
-from emda import core
+from emda.core import restools, quaternions
 import fcodes_fast
 
 np.set_printoptions(suppress=True)  # Suppress insignificant values for clarity
@@ -27,7 +27,7 @@ class LineFit:
             self.e0_lf,
             self.cbin_idx_lf,
             self.cbin_lf,
-        ) = core.restools.cut_resolution_for_linefit(e0, cbin_idx, res_arr, smax)
+        ) = restools.cut_resolution_for_linefit(e0, cbin_idx, res_arr, smax)
 
     def f(self, k):
         from emda.ext.mapfit.utils import get_fsc_wght, get_FRS
@@ -40,7 +40,7 @@ class LineFit:
         tmp = np.insert(self.step[3:] * k[1], 0, 0.0)
         tmp = tmp + q_init
         q = tmp / np.sqrt(np.dot(tmp, tmp))
-        rotmat = core.quaternions.get_RM(q)
+        rotmat = quaternions.get_RM(q)
         ers = get_FRS(rotmat, self.e1_lf * st, interp="linear")
         w_grid = get_fsc_wght(
             self.e0_lf, ers[:, :, :, 0], self.cbin_idx_lf, self.cbin_lf
@@ -59,6 +59,6 @@ class LineFit:
         dz = int((nz - 2 * cz) / 2)
         self.e1_lf = e1[dx : dx + 2 * cx, dy : dy + 2 * cy, dz : dz + 2 * cz]
         assert self.e1_lf.shape == self.e0_lf.shape
-        init_guess = [1.0, 1.0]
+        init_guess = np.array([1.0, 1.0], dtype='float')
         minimum = optimize.minimize(self.f, init_guess, method="Powell")
         return minimum.x
