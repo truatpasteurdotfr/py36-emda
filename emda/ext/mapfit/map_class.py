@@ -264,11 +264,13 @@ class EmmapOverlay:
                         corner_mask = 1.0
                     if com:
                         com1 = ndimage.measurements.center_of_mass(arr * (arr >= 0.0))
-                        print("COM: ", com1)
+                        print("Before centering COM: ", com1)
                         box_centr = (nx // 2, ny // 2, nz // 2)
                         self.com1, self.box_centr = com1, box_centr
                         self.comlist.append(com1)
                         arr_mvd = shift(arr, np.subtract(box_centr, com1))
+                        com1 = ndimage.measurements.center_of_mass(arr_mvd * (arr_mvd >= 0.0))
+                        print("After centering COM: ", com1)
                         self.arr_lst.append(arr_mvd * corner_mask)
                         fhf_lst.append(fftshift(fftn(fftshift(arr_mvd * corner_mask))))
                     else:
@@ -298,9 +300,11 @@ class EmmapOverlay:
                     )
                     if com:
                         com1 = ndimage.measurements.center_of_mass(arr * (arr >= 0.0))
-                        print("COM: ", com1)
+                        print("Before centering COM: ", com1)
                         self.comlist.append(com1)
                         arr = shift(arr, np.subtract(box_centr, com1))
+                        com1 = ndimage.measurements.center_of_mass(arr * (arr >= 0.0))
+                        print("After centering COM: ", com1)
                     self.arr_lst.append(arr * corner_mask)
                     fhf_lst.append(fftshift(fftn(fftshift(arr * corner_mask))))
             self.pixsize = target_pix_size
@@ -465,11 +469,9 @@ class Overlay:
         if self.mask_list is not None:
             if len(self.hfmap_list) // 2 != len(self.mask_list):
                 print(
-                    "mask_list size is not equal to half the \
-                    size of map_list!"
+                    "mask_list size is not equal to half the size of map_list!"
                 )
-                print("exiting program...")
-                exit()
+                raise SystemExit("exiting program...")
             for i in range(0, len(self.hfmap_list), 2):
                 if i % 2 == 0:
                     _, mask, _ = core.iotools.read_map(self.mask_list[i // 2])
@@ -507,7 +509,7 @@ class Overlay:
                                 )
                             )
                 else:
-                    curnt_pix_size = uc[0] / arr.shape[0]
+                    curnt_pix_size = uc[0] / arr1.shape[0]
                     for arr in [arr1, arr2]:
                         arr = core.iotools.resample2staticmap(
                             curnt_pix=curnt_pix_size,
@@ -690,8 +692,7 @@ class EmmapAverage:
         com_lst = []
         if self.mask_list is not None:
             if len(self.hfmap_list) // 2 != len(self.mask_list):
-                raise SystemExit("mask_list size is not equal to half the \
-                    size of map_list!")
+                raise SystemExit("mask_list size is not equal to half the size of map_list!")
             for i in range(0, len(self.hfmap_list), 2):
                 if i % 2 == 0:
                     _, mask, _ = core.iotools.read_map(self.mask_list[i // 2])
