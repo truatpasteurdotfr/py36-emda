@@ -10,7 +10,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from timeit import default_timer as timer
 import numpy as np
 import fcodes_fast
-from emda import core
+from emda.core import fsc as fsctools
 from emda.ext.mapfit.utils import get_FRS, create_xyz_grid, get_xyz_sum
 
 np.set_printoptions(suppress=True)  # Suppress insignificant values for clarity
@@ -54,7 +54,7 @@ class EmFit:
         fsc = core.fsc.anytwomaps_fsc_covariance(
             self.mapobj.cfo_lst[0], frt, self.mapobj.cbin_idx, self.mapobj.cbin
         )[0] """
-        fsc = core.fsc.anytwomaps_fsc_covariance(
+        fsc = fsctools.anytwomaps_fsc_covariance(
             self.e0, self.ert, self.mapobj.cbin_idx, self.mapobj.cbin
         )[0]
         return fsc
