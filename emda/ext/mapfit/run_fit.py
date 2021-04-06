@@ -27,6 +27,7 @@ def fsc_between_static_and_transfomed_map(
 
 
 def get_ibin(bin_fsc):
+    ibin = 0
     # search from rear end
     for i, ifsc in reversed(list(enumerate(bin_fsc))):
         if ifsc > 0.3:
@@ -89,6 +90,9 @@ def run_fit(
             )
             fsc_lst.append(f1f2_fsc)
             ibin = get_ibin(f1f2_fsc)
+            if ibin == 0:
+                print('ibin = 0')
+                raise SystemExit("Cannot proceed! Stopping now...")
             ibin_old = ibin
             if np.average(f1f2_fsc) > 0.999:
                 fobj.write("\n")
@@ -184,7 +188,8 @@ def run_fit(
         if ibin < slf or slf == 0:
             slf = ibin
         #slf = min([ibin, slf])
-        slf = min([ibin, 30]) # use 30 bins for linefit - hard coded
+        slf = ibin
+        #slf = min([ibin, 30]) # use 30 bins for linefit - hard coded
         fit.minimizer(ncycles, t, rotmat, smax_lf=slf, fobj=fobj)
         t = fit.t_accum
         rotmat = fit.rotmat
