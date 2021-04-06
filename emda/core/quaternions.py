@@ -220,5 +220,5 @@ def rot2quart(rm):
 
 def quaternion_inv(q):
     q_conjg = np.array([q[0], -q[1], -q[2], -q[3]], dtype='float')
-    q_inv = q_conjg / q @ q
+    q_inv = q_conjg / np.dot(q, q)
     return q_inv
