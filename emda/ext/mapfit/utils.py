@@ -15,14 +15,14 @@ from timeit import default_timer as timer
 from emda.config import debug_mode
 
 
-def get_FRS(RM, E2, interp):
+def get_FRS(RM, E2, interp='linear'):
     if len(E2.shape) == 3:
         E2 = np.expand_dims(E2, axis=3)
     ERS = get_interp(RM, E2, interp)
     return ERS
 
 
-def get_interp(RM, data, interp):
+def get_interp(RM, data, interp='linear'):
     assert len(data.shape) == 4
     ih, ik, il, n = data.shape
     if interp == "cubic":
@@ -230,7 +230,7 @@ def output_maps(
             Bcode = "_blur" + str(abs(bf_arr[ibf]))
         elif bf_arr[ibf] > 0.0:
             Bcode = "_sharp" + str(abs(bf_arr[ibf]))
-        elif bf_arr[ibf] == 0.0:
+        else:
             Bcode = "_unsharpened"
         for imap in range(averagemaps.shape[3]):
             filename_mrc = "avgmap_" + str(imap) + Bcode + ".mrc"
