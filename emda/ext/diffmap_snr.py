@@ -142,6 +142,7 @@ def main(maplist, results, fit=True, resol=3, ncy=5, usecom=False, fitres=None, 
                     print(error)
             if i == 0:
                 target_uc = uc
+                map_origin = origin
                 target_dim = arr1.shape
                 tpix = target_uc[0] / target_dim[0]
                 nbin, res_arr, bin_idx = restools.get_resolution_array(uc, arr1)
@@ -158,7 +159,7 @@ def main(maplist, results, fit=True, resol=3, ncy=5, usecom=False, fitres=None, 
         results.masklist = msk_list
     uc = target_uc
     results.cell = uc
-    results.origin = origin
+    results.origin = map_origin
     # maps for fitting
     fmaps_to_fit = bestmap_list
     if len(msk_list) == 2:
@@ -185,7 +186,7 @@ def main(maplist, results, fit=True, resol=3, ncy=5, usecom=False, fitres=None, 
         emmap1.map_dim = maps[0].shape
         emmap1.map_unit_cell = uc
         emmap1.pixsize = uc[0] / emmap1.map_dim[0]
-        emmap1.map_origin = origin
+        emmap1.map_origin = map_origin
         emmap1.nbin = nbin
         emmap1.bin_idx = bin_idx
         emmap1.res_arr = res_arr
