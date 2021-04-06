@@ -7,7 +7,7 @@ Mozilla Public License, version 2.0; see LICENSE.
 """
 
 from __future__ import absolute_import, division, print_function, unicode_literals
-from emda import core
+from emda.core import restools
 
 
 def frequency_marching(fo, bin_idx, res_arr, bmax=None, fobj=None):
@@ -21,7 +21,7 @@ def frequency_marching(fo, bin_idx, res_arr, bmax=None, fobj=None):
     dy = int((fo.shape[1] - 2 * cx) / 2)
     dz = int((fo.shape[2] - 2 * cx) / 2)
     cBIdx = bin_idx[dx : dx + 2 * cx, dy : dy + 2 * cx, dz : dz + 2 * cx]
-    cutmap = core.restools.cut_resolution(fo, bin_idx, res_arr, cbin)[
+    cutmap = restools.cut_resolution(fo, bin_idx, res_arr, cbin)[
         dx : dx + 2 * cx, dy : dy + 2 * cx, dz : dz + 2 * cx
     ]
     return cutmap, cBIdx, cbin
