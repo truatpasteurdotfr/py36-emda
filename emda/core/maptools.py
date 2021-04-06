@@ -104,7 +104,7 @@ def apply_bfactor_to_map(mapname, bf_arr, mapout):
                 Bcode = "_blur" + str(abs(bf_arr[i]))
             elif bf_arr[i] > 0.0:
                 Bcode = "_sharp" + str(abs(bf_arr[i]))
-            elif bf_arr[i] == 0.0:
+            else:
                 Bcode = "_unsharpened"
             filename_mrc = mapname[:-4] + Bcode + ".mrc"
             data2write = np.real(np.fft.ifftn(np.fft.ifftshift(all_mapout[:, :, :, i])))
@@ -130,6 +130,7 @@ def mtz2map(mtzname, map_size):
     k = dataframe["K"].astype("int")
     l = dataframe["L"].astype("int")
     f = dataframe["Fout0"] * np.exp(np.pi * 1j * dataframe["Pout0"] / 180.0)
+    #f = dataframe["FWT"] * np.exp(np.pi * 1j * dataframe["PHWT"] / 180.0)
     nx, ny, nz = map_size
     f3d = fcodes_fast.mtz2_3d(h, k, l, f, nx, ny, nz, len(f))
     data2write = np.real((ifftn(ifftshift(f3d))))
