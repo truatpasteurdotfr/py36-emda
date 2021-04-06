@@ -101,13 +101,15 @@ def plot_nlines(
     res_arr,
     list_arr,
     mapname="halfmap_fsc.eps",
-    curve_label=["halfmap_fsc"],
+    curve_label=None,
     fscline=0.143,
     plot_title=None,
 ):
     # from mpl_toolkits.axes_grid1 import host_subplot
     # import mpl_toolkits.axisartist as AA
 
+    if curve_label is None:
+        curve_label = ["halfmap_fsc"]
     bin_arr = np.arange(len(res_arr))
     fig = plt.figure(figsize=(6, 4))
     # ax1 = host_subplot(111,axes_class=AA.Axes)
@@ -136,11 +138,13 @@ def plot_nlines(
 
 
 def plot_nlines2(
-    res_arr, list_arr, mapname="halfmap_fsc.eps", curve_label=["halfmap_fsc"]
+    res_arr, list_arr, mapname="halfmap_fsc.eps", curve_label=None
 ):
     # from mpl_toolkits.axes_grid1 import host_subplot
     # import mpl_toolkits.axisartist as AA
 
+    if curve_label is None:
+        curve_label = ["halfmap_fsc"]
     bin_arr = np.arange(len(res_arr))
     fig = plt.figure(figsize=(6, 4))
     # ax1 = host_subplot(111,axes_class=AA.Axes)
