@@ -11,14 +11,15 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import sys
 import numpy as np
 import fcodes_fast
-import gemmi, pandas
+import gemmi
+import pandas
 import mrcfile as mrc
 from emda.config import debug_mode
 
 
 def test():
     """ Tests iotools module installation. """
-    
+
     print("iotools test ... Passed")
 
 
@@ -46,7 +47,7 @@ def read_map(mapname):
         unit_cell[:3] = cell.view(('f4', 3))
         # Swap cell parameters a, b, c to c, b, a
         tmp = unit_cell[:3]
-        unit_cell[0],  unit_cell[2] = tmp[2], tmp[0]
+        unit_cell[0], unit_cell[2] = tmp[2], tmp[0]
         #
         unit_cell[3:] = float(90)
         origin = [
@@ -89,7 +90,7 @@ def read_mtz(mtzfile):
     except FileNotFoundError as e:
         print(e)
 
-       
+
 def write_mrc(mapdata, filename, unit_cell, map_origin=None, factor=1.0, label=False):
     """ Writes 3D Numpy array into MRC file.
 
@@ -135,7 +136,7 @@ def write_mrc(mapdata, filename, unit_cell, map_origin=None, factor=1.0, label=F
             ")",
         )
         file.header.label = label1
-    #file.update_header_from_data()
+    # file.update_header_from_data()
     file.close()
 
 
@@ -177,8 +178,7 @@ def write_3d2mtz(unit_cell, mapdata, outfile="map2mtz.mtz", resol=None):
     mtz.add_column("Fout0", "F")
     mtz.add_column("Pout0", "P")
     # calling fortran function
-    h,k,l,ampli,phase = fcodes_fast.prepare_hkl(mapdata,bin_idx,cbin,debug_mode,nx,ny,nz)
-    #h, k, l, ampli, phase = fcodes_fast.prepare_hkl(mapdata, debug_mode, nx, ny, nz)
+    h, k, l, ampli, phase = fcodes_fast.prepare_hkl(mapdata, bin_idx, cbin, debug_mode, nx, ny, nz)
     print("hmin, hmax ", np.amin(h), np.amax(h))
     print("kmin, kmax ", np.amin(k), np.amax(k))
     print("lmin, lmax ", np.amin(l), np.amax(l))
@@ -190,7 +190,6 @@ def write_3d2mtz(unit_cell, mapdata, outfile="map2mtz.mtz", resol=None):
     data[:, 2] = -h.astype(int)
     data[:, 3] = ampli.astype(np.float32)
     data[:, 4] = phase.astype(np.float32)
-    #print("data shape: ", data.shape)
     mtz.set_data(data)
     mtz.write_to_file(outfile)
 
@@ -367,15 +366,15 @@ def resample2staticmap(curnt_pix, targt_pix, targt_dim, arr, sf=False, fobj=None
                 fobj.write("Padded with zeros \n")
             dx = abs(tnx - nx) // 2
             new_arr = np.zeros((tnx, tny, tnz), arr.dtype)
-            new_arr[dx : nx + dx, dx : nx + dx, dx : nx + dx] = arr
+            new_arr[dx: nx + dx, dx: nx + dx, dx: nx + dx] = arr
         elif targt_dim[0] < curnt_dim[0]:
             print("Cropped image")
             if fobj is not None:
                 fobj.write("Cropped image \n")
             dx = abs(nx - tnx) // 2
             new_arr = np.zeros((targt_dim), arr.dtype)
-            new_arr = arr[dx : dx + tnx, dx : dx + tnx, dx : dx + tnx]
-    elif curnt_pix != targt_pix:
+            new_arr = arr[dx: dx + tnx, dx: dx + tnx, dx: dx + tnx]
+    elif abs(curnt_pix - targt_pix) > 10e-3:
         print("Resizing in Fourier space and transforming back")
         if fobj is not None:
             fobj.write("Resizing in Fourier space and transforming back \n")
@@ -412,13 +411,13 @@ def resample(x, num, sf):
     # upsampling
     if X.shape[0] < newshape[0]:
         dx = abs(newshape[0] - X.shape[0]) // 2
-        Y[dx : dx + X.shape[0], dx : dx + X.shape[0], dx : dx + X.shape[0]] = X
+        Y[dx: dx + X.shape[0], dx: dx + X.shape[0], dx: dx + X.shape[0]] = X
     # downsampling
     if newshape[0] < X.shape[0]:
         dx = abs(newshape[0] - X.shape[0]) // 2
         Y[:, :, :] = X[
-            dx : dx + newshape[0], dx : dx + newshape[0], dx : dx + newshape[0]
-        ]
+                     dx: dx + newshape[0], dx: dx + newshape[0], dx: dx + newshape[0]
+                     ]
     if sf:
         return Y
     Y = np.fft.ifftshift(Y)
@@ -487,10 +486,11 @@ def run_refmac_sfcalc(filename, resol, bfac, lig=True, ligfile=None):
         inp = open("sfcalc.inp", "r")
         # Run the command with parameters from file f2mtz.inp
         subprocess.call(cmd, stdin=inp, stdout=logf)
+        logf.close()
+        inp.close()
     else:
-        print("Either the file is missing or not readable")
-    logf.close()
-    inp.close()
+        raise SystemExit("File is either missing or not readable")
+
 
 
 def read_atomsf(atm, fpath=None):
@@ -557,21 +557,20 @@ def mask_by_value_greater(array, masking_value=0.0, filling_value=0.0):
 def output_to_table(dataframe, filename="data_emda.txt"):
     with open(filename, 'a') as f:
         f.write(
-            dataframe.to_string(header = True, index = False)
+            dataframe.to_string(header=True, index=False)
         )
     print("data_emda.txt file was written!")
-
 
 
 def apply_transformation_on_model(mmcif_file, rotmat=None, trans=None, outfilename=None):
     import gemmi
     import numpy as np
-    
+
     doc = gemmi.cif.read_file(mmcif_file)
     st = gemmi.read_structure(mmcif_file)
     model = st[0]
     com = model.calculate_center_of_mass()
-    #print(com)
+    # print(com)
     block = doc.sole_block()  # cif file as a single block
     col_x = block.find_values("_atom_site.Cartn_x")
     col_y = block.find_values("_atom_site.Cartn_y")
@@ -594,7 +593,8 @@ def apply_transformation_on_model(mmcif_file, rotmat=None, trans=None, outfilena
         vec[0] = float(col_x[n]) - com.x
         vec[1] = float(col_y[n]) - com.y
         vec[2] = float(col_z[n]) - com.z
-        vec_rot = rotmat @ vec
+        # vec_rot = rotmat @ vec
+        vec_rot = np.dot(rotmat, vec)
         col_x[n] = str(vec_rot[0] + com.x + trans[0])
         col_y[n] = str(vec_rot[1] + com.y + trans[1])
         col_z[n] = str(vec_rot[2] + com.z + trans[2])
@@ -626,8 +626,7 @@ def read_mrc(mapname11):
     hf11 = np.fft.fftshift(np.fft.fftn(ar11_centered))  # CENTERED FFT OF CENTERED IMAGE
     return uc, hf11, origin
 
-
-#def write_3d2mtz_full(uc, arr, outfile="output.mtz"):
+# def write_3d2mtz_full(uc, arr, outfile="output.mtz"):
 #    # Write numpy 3D array into MTZ file.
 #    # Issue: It write out full sphere data
 #    import numpy.fft as fft
