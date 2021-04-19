@@ -710,6 +710,15 @@ symmap.add_argument("--fsc_cutoff", required=False, default=0.7,
 symmap.add_argument("--ang_tol", required=False, default=5.0,
                     type=float, help="angle tolerence between two axes for determining point group. default= 5 deg.")
 
+rebox = subparsers.add_parser(
+    "rebox", description="rebox map and model using a mask")
+rebox.add_argument("--map", required=True, nargs="+",
+                    type=str, help="list of map names for reboxing")
+rebox.add_argument("--msk", required=True, nargs="+",
+                    type=str, help="list of mask names for reboxing")
+rebox.add_argument("--mdl", required=False, nargs="+",
+                    type=str, default=None, help="list of model names (pdb/cif) for reboxing")
+
 
 def apply_mask(args):
     from emda.emda_methods import applymask
@@ -1248,6 +1257,12 @@ def symmetrize(args, fobj):
     )
 
 
+def reboxmap(args):
+    from emda import emda_methods as em
+
+    em.rebox_mapmodel(maplist=args.map, masklist=args.msk, modellist=args.mdl)
+
+
 def main(command_line=None):
     f = open("EMDA.txt", "w")
     f.write("EMDA session recorded at %s.\n\n" % (datetime.datetime.now()))
@@ -1340,6 +1355,8 @@ def main(command_line=None):
         pointgroup(args, f)
     if args.command == "symmetrise":
         symmetrize(args, f)
+    if args.command == "rebox":
+        reboxmap(args)
 
 
 if __name__ == "__main__":
