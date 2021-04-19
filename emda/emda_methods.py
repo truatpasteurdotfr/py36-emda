@@ -1151,9 +1151,11 @@ def overlay_maps(
         smax=res,
         fobj=fobj,
         interp=interp,
+        modelres=modelres,
         halfmaps=hfm,
         usemodel=usemodel,
         fitres=fitres,
+        usecom=usecom,
     )
     # new overlay function call
     """ q = quaternions.get_quaternion(theta_init)
@@ -1796,7 +1798,10 @@ def overall_cc(map1name, map2name, space="real", resol=5, maskname=None):
 def mirror_map(mapname):
     # gives the inverted copy of the map
     uc, arr, origin = iotools.read_map(mapname)
+    com = center_of_mass_density(arr)
     data = np.real(np.fft.ifftn(np.conjugate(np.fft.fftn(arr))))
+    com2 = center_of_mass_density(data)
+    data = shift_density(data, shift=np.subtract(com, com2))
     iotools.write_mrc(data, "mirror.mrc", uc, origin)
 
 
@@ -2230,3 +2235,25 @@ def symmetry_average_using_ops(imap, ops, outmapname=None):
     from emda.ext.sym.symmetrize_map import symmetrize_map_using_ops
 
     return symmetrize_map_using_ops(imap=imap, ops=ops, outmapname=outmapname)
+
+
+def rebox_mapmodel(maplist, masklist, modellist=None):
+    """Reboxes a map by a mask.
+
+    This function reboxes a map by a mask into a smaller cube. Size of the box 
+    is determine by the size of te mask + 10 voxels in each dimetion. 
+    It can accept list arguments if there's more than one map and mask. 
+    Also, a model can be given and then that will also be reboxed.
+
+    Args:
+        maplist (string): List of map names to be reboxed
+        masklist (string): List of mask names to be used in reboxing
+        modellist (string, optional): List of model names (pdb/cif) to be reboxed. 
+                        Defaults to None.
+        
+    Output:
+        It outputs reboxed maps, models (if supplied).
+    """
+    from emda.ext.rebox_map import rebox_maps_and_models
+
+    rebox_maps_and_models(maplist=maplist, masklist=masklist, modellist=modellist)
