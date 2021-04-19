@@ -844,7 +844,7 @@ def output_rotated_maps(emmap1, r_lst, t_lst, Bf_arr=None):
         )
 
 
-def output_rotated_models(emmap1, maplist, r_lst, t_lst):
+""" def output_rotated_models(emmap1, maplist, r_lst, t_lst):
     from emda.core.iotools import apply_transformation_on_model, pdb2mmcif
 
     pixsize = emmap1.pixsize
@@ -864,6 +864,41 @@ def output_rotated_models(emmap1, maplist, r_lst, t_lst):
         elif model.endswith((".cif")):
             outcifname = "emda_transformed_model_" + str(i) + ".cif"
             _,_,_,_ = apply_transformation_on_model(mmcif_file=model,rotmat=rotmat, trans=t, outfilename=outcifname)
+ """
+
+def output_rotated_models(emmap1, maplist, r_lst, t_lst):
+    from emda.core.iotools import apply_transformation_on_model, pdb2mmcif, model_transform_gm
+
+    pixsize = emmap1.pixsize
+    comlist = emmap1.comlist
+    box_center = emmap1.box_centr
+    if len(comlist) > 0:
+        assert len(comlist) == len(maplist)
+    i = 0
+    for model, t, rotmat in zip(maplist[1:], t_lst, r_lst):
+        i += 1
+        print(rotmat)
+        t = np.asarray(t, 'float') *  pixsize * np.asarray(emmap1.map_dim, 'int')
+        # calculate the vector from com to box_center in Angstroms
+        if len(comlist) > 0:
+            shift = np.subtract(comlist[i], comlist[0]) * pixsize
+            t = t + shift
+        t = -t
+        print(t)
+        i += 1
+        if model.endswith((".mrc", ".map")):
+            continue
+        elif model.endswith((".pdb", ".ent")):
+            pdb2mmcif(model)
+            outcifname = "emda_transformed_model_" + str(i) + ".cif"
+            print(outcifname)
+            _,_,_,_ = apply_transformation_on_model(mmcif_file="./out.cif",rotmat=rotmat, trans=t, outfilename=outcifname)
+            #model_transform_gm(mmcif_file="./out.cif",rotmat=rotmat, trans=t, outfilename=outcifname)
+        elif model.endswith((".cif")):
+            outcifname = "emda_transformed_model_" + str(i) + ".cif"
+            _,_,_,_ = apply_transformation_on_model(mmcif_file=model,rotmat=rotmat, trans=t, outfilename=outcifname)
+            #model_transform_gm(mmcif_file=model,rotmat=rotmat, trans=t, outfilename=outcifname)
+
 
 
 if __name__ == "__main__":
