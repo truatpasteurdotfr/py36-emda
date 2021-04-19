@@ -13,6 +13,8 @@ import fcodes_fast
 from emda import core
 from emda.ext.mapfit import map_class
 from numpy.fft import fftn, ifftn, fftshift, ifftshift
+from emda.ext.overlay import output_rotated_maps as outputmaps
+from emda.ext.overlay import output_rotated_models
 
 
 def output_rotated_maps(emmap1, r_lst, t_lst, Bf_arr=None):
@@ -85,9 +87,11 @@ def main(
     masklist,
     fobj,
     interp,
+    modelres=5.0,
     halfmaps=False,
     dfs_interp=False,
     usemodel=False,
+    usecom=False,
     fitres=None,
 ):
     from emda.ext.mapfit import utils, run_fit, interp_derivatives
@@ -101,15 +105,15 @@ def main(
             emmap1 = map_class.Overlay(maplist, masklist)
         else:
             print("Map overlay not using halfmaps")
-            emmap1 = map_class.EmmapOverlay(maplist, masklist)
+            emmap1 = map_class.EmmapOverlay(map_list=maplist, mask_list=masklist, modelres=modelres, com=usecom)
         fobj.write("Map overlay\n")
     except NameError:
         if halfmaps:
             print("Map overlay using halfmaps")
-            emmap1 = map_class.Overlay(maplist)
+            emmap1 = map_class.Overlay(map_list=maplist)
         else:
             print("Map overlay not using halfmaps")
-            emmap1 = map_class.EmmapOverlay(maplist)
+            emmap1 = map_class.EmmapOverlay(map_list=maplist, modelres=modelres, com=usecom)
         fobj.write("Map overlay\n")
     if usemodel:
         emmap1.load_models()
@@ -172,4 +176,6 @@ def main(
         fobj.write("Final Rotation matrix: " + str(rotmat) + " \n")
         print("time for fitting: ", end_fit - start_fit)
 
-    output_rotated_maps(emmap1, rotmat_lst, transl_lst)
+    #output_rotated_maps(emmap1, rotmat_lst, transl_lst)
+    outputmaps(emmap1, r_lst=rotmat_lst, t_lst=transl_lst)
+    output_rotated_models(emmap1, maplist=maplist, r_lst=rotmat_lst, t_lst=transl_lst)
