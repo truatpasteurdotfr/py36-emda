@@ -375,11 +375,61 @@ def resample2staticmap(curnt_pix, targt_pix, targt_dim, arr, sf=False, fobj=None
             new_arr = np.zeros((targt_dim), arr.dtype)
             new_arr = arr[dx: dx + tnx, dx: dx + tnx, dx: dx + tnx]
     elif abs(curnt_pix - targt_pix) > 10e-3:
+        newsize = int(round(arr.shape[0] * (curnt_pix / targt_pix)))
+        if newsize % 2 != 0: newsize -= 1
+        #print("newsize: ", newsize)
         print("Resizing in Fourier space and transforming back")
         if fobj is not None:
             fobj.write("Resizing in Fourier space and transforming back \n")
         new_arr = resample(arr, targt_dim, sf)
+        """ new_arr = resample(arr, [newsize, newsize, newsize], sf)
+        uc = round(targt_pix, 3) * np.asarray([newsize, newsize, newsize], dtype="int")
+        if newsize >= targt_dim[0]:
+            new_arr = cropimage(arr=new_arr, tdim=targt_dim)
+        else:
+            new_arr = padimage(arr=new_arr, tdim=targt_dim) """
     return new_arr
+
+
+def padimage(arr, tdim):
+    if type(tdim) is list:
+        if len(tdim) == 3:
+            tnz, tny, tnx = tdim
+        elif len(tdim) < 3:
+            tnz = tny = tnx = tdim[0]
+        else:
+            raise SystemExit("More than 3 dimensions given. Cannot handle")
+    else:
+        tnz = tny = tnx = tdim
+    nz, ny, nx = arr.shape
+    assert tnx >= nx
+    assert tny >= ny
+    assert tnz >= nz
+    dx = abs(tnx - nx) // 2
+    dy = abs(tny - ny) // 2
+    dz = abs(tnz - nz) // 2
+    image = np.zeros((tnx, tny, tnz), arr.dtype)
+    image[dz: nz + dz, dy: ny + dy, dx: nx + dx] = arr
+    return image
+
+def cropimage(arr, tdim):
+    if type(tdim) is list:
+        if len(tdim) == 3:
+            tnz, tny, tnx = tdim
+        elif len(tdim) < 3:
+            tnz = tny = tnx = tdim[0]
+        else:
+            raise SystemExit("More than 3 dimensions given. Cannot handle")
+    else:
+        tnz = tny = tnx = tdim
+    nz, ny, nx = arr.shape
+    assert tnx <= nx
+    assert tny <= ny
+    assert tnz <= nz
+    dx = abs(nx - tnx) // 2
+    dy = abs(ny - tny) // 2
+    dz = abs(nz - tnz) // 2
+    return arr[dz: nz + dz, dy: ny + dy, dx: nx + dx]
 
 
 def resample(x, num, sf):
@@ -593,16 +643,38 @@ def apply_transformation_on_model(mmcif_file, rotmat=None, trans=None, outfilena
         vec[0] = float(col_x[n]) - com.x
         vec[1] = float(col_y[n]) - com.y
         vec[2] = float(col_z[n]) - com.z
-        # vec_rot = rotmat @ vec
         vec_rot = np.dot(rotmat, vec)
-        col_x[n] = str(vec_rot[0] + com.x + trans[0])
+        col_x[n] = str(vec_rot[0] + com.x + trans[2])
         col_y[n] = str(vec_rot[1] + com.y + trans[1])
-        col_z[n] = str(vec_rot[2] + com.z + trans[2])
+        col_z[n] = str(vec_rot[2] + com.z + trans[0])
     x_np = np.array(col_x, dtype="float", copy=False)
     y_np = np.array(col_y, dtype="float", copy=False)
     z_np = np.array(col_z, dtype="float", copy=False)
     doc.write_file(outfilename)
     return cell, x_np, y_np, z_np
+
+
+def model_transform_gm(mmcif_file, rotmat=None, trans=None, outfilename=None):
+    if rotmat is None:
+        rotmat = np.identity(3)
+    if outfilename is None:
+        outfilename = "gemmi_transformed_model.cif"
+    st = gemmi.read_structure(mmcif_file)
+    com = gemmi.Vec3(*st[0].calculate_center_of_mass())
+    """ 
+    # This code segment does not work properly.
+    print(com)
+    tmp = np.zeros(3, 'float')
+    tmp[0] = trans[2]
+    tmp[1] = trans[1]
+    tmp[2] = trans[0]
+    com = com - gemmi.Vec3(*tmp)
+    print(com) """
+    mat33 = gemmi.Mat33(rotmat) 
+    trans = com - mat33.multiply(com)
+    tr = gemmi.Transform(mat33, trans)
+    st[0].transform(tr)
+    st.make_mmcif_document().write_file(outfilename)
 
 
 ##### below function are not frequently used.#####
