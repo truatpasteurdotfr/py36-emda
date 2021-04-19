@@ -207,9 +207,10 @@ from numpy.fft import fftn, fftshift
         self.fhf_lst = fhf_lst """
 
 class EmmapOverlay:
-    def __init__(self, map_list, mask_list=None):
+    def __init__(self, map_list, modelres=5.0, com=False, mask_list=None):
         self.map_list = map_list
         self.mask_list = mask_list
+        self.modelres = modelres
         self.map_unit_cell = None
         self.map_origin = None
         self.map_dim = None
@@ -220,7 +221,7 @@ class EmmapOverlay:
         self.cbin_idx = None
         self.cdim = None
         self.cbin = None
-        self.com = True
+        self.com = com
         self.com1 = None
         self.comlist = []
         self.box_centr = None
@@ -278,6 +279,7 @@ class EmmapOverlay:
                 else:
                     uc, arr, origin = em.get_data(
                         self.map_list[i],
+                        resol=self.modelres,
                         dim=target_dim,
                         uc=uc_target,
                         maporigin=map_origin,
@@ -330,6 +332,7 @@ class EmmapOverlay:
                         print("BOX center: ", box_centr)
                         self.com1 = com1
                         self.box_centr = box_centr
+                        self.comlist.append(com1)
                         arr = shift(arr, np.subtract(box_centr, com1))
                         self.arr_lst.append(arr)
                         core.iotools.write_mrc(
@@ -344,6 +347,7 @@ class EmmapOverlay:
                 else:
                     uc, arr, origin = em.get_data(
                         self.map_list[i],
+                        resol=self.modelres,
                         dim=target_dim,
                         uc=uc_target,
                         maporigin=map_origin,
@@ -361,6 +365,7 @@ class EmmapOverlay:
                     if com:
                         com1 = ndimage.measurements.center_of_mass(arr * (arr >= 0.0))
                         print("COM: ", com1)
+                        self.comlist.append(com1)
                         arr = shift(arr, np.subtract(box_centr, com1))
                         core.iotools.write_mrc(
                             arr, "moving_centered.mrc", uc_target, map_origin
