@@ -626,6 +626,9 @@ model2map.add_argument(
 model2map.add_argument(
     "--org", required=False, default=None, nargs="+", type=int, help="map origin"
 )
+model2map.add_argument(
+    "--gemmi", action="store_true", help="if used, GEMMI is used instead REFMAC for structure factor calculation"
+)
 
 composite = subparsers.add_parser(
     "composite", description="make composite map")
@@ -1149,21 +1152,25 @@ def mirrormap(args):
 def modeltomap(args):
     from emda.emda_methods import model2map, model2map_gm, write_mrc
 
-    # REFMAC sfcalc
-    modelmap = model2map(
-        modelxyz=args.mdl,
-        dim=args.dim,
-        resol=args.res,
-        bfac=args.bfc,
-        cell=args.cel,
-        maporigin=args.org,
-        # lig=args.lig,
-        ligfile=args.lgf,
-    )
-    write_mrc(modelmap, "modelmap_refmac.mrc", args.cel, args.org)
-    """ modelmap = model2map_gm(modelxyz=args.mdl, resol=args.res,
+    if args.gemmi:
+        # GEMMI for sfcalc
+        modelmap = model2map_gm(modelxyz=args.mdl, resol=args.res,
                             dim=args.dim, bfac=args.bfc, cell=args.cel, maporigin=args.org)
-    write_mrc(modelmap, "modelmap_gm.mrc", args.cel, args.org) """
+        write_mrc(modelmap, "modelmap_gm.mrc", args.cel, args.org)
+    else:
+        # REFMAC sfcalc
+        modelmap = model2map(
+            modelxyz=args.mdl,
+            dim=args.dim,
+            resol=args.res,
+            bfac=args.bfc,
+            cell=args.cel,
+            maporigin=args.org,
+            # lig=args.lig,
+            ligfile=args.lgf,
+        )
+        write_mrc(modelmap, "modelmap_refmac.mrc", args.cel, args.org)
+    
 
 
 def mask4mmap(args):
