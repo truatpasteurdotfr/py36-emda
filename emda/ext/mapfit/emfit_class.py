@@ -113,7 +113,7 @@ class EmFit:
                 if i == 0:
                     self.t = np.asarray(t_init, dtype='float')
                     t_accum = self.t
-                    t_accum_angstrom = t_accum * self.pixsize#self.cell[:3]
+                    t_accum_angstrom = t_accum * self.pixsize * self.ful_dim[0]#self.cell[:3]
                     translation_vec = np.sqrt(
                         np.sum(t_accum_angstrom * t_accum_angstrom)
                     )
@@ -138,7 +138,7 @@ class EmFit:
                     self.rotmat = quaternions.get_RM(q_accum)
                     self.t_accum = t_accum_previous  # final translation
                     self.fsc_lst = fsc_lst
-                    translation_vec = trans_in_angstrom(self.t_accum, self.pixsize, self.cut_dim)
+                    translation_vec = trans_in_angstrom(self.t_accum, self.pixsize, self.ful_dim)
                     theta2 = np.arccos((np.trace(self.rotmat) - 1) / 2) * 180.0 / np.pi
                     print("thets2, trans: ", theta2, translation_vec)
                     break
@@ -175,7 +175,7 @@ class EmFit:
                     self.q = q_list[-1]
                     self.t_accum = t_list[-1]
                     self.fsc_lst = fsc_lst
-                    translation_vec = trans_in_angstrom(t_accum, self.pixsize, self.cut_dim)
+                    translation_vec = trans_in_angstrom(t_accum, self.pixsize, self.ful_dim)
                     theta2 = np.arccos((np.trace(self.rotmat) - 1) / 2) * 180.0 / np.pi
                     print("thets2, trans: ", theta2, translation_vec)
                     break
@@ -238,7 +238,7 @@ class EmFit:
                 # translation
                 self.t = self.step[:3] * alpha[0]
                 t_accum = t_accum + self.t
-                translation_vec = trans_in_angstrom(t_accum, self.pixsize, self.cut_dim)
+                translation_vec = trans_in_angstrom(t_accum, self.pixsize, self.ful_dim)
                 # rotation
                 tmp = np.insert(self.step[3:] * alpha[1], 0, 0.0)
                 q_accum = q_accum + tmp
