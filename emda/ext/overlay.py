@@ -892,12 +892,12 @@ def output_rotated_models(emmap1, maplist, r_lst, t_lst):
             pdb2mmcif(model)
             outcifname = "emda_transformed_model_" + str(i) + ".cif"
             print(outcifname)
-            _,_,_,_ = apply_transformation_on_model(mmcif_file="./out.cif",rotmat=rotmat, trans=t, outfilename=outcifname)
-            #model_transform_gm(mmcif_file="./out.cif",rotmat=rotmat, trans=t, outfilename=outcifname)
+            #_,_,_,_ = apply_transformation_on_model(mmcif_file="./out.cif",rotmat=rotmat, trans=t, outfilename=outcifname)
+            model_transform_gm(mmcif_file="./out.cif",rotmat=rotmat, trans=t, outfilename=outcifname)
         elif model.endswith((".cif")):
             outcifname = "emda_transformed_model_" + str(i) + ".cif"
-            _,_,_,_ = apply_transformation_on_model(mmcif_file=model,rotmat=rotmat, trans=t, outfilename=outcifname)
-            #model_transform_gm(mmcif_file=model,rotmat=rotmat, trans=t, outfilename=outcifname)
+            #_,_,_,_ = apply_transformation_on_model(mmcif_file=model,rotmat=rotmat, trans=t, outfilename=outcifname)
+            model_transform_gm(mmcif_file=model,rotmat=rotmat, trans=t, outfilename=outcifname)
 
 
 
