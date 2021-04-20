@@ -661,17 +661,9 @@ def model_transform_gm(mmcif_file, rotmat=None, trans=None, outfilename=None):
         outfilename = "gemmi_transformed_model.cif"
     st = gemmi.read_structure(mmcif_file)
     com = gemmi.Vec3(*st[0].calculate_center_of_mass())
-    """ 
-    # This code segment does not work properly.
-    print(com)
-    tmp = np.zeros(3, 'float')
-    tmp[0] = trans[2]
-    tmp[1] = trans[1]
-    tmp[2] = trans[0]
-    com = com - gemmi.Vec3(*tmp)
-    print(com) """
     mat33 = gemmi.Mat33(rotmat) 
-    trans = com - mat33.multiply(com)
+    t = gemmi.Vec3(trans[2], trans[1], trans[0])
+    trans = com - mat33.multiply(com) + t
     tr = gemmi.Transform(mat33, trans)
     st[0].transform(tr)
     st.make_mmcif_document().write_file(outfilename)
