@@ -868,6 +868,7 @@ def output_rotated_maps(emmap1, r_lst, t_lst, Bf_arr=None):
 
 def output_rotated_models(emmap1, maplist, r_lst, t_lst):
     from emda.core.iotools import apply_transformation_on_model, pdb2mmcif, model_transform_gm
+    from emda.ext.mapfit.utils import rm_zyx2xyz
 
     pixsize = emmap1.pixsize
     comlist = emmap1.comlist
@@ -885,10 +886,14 @@ def output_rotated_models(emmap1, maplist, r_lst, t_lst):
             t = t + shift
         t = -t
         print(t)
+        rotmat = rm_zyx2xyz(rotmat)
         i += 1
         if model.endswith((".mrc", ".map")):
             continue
-        elif model.endswith((".pdb", ".ent")):
+        else:
+            outcifname = "emda_transformed_model_" + str(i) + ".cif"
+            model_transform_gm(mmcif_file=model,rotmat=rotmat, trans=t, outfilename=outcifname)
+        """ elif model.endswith((".pdb", ".ent")):
             pdb2mmcif(model)
             outcifname = "emda_transformed_model_" + str(i) + ".cif"
             print(outcifname)
@@ -897,7 +902,7 @@ def output_rotated_models(emmap1, maplist, r_lst, t_lst):
         elif model.endswith((".cif")):
             outcifname = "emda_transformed_model_" + str(i) + ".cif"
             #_,_,_,_ = apply_transformation_on_model(mmcif_file=model,rotmat=rotmat, trans=t, outfilename=outcifname)
-            model_transform_gm(mmcif_file=model,rotmat=rotmat, trans=t, outfilename=outcifname)
+            model_transform_gm(mmcif_file=model,rotmat=rotmat, trans=t, outfilename=outcifname) """
 
 
 
