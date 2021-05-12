@@ -691,3 +691,16 @@ def get_dim(model, shiftmodel="new1.cif"):
     distances = np.sqrt(np.power(xc_np, 2) + np.power(yc_np, 2) + np.power(zc_np, 2))
     dim1 = 2 + (int(np.max(distances)) + 1) * 2
     return dim1
+
+def rm_zyx2xyz(op):
+    assert op.ndim == 2
+    assert op.shape[0] == op.shape[1] == 3
+    tmp = np.zeros(op.shape, 'float')
+    rm = np.zeros(op.shape, 'float')
+    tmp[:,0] = op[:,2]
+    tmp[:,1] = op[:,1]
+    tmp[:,2] = op[:,0]
+    rm[0, :] = tmp[2, :]
+    rm[1, :] = tmp[1, :]
+    rm[2, :] = tmp[0, :] 
+    return rm
