@@ -119,14 +119,10 @@ def resample_data(curnt_pix, targt_pix, targt_dim, arr):
 
     Arguments:
         Inputs:
-            curnt_pix: float
-                Current pixel size.
-            targt_pix: float
-                Target pixel size.
-            targt_dim: list
-                List of three integer values.
-            arr: float
-                3D array of map values.
+            curnt_pix: float list, Current pixel sizes along c, b, a.
+            targt_pix: float list, Target pixel sizes along c, b a.
+            targt_dim: int list, Target sampling along z, y, x.
+            arr: float, 3D array of map values.
 
         Outputs:
             new_arr: float, 3D array
@@ -1044,15 +1040,38 @@ def prepare_refmac_data(
 
 
 def overall_cc(map1name, map2name, space="real", resol=5, maskname=None):
-    """Computes overall correlation coefficient between two maps"""
+    """Calculates overall correlation coefficient (CC) between two density maps
+
+    This method calculates overall CC in real or Fourier space. First two inputs can be
+    both maps or one of them is map and the other is an atomic model (pdb/ent/cif).
+    If one of them is an atomi model, the resolution (Angstroms) should be given.
+    Default resolution is 5 A. 
+
+    Args:
+        map1name (string): Name of map1
+        map2name (string): Name of map1
+        space (str, optional): CC calculation in real/Fourier space. Defaults to "real".
+        resol (int, optional): [description]. Defaults to 5.
+        maskname ([type], optional): [description]. Defaults to None.
+
+    Returns:
+        occ: Overall CC corrected to fullmap
+        hocc: Overall CC between half maps
+    """
 
 
 def mirror_map(mapname):
-    """Gives inverted copy of the map"""
+    """Invert map
+
+    This method invert the map at its center-of-mass
+
+    Args:
+        mapname (string): Name of the map
+    """
 
 
 def model2map(
-    modelxyz, dim, resol, cell, bfac=0.0, maporigin=None, ligfile=None
+    modelxyz, dim, resol, cell, maporigin=None, ligfile=None
 ):
     """Calculates EM map from atomic coordinates using REFMAC5
 
@@ -1061,7 +1080,6 @@ def model2map(
         dim (list): Map dimensions [nx, ny, nz] as a list of integers
         resol (float): Requested resolution for density calculation in Angstroms.
         cell (list): Cell parameters a, b and c as floats
-        bfac (float, optional): Overall B factor to apply on the map. Defaults to 0.0.
         maporigin (list, optional): Location of the first column (nxstart), 
             row (nystart), section (nzstart) of the unit cell. Defaults to [0, 0, 0].
         ligfile (string, optional): Name of the ligand description file. Defaults to None.
@@ -1071,8 +1089,20 @@ def model2map(
     """
 
 
-def model2map_gm(modelxyz, resol, dim, bfac=0.0, cell=None, maporigin=None):
-        """Calculates model from coordinates using GEMMI"""
+def model2map_gm(modelxyz, resol, dim, cell=None, maporigin=None):
+    """Calculates model from coordinates using GEMMI in Servalcat
+    
+    Args:
+        modelxyz (string): Name of the coordinate file (.cif/.pdb)
+        dim (list): Map dimensions [nx, ny, nz] as a list of integers
+        resol (float): Requested resolution for density calculation in Angstroms.
+        cell (list): Cell parameters a, b and c as floats
+        maporigin (list, optional): Location of the first column (nxstart), 
+            row (nystart), section (nzstart) of the unit cell. Defaults to [0, 0, 0].
+
+    Returns:
+        float ndarray: calculated model-based density array
+    """
 
 
 def read_atomsf(atom, fpath=None):
@@ -1301,4 +1331,22 @@ def symmetry_average_using_ops(imap, ops, outmapname=None):
 
         Outputs:
             Results in a list: [symmetry-averaged-density, unit-cell, map-origin]
+    """
+
+def rebox_mapmodel(maplist, masklist, modellist=None):
+    """Reboxes a map by a mask.
+
+    This function reboxes a map by a mask into a smaller cube. Size of the box 
+    is determine by the size of te mask + 10 voxels in each dimetion. 
+    It can accept list arguments if there's more than one map and mask. 
+    Also, a model can be given and then that will also be reboxed.
+
+    Args:
+        maplist (string): List of map names to be reboxed
+        masklist (string): List of mask names to be used in reboxing
+        modellist (string, optional): List of model names (pdb/cif) to be reboxed. 
+                        Defaults to None.
+        
+    Output:
+        It outputs reboxed maps, models (if supplied).
     """
