@@ -88,6 +88,10 @@ def write_mrc(mapdata, filename, unit_cell, map_origin=None):
                 Unit cell params
             map_origin: list, optional
                 map origin. Default is [0.0, 0.0, 0.0]
+            axesorder: string, optional
+                Axes order can be specified for the data to be written.
+                By defualt EMDA write data in ZXY convension.
+                With this argument, the axes order can be changed.
 
         Outputs:
             Output MRC file
@@ -1048,9 +1052,23 @@ def mirror_map(mapname):
 
 
 def model2map(
-    modelxyz, dim, resol, cell, bfac=0.0, lig=True, maporigin=None, ligfile=None
+    modelxyz, dim, resol, cell, bfac=0.0, maporigin=None, ligfile=None
 ):
-    """Calculates model from coordinates using REFMAC"""
+    """Calculates EM map from atomic coordinates using REFMAC5
+
+    Args:
+        modelxyz (string): Name of the coordinate file (.cif/.pdb)
+        dim (list): Map dimensions [nx, ny, nz] as a list of integers
+        resol (float): Requested resolution for density calculation in Angstroms.
+        cell (list): Cell parameters a, b and c as floats
+        bfac (float, optional): Overall B factor to apply on the map. Defaults to 0.0.
+        maporigin (list, optional): Location of the first column (nxstart), 
+            row (nystart), section (nzstart) of the unit cell. Defaults to [0, 0, 0].
+        ligfile (string, optional): Name of the ligand description file. Defaults to None.
+
+    Returns:
+        float ndarray: calculated model-based density array
+    """
 
 
 def model2map_gm(modelxyz, resol, dim, bfac=0.0, cell=None, maporigin=None):
