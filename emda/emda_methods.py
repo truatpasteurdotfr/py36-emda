@@ -173,14 +173,10 @@ def resample_data(curnt_pix, targt_pix, targt_dim, arr):
 
     Arguments:
         Inputs:
-            curnt_pix: float
-                Current pixel size.
-            targt_pix: float
-                Target pixel size.
-            targt_dim: list
-                List of three integer values.
-            arr: float
-                3D array of map values.
+            curnt_pix: float list, Current pixel sizes along c, b, a.
+            targt_pix: float list, Target pixel sizes along c, b a.
+            targt_dim: int list, Target sampling along z, y, x.
+            arr: float, 3D array of map values.
 
         Outputs:
             new_arr: float, 3D array
@@ -1759,6 +1755,24 @@ def prepare_refmac_data(
 
 
 def overall_cc(map1name, map2name, space="real", resol=5, maskname=None):
+    """Calculates overall correlation coefficient (CC) between two density maps
+
+    This method calculates overall CC in real or Fourier space. First two inputs can be
+    both maps or one of them is map and the other is an atomic model (pdb/ent/cif).
+    If one of them is an atomi model, the resolution (Angstroms) should be given.
+    Default resolution is 5 A. 
+
+    Args:
+        map1name (string): Name of map1
+        map2name (string): Name of map1
+        space (str, optional): CC calculation in real/Fourier space. Defaults to "real".
+        resol (int, optional): [description]. Defaults to 5.
+        maskname ([type], optional): [description]. Defaults to None.
+
+    Returns:
+        occ: Overall CC corrected to fullmap
+        hocc: Overall CC between half maps
+    """
     from emda.ext import cc
 
     data_found = False
@@ -1773,11 +1787,11 @@ def overall_cc(map1name, map2name, space="real", resol=5, maskname=None):
             _, arr1, _ = get_data(
                 struct=map1name, resol=resol, uc=uc, dim=arr2.shape, maporigin=origin
             )
-    else:
-        uc, arr1, origin = get_data(struct=map1name, resol=resol)
-        _, arr1, _ = get_data(
-            struct=map2name, resol=resol, uc=uc, dim=arr1.shape, maporigin=origin
-        )
+    #else:
+    #    uc, arr1, origin = get_data(struct=map1name, resol=resol)
+    #    _, arr1, _ = get_data(
+    #        struct=map2name, resol=resol, uc=uc, dim=arr1.shape, maporigin=origin
+    #    )
     if maskname is not None:
         uc, msk, origin = read_map(maskname)
         msk = msk * (msk > 0.0)
