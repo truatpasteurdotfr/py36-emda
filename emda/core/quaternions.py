@@ -3,6 +3,7 @@ import math
 
 
 def get_quaternion(theta):
+    # angle should be in degrees
     rv = theta[0]
     rv = np.asarray(rv, dtype='float')
     rv = rv / np.sqrt(np.dot(rv, rv))
