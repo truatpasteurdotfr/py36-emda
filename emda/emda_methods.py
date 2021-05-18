@@ -123,7 +123,7 @@ def get_data(struct, resol=5.0, uc=None, dim=None, maporigin=None):
     return uc, arr, orig
 
 
-def write_mrc(mapdata, filename, unit_cell, map_origin=None):
+def write_mrc(mapdata, filename, unit_cell, map_origin=None, axesorder='ZYX'):
     """Writes 3D Numpy array into MRC file.
 
     Arguments:
@@ -136,12 +136,17 @@ def write_mrc(mapdata, filename, unit_cell, map_origin=None):
                 Unit cell params
             map_origin: list, optional
                 map origin. Default is [0.0, 0.0, 0.0]
+            axesorder: string, optional
+                Axes order can be specified for the data to be written.
+                By defualt EMDA write data in ZXY convension.
+                With this argument, the axes order can be changed.
 
         Outputs:
             Output MRC file
     """
     iotools.write_mrc(
-        mapdata=mapdata, filename=filename, unit_cell=unit_cell, map_origin=map_origin
+        mapdata=mapdata, filename=filename, unit_cell=unit_cell, map_origin=map_origin, 
+        axesorder=axesorder
     )
 
 
@@ -1796,6 +1801,13 @@ def overall_cc(map1name, map2name, space="real", resol=5, maskname=None):
 
 
 def mirror_map(mapname):
+    """Invert map
+
+    This method invert the map at its center-of-mass
+
+    Args:
+        mapname (string): Name of the map
+    """
     # gives the inverted copy of the map
     uc, arr, origin = iotools.read_map(mapname)
     com = center_of_mass_density(arr)
@@ -1806,22 +1818,44 @@ def mirror_map(mapname):
 
 
 def model2map(
-    modelxyz, dim, resol, cell, bfac=0.0, lig=True, maporigin=None, ligfile=None
+    modelxyz, dim, resol, cell, maporigin=None, ligfile=None
 ):
+    """Calculates EM map from atomic coordinates using REFMAC5
+
+    Args:
+        modelxyz (string): Name of the coordinate file (.cif/.pdb)
+        dim (list): Map dimensions [nx, ny, nz] as a list of integers
+        resol (float): Requested resolution for density calculation in Angstroms.
+        cell (list): Cell parameters a, b and c as floats
+        maporigin (list, optional): Location of the first column (nxstart), 
+            row (nystart), section (nzstart) of the unit cell. Defaults to [0, 0, 0].
+        ligfile (string, optional): Name of the ligand description file. Defaults to None.
+
+    Returns:
+        float ndarray: calculated model-based density array
+    """
     import gemmi as gm
 
+    # print parameters
+    print('Requested resolution (A): ', resol)
+    print('Requested sampling: ', dim)
+    print('Cell [a, b, c]: ', cell)
     # check for valid sampling:
-    if np.any(np.mod(dim, 2)) != 0:
-        dim = dim + 1
+    for i in range(3):
+        if dim[i] % 2 != 0:
+            dim[i] += 1
     # check for minimum sampling
     min_pix_size = resol / 2  # in Angstrom
     min_dim = np.asarray(cell[:3], dtype="float") / min_pix_size
     min_dim = np.ceil(min_dim).astype(int)
-    if np.any(np.mod(min_dim, 2)) != 0:
-        min_dim = min_dim + 1
-    if min_dim[0] > dim[0]:
-        print("Minimum dim should be: ", min_dim)
-        exit()
+    for i in range(3):
+        if min_dim[i] % 2 != 0:
+            min_dim += 1
+        if min_dim[0] > dim[0]:
+            print("Requested dims: ", dim)
+            print("Minimum dims needed (for requested resolution): ", min_dim)
+            print("!!! Please lower the requested resolution or increase the grid dimensions !!!")
+            raise SystemExit()
     # replace/add cell and write model.cif
     a, b, c = cell[:3]
     structure = gm.read_structure(modelxyz)
@@ -1829,8 +1863,7 @@ def model2map(
     structure.spacegroup_hm = "P 1"
     structure.make_mmcif_document().write_file("model.cif")
     # run refmac using model.cif just created
-    iotools.run_refmac_sfcalc("./model.cif", resol,
-                              bfac, lig=lig, ligfile=ligfile)
+    iotools.run_refmac_sfcalc("./model.cif", resol, ligfile=ligfile)
     modelmap = maptools.mtz2map("./sfcalc_from_crd.mtz", dim)
     if maporigin is None:
         maporigin = [0, 0, 0]
@@ -1847,23 +1880,40 @@ def model2map(
     return modelmap
 
 
-def model2map_gm(modelxyz, resol, dim, bfac=0.0, cell=None, maporigin=None):
+def model2map_gm(modelxyz, resol, dim, cell=None, maporigin=None):
     import gemmi
+    from servalcat.utils.model import calc_fc_fft
 
     st = gemmi.read_structure(modelxyz)
+    st.spacegroup_hm = "P 1"
+    st.cell.set(cell[0], cell[1], cell[2], 90., 90., 90.)
+    asu_data = calc_fc_fft(st=st, 
+                           d_min=resol, 
+                           source='electron', 
+                           mott_bethe=True)
+
+    """ st = gemmi.read_structure(modelxyz)
     st.spacegroup_hm = "P 1"
     st.cell.set(cell[0], cell[1], cell[2], 90., 90., 90.)
     dc = gemmi.DensityCalculatorX()
     dc.d_min = resol
     dc.rate = sample_rate = 1.5  # default
-    dc.r_cut = 1.e-5  # default
-    dc.blur = bfac
+    dc.cutoff = 1.e-5  # default
+    if bfac is None:
+        # code inherited from servalcat. Thanks Keitaro.
+        grid = resol/2/sample_rate
+        b_min = min((cra.atom.b_iso for cra in st[0].all()))
+        b_need = grid**2*8*numpy.pi**2/1.1 # Refmac's way
+        b_add = b_need - b_min
+        blur = max(0, bfac) # negative blur may cause non-positive definite in case of anisotropic Bs
+        #
+    dc.blur = blur
     dc.addends.subtract_z()
     dc.set_grid_cell_and_spacegroup(st)
     dc.put_model_density_on_grid(st[0])
     grid = gemmi.transform_map_to_f_phi(dc.grid)
     asu_data = grid.prepare_asu_data(
-        dmin=resol, mott_bethe=True, unblur=dc.blur)
+        dmin=resol, mott_bethe=True, unblur=dc.blur) """
     griddata = asu_data.get_f_phi_on_grid(
         asu_data.get_size_for_hkl(min_size=dim))
     griddata_np = (np.array(griddata, copy=False)).transpose()
@@ -1880,8 +1930,6 @@ def model2map_gm(modelxyz, resol, dim, bfac=0.0, cell=None, maporigin=None):
             -shift_x,
             axis=2,
         )
-    """ if cell is not None:
-        em.write_mrc(modelmap, 'modelmap_gm.mrc', cell, maporigin) """
     return modelmap
 
 
