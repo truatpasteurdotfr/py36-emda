@@ -215,12 +215,16 @@ resample_d = subparsers.add_parser(
 )
 resample_d.add_argument("--map", required=True, help="input map (mrc/map)")
 resample_d.add_argument(
-    "--pix", required=True, type=float, help="target pixel size (A)"
+    "--pix", 
+    required=True, 
+    nargs="+",
+    type=float, 
+    help="target pixel size (A)"
 )
 resample_d.add_argument(
     "--dim",
-    required=False,
-    default=None,
+    required=True,
+    #default=None,
     nargs="+",
     type=np.int,
     help="target map dimensions. e.g. 100 100 100 ",
@@ -857,6 +861,74 @@ def mtz2map(args):
     iotools.write_mrc(dat, outfile, uc, origin)
 
 
+#def resample_data(args):
+#    import numpy as np
+#    from emda.emda_methods import read_map, resample_data, write_mrc
+#    import emda.ext.mapfit.utils as utils
+#
+#    ucx, arr, org = read_map(args.map)
+#    uc = np.zeros(3, 'float')
+#    uc[0] = ucx[2]
+#    uc[1] = ucx[1]
+#    uc[2] = ucx[0]
+#    arr = utils.set_dim_even(arr)
+#    arr = np.transpose(arr)
+#    curnt_pix = float(round(uc[0] / arr.shape[0], 5))
+#    if args.cel:
+#        target_uc = args.cel
+#    if args.pix is None:
+#        targt_pix = curnt_pix
+#    else:
+#        targt_pix = float(round(args.pix, 5))
+#    # print('pixel size [current, target]: ', curnt_pix,targt_pix)
+#    if args.dim is None:
+#        if args.cel:
+#            dim1 = int(round(target_uc[0] / targt_pix))
+#            dim2 = int(round(target_uc[1] / targt_pix))
+#            dim3 = int(round(target_uc[2] / targt_pix))
+#            new_arr = resample_data(
+#                curnt_pix=curnt_pix,
+#                targt_pix=targt_pix,
+#                targt_dim=[dim1, dim2, dim3],
+#                arr=arr,
+#            )
+#        else:
+#            dim1 = int(round(uc[0] / targt_pix))
+#            dim2 = int(round(uc[1] / targt_pix))
+#            dim3 = int(round(uc[2] / targt_pix))
+#            new_arr = resample_data(
+#                curnt_pix=curnt_pix,
+#                targt_pix=targt_pix,
+#                targt_dim=[dim1, dim2, dim3],
+#                arr=arr,
+#            )
+#            new_arr = np.transpose(new_arr)
+#            target_uc = round(targt_pix, 3) * np.asarray([dim1, dim2, dim3], dtype="int")
+#            #target_uc = uc
+#    if args.dim is not None:
+#        if args.cel:
+#            if abs(targt_pix - round(target_uc[0] / args.dim[0], 3)) < 10e-3:
+#                new_arr = resample_data(
+#                    curnt_pix=curnt_pix,
+#                    targt_pix=targt_pix,
+#                    targt_dim=args.dim,
+#                    arr=arr,
+#                )
+#            else:
+#                print(
+#                    "target pixel size does not match \
+#                    with given cell and dims."
+#                )
+#                exit()
+#        else:
+#            target_uc = round(targt_pix, 3) * np.asarray(args.dim, dtype="int")
+#            print("New cell: ", target_uc)
+#            new_arr = resample_data(
+#                curnt_pix=curnt_pix, targt_pix=targt_pix, targt_dim=args.dim, arr=arr
+#            )
+#    write_mrc(new_arr, args.out, target_uc, org)
+
+
 def resample_data(args):
     import numpy as np
     from emda.emda_methods import read_map, resample_data, write_mrc
@@ -864,58 +936,26 @@ def resample_data(args):
 
     uc, arr, org = read_map(args.map)
     arr = utils.set_dim_even(arr)
-    curnt_pix = float(round(uc[0] / arr.shape[0], 3))
-    if args.cel:
-        target_uc = args.cel
+    cpix1 = float(round(uc[0] / arr.shape[0], 5))
+    cpix2 = float(round(uc[1] / arr.shape[1], 5))
+    cpix3 = float(round(uc[2] / arr.shape[2], 5))
+    curnt_pix = [cpix1, cpix2, cpix3]
     if args.pix is None:
         targt_pix = curnt_pix
     else:
-        targt_pix = float(round(args.pix, 3))
-    # print('pixel size [current, target]: ', curnt_pix,targt_pix)
-    if args.dim is None:
-        if args.cel:
-            dim = int(round(target_uc[0] / targt_pix))
-            new_arr = resample_data(
-                curnt_pix=curnt_pix,
-                targt_pix=targt_pix,
-                targt_dim=[dim, dim, dim],
-                arr=arr,
-            )
-        else:
-            dim = int(round(uc[0] / targt_pix))
-            new_arr = resample_data(
-                curnt_pix=curnt_pix,
-                targt_pix=targt_pix,
-                targt_dim=[dim, dim, dim],
-                arr=arr,
-            )
-            target_uc = uc
-    if args.dim is not None:
-        if args.cel:
-            if abs(targt_pix - round(target_uc[0] / args.dim[0], 3)) < 10e-3:
-                new_arr = resample_data(
-                    curnt_pix=curnt_pix,
-                    targt_pix=targt_pix,
-                    targt_dim=args.dim,
-                    arr=arr,
-                )
-            else:
-                print(
-                    "target pixel size does not match \
-                    with given cell and dims."
-                )
-                exit()
-        else:
-            target_uc = round(targt_pix, 3) * np.asarray(args.dim, dtype="int")
-            print("New cell: ", target_uc)
-            new_arr = resample_data(
-                curnt_pix=curnt_pix, targt_pix=targt_pix, targt_dim=args.dim, arr=arr
-            )
+        targt_pix = args.pix
+    new_arr = resample_data(
+        curnt_pix=curnt_pix,
+        targt_pix=targt_pix,
+        targt_dim=args.dim,
+        arr=arr,
+    )
+    target_uc = np.array(targt_pix, 'float') * np.asarray(new_arr.shape, dtype="int")
     write_mrc(new_arr, args.out, target_uc, org)
 
 
 def resample2maps(args):
-    # Resampling one map2 on map1
+    # Resampling map2 on map1
     from emda.emda_methods import read_map, resample_data, write_mrc
     import emda.ext.mapfit.utils as utils
 
@@ -923,8 +963,10 @@ def resample2maps(args):
     uc2, arr2, org2 = read_map(args.map2)
     arr1 = utils.set_dim_even(arr1)
     arr2 = utils.set_dim_even(arr2)
-    curnt_pix = round(uc2[0] / arr2.shape[0], 3)
-    targt_pix = round(uc1[0] / arr1.shape[0], 3)
+    curnt_pix, targt_pix = [], []
+    for i in range(3):
+        curnt_pix.append(float(round(uc2[0] / arr2.shape[0], 5))) 
+        targt_pix.append(float(round(uc1[0] / arr1.shape[0], 5))) 
     new_arr = resample_data(
         curnt_pix=curnt_pix, targt_pix=targt_pix, targt_dim=arr1.shape, arr=arr2
     )
