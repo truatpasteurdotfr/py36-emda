@@ -24,7 +24,7 @@ setup(name='emda',
     packages=setuptools.find_packages(),
     #packages= ['emda','emda.core','emda.ext','emda.ext.mapfit'],
     ext_modules =[ex1],
-    install_requires=['pandas>=0.23.4','mrcfile','matplotlib','numpy','scipy','gemmi'],
+    install_requires=['pandas>=0.23.4','mrcfile','matplotlib','numpy','scipy','gemmi','servalcat'],
     test_suite='emda.tests',
     entry_points={
       'console_scripts': [
