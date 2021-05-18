@@ -215,12 +215,16 @@ resample_d = subparsers.add_parser(
 )
 resample_d.add_argument("--map", required=True, help="input map (mrc/map)")
 resample_d.add_argument(
-    "--pix", required=True, type=float, help="target pixel size (A)"
+    "--pix", 
+    required=True, 
+    nargs="+",
+    type=float, 
+    help="target pixel size (A)"
 )
 resample_d.add_argument(
     "--dim",
-    required=False,
-    default=None,
+    required=True,
+    #default=None,
     nargs="+",
     type=np.int,
     help="target map dimensions. e.g. 100 100 100 ",
@@ -614,9 +618,10 @@ model2map.add_argument("--dim", required=True, nargs="+",
 model2map.add_argument(
     "--cel", required=True, nargs="+", type=np.float, help="cell parameters "
 )
-model2map.add_argument(
-    "--bfc", required=False, default=0.0, type=float, help="overall b-factor"
-)
+#model2map.add_argument(
+#    "--bfc", required=False, default=0.0, type=float, 
+#    help="replace all atomic Bs with this. Only +ve values have an effect"
+#)
 # model2map.add_argument(
 #    "--lig", action="store_true", help="use if there is ligand, but no description"
 # )
@@ -625,6 +630,10 @@ model2map.add_argument(
 )
 model2map.add_argument(
     "--org", required=False, default=None, nargs="+", type=int, help="map origin"
+)
+model2map.add_argument(
+    "--gemmi", action="store_true", 
+    help="if used, GEMMI is used instead REFMAC for structure factor calculation"
 )
 
 composite = subparsers.add_parser(
@@ -710,3 +719,11 @@ symmap.add_argument("--fsc_cutoff", required=False, default=0.7,
 symmap.add_argument("--ang_tol", required=False, default=5.0,
                     type=float, help="angle tolerence between two axes for determining point group. default= 5 deg.")
 
+rebox = subparsers.add_parser(
+    "rebox", description="rebox map and model using a mask")
+rebox.add_argument("--map", required=True, nargs="+",
+                    type=str, help="list of map names for reboxing")
+rebox.add_argument("--msk", required=True, nargs="+",
+                    type=str, help="list of mask names for reboxing")
+rebox.add_argument("--mdl", required=False, nargs="+",
+                    type=str, default=None, help="list of model names (pdb/cif) for reboxing")
