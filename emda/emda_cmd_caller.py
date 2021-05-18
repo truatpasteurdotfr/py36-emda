@@ -618,9 +618,10 @@ model2map.add_argument("--dim", required=True, nargs="+",
 model2map.add_argument(
     "--cel", required=True, nargs="+", type=np.float, help="cell parameters "
 )
-model2map.add_argument(
-    "--bfc", required=False, default=0.0, type=float, help="overall b-factor"
-)
+#model2map.add_argument(
+#    "--bfc", required=False, default=0.0, type=float, 
+#    help="replace all atomic Bs with this. Only +ve values have an effect"
+#)
 # model2map.add_argument(
 #    "--lig", action="store_true", help="use if there is ligand, but no description"
 # )
@@ -631,7 +632,8 @@ model2map.add_argument(
     "--org", required=False, default=None, nargs="+", type=int, help="map origin"
 )
 model2map.add_argument(
-    "--gemmi", action="store_true", help="if used, GEMMI is used instead REFMAC for structure factor calculation"
+    "--gemmi", action="store_true", 
+    help="if used, GEMMI is used instead REFMAC for structure factor calculation"
 )
 
 composite = subparsers.add_parser(
@@ -1196,8 +1198,12 @@ def modeltomap(args):
 
     if args.gemmi:
         # GEMMI for sfcalc
-        modelmap = model2map_gm(modelxyz=args.mdl, resol=args.res,
-                            dim=args.dim, bfac=args.bfc, cell=args.cel, maporigin=args.org)
+        modelmap = model2map_gm(
+            modelxyz=args.mdl, 
+            resol=args.res,
+            dim=args.dim, 
+            cell=args.cel, 
+            maporigin=args.org)
         write_mrc(modelmap, "modelmap_gm.mrc", args.cel, args.org)
     else:
         # REFMAC sfcalc
@@ -1205,7 +1211,6 @@ def modeltomap(args):
             modelxyz=args.mdl,
             dim=args.dim,
             resol=args.res,
-            bfac=args.bfc,
             cell=args.cel,
             maporigin=args.org,
             # lig=args.lig,
