@@ -23,7 +23,7 @@ def test():
     print("iotools test ... Passed")
 
 
-def read_map(mapname):
+def read_map(mapname, fid=None):
     """Reads CCP4 type map (.map) or MRC type map.
 
     Arguments:
@@ -38,30 +38,189 @@ def read_map(mapname):
             origin: list
                 Map origin list
      """
+    import mrcfile
+    import numpy as np
 
     try:
-        file = mrc.open(mapname)
-        cell = np.array(file.header.cella)
+        file = mrcfile.open(mapname)
+        if file.header.mapc == 1:
+            if file.header.mapr == 2 and file.header.maps == 3:
+                axes_order = 'ZYX'
+                arr = np.asarray(file.data, dtype="float")
+            elif file.header.mapr == 3 and file.header.maps == 2:
+                axes_order = 'ZXY'
+                arr = np.asarray(file.data, dtype="float")
+                arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-3,-1,-2])                
+        elif file.header.mapc == 2:
+            if file.header.mapr == 1 and file.header.maps == 3:
+                axes_order = 'YZX'
+                arr = np.asarray(file.data, dtype="float")
+                arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-2,-3,-1])                
+            elif file.header.mapr == 3 and file.header.maps == 1:
+                axes_order = 'YXZ'
+                arr = np.asarray(file.data, dtype="float")
+                arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-2,-1,-3])
+        elif file.header.mapc == 3:
+            if file.header.mapr == 1 and file.header.maps == 2:
+                axes_order = 'XZY'
+                arr = np.asarray(file.data, dtype="float")
+                arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-1,-3,-2])
+            elif file.header.mapr == 2 and file.header.maps == 1:
+                axes_order = 'XYZ'
+                arr = np.asarray(file.data, dtype="float")
+                arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-1,-2,-3])
+        else:
+            raise SystemExit("Wrong axes order. Stopping now...")
+        if fid is not None:
+            fid.write('Axes order: %s\n' % (axes_order))
         unit_cell = np.zeros(6, dtype='float')
         cell = file.header.cella[['x', 'y', 'z']]
         unit_cell[:3] = cell.view(('f4', 3))
-        # Swap cell parameters a, b, c to c, b, a
-        tmp = unit_cell[:3]
-        unit_cell[0], unit_cell[2] = tmp[2], tmp[0]
-        #
+        # swapping a and c to compatible with ZYX convension
+        unit_cell[0], unit_cell[2] = unit_cell[2], unit_cell[0]
         unit_cell[3:] = float(90)
         origin = [
-            1 * file.header.nxstart,
-            1 * file.header.nystart,
-            1 * file.header.nzstart,
-        ]
-        arr = np.asarray(file.data, dtype="float")
+                1 * file.header.nxstart,
+                1 * file.header.nystart,
+                1 * file.header.nzstart,
+            ]
         file.close()
         print(mapname, arr.shape, unit_cell[:3])
         return unit_cell, arr, origin
-    except FileNotFoundError:
-        print("File Not Found!")
-        exit()
+    except FileNotFoundError as e:
+        print(e)
+
+
+#def read_map(mapname):
+#    """Reads CCP4 type map (.map) or MRC type map.
+#
+#    Arguments:
+#        Inputs:
+#            mapname: string
+#                CCP4/MRC map file name
+#        Outputs:
+#            unit_cell: float, 1D array
+#                Unit cell
+#            arr: float, 3D array
+#                Map values as Numpy array
+#            origin: list
+#                Map origin list
+#     """
+#
+#    try:
+#        file = mrc.open(mapname)
+#        cell = np.array(file.header.cella)
+#        unit_cell = np.zeros(6, dtype='float')
+#        cell = file.header.cella[['x', 'y', 'z']]
+#        unit_cell[:3] = cell.view(('f4', 3))
+#        # Swap cell parameters a, b, c to c, b, a
+#        tmp = unit_cell[:3]
+#        unit_cell[0], unit_cell[2] = tmp[2], tmp[0]
+#        #
+#        unit_cell[3:] = float(90)
+#        origin = [
+#            1 * file.header.nxstart,
+#            1 * file.header.nystart,
+#            1 * file.header.nzstart,
+#        ]
+#        arr = np.asarray(file.data, dtype="float")
+#        file.close()
+#        print(mapname, arr.shape, unit_cell[:3])
+#        return unit_cell, arr, origin
+#    except FileNotFoundError:
+#        print("File Not Found!")
+#        exit()
+
+
+def change_axesorder(arr, uc, axes_order, maporig):
+    import numpy as np
+
+    # Change Mmap axes order
+    # input arr has ZYX order (EMDA convension)
+    if axes_order == 'ZXY':
+        arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-3,-1,-2])
+        # cba --> cab
+        uc[0], uc[1], uc[2] = uc[0], uc[2], uc[1]
+        maporig[0], maporig[1], maporig[2] = maporig[0], maporig[2], maporig[2]
+    if axes_order == 'YZX':
+        arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-2,-3,-1]) 
+        # cba --> bca
+        uc[0], uc[1], uc[2] = uc[1], uc[0], uc[2]
+        maporig[0], maporig[1], maporig[2] = maporig[1], maporig[0], maporig[2]              
+    if axes_order == 'YXZ':
+        arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-2,-1,-3])
+        # cba --> bac
+        uc[0], uc[1], uc[2] = uc[1], uc[2], uc[0]
+        maporig[0], maporig[1], maporig[2] = maporig[1], maporig[2], maporig[0]
+    if axes_order == 'XZY':
+        arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-1,-3,-2])
+        # cba --> acb
+        uc[0], uc[1], uc[2] = uc[2], uc[0], uc[1]
+        maporig[0], maporig[1], maporig[2] = maporig[2], maporig[0], maporig[1]
+    if axes_order == 'XYZ':
+        arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-1,-2,-3])
+        # cba --> abc
+        uc[0], uc[1], uc[2] = uc[2], uc[1], uc[0]
+        maporig[0], maporig[1], maporig[2] = maporig[2], maporig[1], maporig[0]
+    else:
+        raise SystemExit("Wrong axes order. Stopping now...")
+    return arr, uc, maporig
+
+
+def write_mrc(mapdata, filename, unit_cell, map_origin=None, label=False, axesorder='ZYX'):
+    """ Writes 3D Numpy array into MRC file.
+
+    Arguments:
+        Inputs:
+            mapdata: float, 3D array
+                Map values to write
+            filename: string
+                Output file name
+            unit_cell: float, 1D array
+                Unit cell params
+            map_origin: list, optional
+                map origin. Default is [0.0, 0.0, 0.0]
+            label: bool, optional
+                If True a text label is written out in the map header.
+                Default is False
+            axesorder: string, optional
+                Axes order can be specified for the data to be written.
+                By defualt EMDA write data in ZXY convension.
+                With this argument, the axes order can be changed.
+
+        Outputs:
+            Outputs the MRC file
+    """
+    import numpy as np
+    import mrcfile as mrc
+
+    if map_origin is None:
+        map_origin = [0.0, 0.0, 0.0]
+    if axesorder != 'ZYX':
+        mapdata, unit_cell, map_origin = change_axesorder(
+            arr=mapdata, uc=unit_cell, axes_order=axesorder, maporig=map_origin)
+    file = mrc.new(
+        name=filename, data=np.float32(mapdata), compression=None, overwrite=True
+    )
+    file.header.cella.x = unit_cell[0]
+    file.header.cella.y = unit_cell[1]
+    file.header.cella.z = unit_cell[2]
+    file.header.nxstart = map_origin[0]
+    file.header.nystart = map_origin[1]
+    file.header.nzstart = map_origin[2]
+    if label:
+        # correlation maps are written with effective correlation
+        # range in the header for visualisation
+        maxcc = np.max(mapdata)
+        label1 = "{}{:5.3f}{}{:5.3f}{}".format(
+            "EMDA_Color:linear: (#901010, 0.000) (#109010, ",
+            maxcc / 2.0,
+            ") (#101090, ",
+            maxcc,
+            ")",
+        )
+        file.header.label = label1
+    file.close()
 
 
 def read_mtz(mtzfile):
@@ -89,55 +248,6 @@ def read_mtz(mtzfile):
         return unit_cell, data_frame
     except FileNotFoundError as e:
         print(e)
-
-
-def write_mrc(mapdata, filename, unit_cell, map_origin=None, factor=1.0, label=False):
-    """ Writes 3D Numpy array into MRC file.
-
-    Arguments:
-        Inputs:
-            mapdata: float, 3D array
-                Map values to write
-            filename: string
-                Output file name
-            unit_cell: float, 1D array
-                Unit cell params
-            map_origin: list, optional
-                map origin. Default is [0.0, 0.0, 0.0]
-            factor: float, optional
-                A factor to apply on unit cell params. Default is 1.0
-            label: bool, optional
-                If True a text label is written out in the map header.
-                Default is False
-
-        Outputs:
-            Outputs the MRC file
-    """
-    if map_origin is None:
-        map_origin = [0.0, 0.0, 0.0]
-    file = mrc.new(
-        name=filename, data=np.float32(mapdata), compression=None, overwrite=True
-    )
-    file.header.cella.x = unit_cell[0] * factor
-    file.header.cella.y = unit_cell[1] * factor
-    file.header.cella.z = unit_cell[2] * factor
-    file.header.nxstart = map_origin[0]
-    file.header.nystart = map_origin[1]
-    file.header.nzstart = map_origin[2]
-    if label:
-        # correlation maps are written with effective correlation
-        # range in the header for visualisation
-        maxcc = np.max(mapdata)
-        label1 = "{}{:5.3f}{}{:5.3f}{}".format(
-            "EMDA_Color:linear: (#901010, 0.000) (#109010, ",
-            maxcc / 2.0,
-            ") (#101090, ",
-            maxcc,
-            ")",
-        )
-        file.header.label = label1
-    # file.update_header_from_data()
-    file.close()
 
 
 def write_3d2mtz(unit_cell, mapdata, outfile="map2mtz.mtz", resol=None):
@@ -320,14 +430,82 @@ def write_mtz2_3d_gemmi(mtzfile, map_size):
     return
 
 
+#def resample2staticmap(curnt_pix, targt_pix, targt_dim, arr, sf=False, fobj=None):
+#    """Resamples a 3D array.
+#
+#    Arguments:
+#        Inputs:
+#            curnt_pix: float, Current pixel size.
+#            targt_pix: float, Target pixel size.
+#            targt_dim: list, List of three integer values.
+#            arr: float, 3D array of map values.
+#            sf: bool, optional
+#                If True, returns a complex array. Otherwise, float array
+#            fobj: optional. Logger file object
+#
+#        Outputs:
+#            new_arr: float, 3D array
+#                Resampled 3D array. If sf was used, return is a complex array
+#    """
+#    # Resamling arr into an array having target_dim
+#    tnx, tny, tnz = targt_dim
+#    curnt_dim = arr.shape
+#    nx, ny, nz = arr.shape
+#    tnx, tny, tnz = targt_dim
+#    print("pixel size [current, target]: ", curnt_pix, targt_pix)
+#    if fobj is not None:
+#        fobj.write(
+#            "pixel size [current, target]: "
+#            + str(curnt_pix)
+#            + " "
+#            + str(targt_pix)
+#            + " \n"
+#        )
+#    if abs(curnt_pix - targt_pix) < 10e-3:
+#        if targt_dim[0] == curnt_dim[0]:
+#            print("No change of dims")
+#            if fobj is not None:
+#                fobj.write("No change of dims \n")
+#            new_arr = arr
+#        elif curnt_dim[0] < targt_dim[0]:
+#            print("Padded with zeros")
+#            if fobj is not None:
+#                fobj.write("Padded with zeros \n")
+#            dx = abs(tnx - nx) // 2
+#            new_arr = np.zeros((tnx, tny, tnz), arr.dtype)
+#            new_arr[dx: nx + dx, dx: nx + dx, dx: nx + dx] = arr
+#        elif targt_dim[0] < curnt_dim[0]:
+#            print("Cropped image")
+#            if fobj is not None:
+#                fobj.write("Cropped image \n")
+#            dx = abs(nx - tnx) // 2
+#            new_arr = np.zeros((targt_dim), arr.dtype)
+#            new_arr = arr[dx: dx + tnx, dx: dx + tnx, dx: dx + tnx]
+#    elif abs(curnt_pix - targt_pix) > 10e-3:
+#        newsize = []
+#        for i in range(3):
+#            ns = int(round(arr.shape[i] * (curnt_pix / targt_pix)))
+#            if ns % 2 != 0: ns -= 1
+#            newsize.append(ns)
+#        print("Resizing in Fourier space and transforming back")
+#        if fobj is not None:
+#            fobj.write("Resizing in Fourier space and transforming back \n")
+#        new_arr = resample(arr, newsize, sf)
+#        if newsize[0] < targt_dim[0]:
+#            new_arr = padimage(new_arr, targt_dim)
+#        elif newsize[0] > targt_dim[0]:
+#            new_arr = cropimage(new_arr, targt_dim)
+#    return new_arr
+
+
 def resample2staticmap(curnt_pix, targt_pix, targt_dim, arr, sf=False, fobj=None):
     """Resamples a 3D array.
 
     Arguments:
         Inputs:
-            curnt_pix: float, Current pixel size.
-            targt_pix: float, Target pixel size.
-            targt_dim: list, List of three integer values.
+            curnt_pix: float list, Current pixel sizes along c, b, a.
+            targt_pix: float list, Target pixel sizes along c, b a.
+            targt_dim: int list, Target sampling along z, y, x.
             arr: float, 3D array of map values.
             sf: bool, optional
                 If True, returns a complex array. Otherwise, float array
@@ -338,13 +516,16 @@ def resample2staticmap(curnt_pix, targt_pix, targt_dim, arr, sf=False, fobj=None
                 Resampled 3D array. If sf was used, return is a complex array
     """
     # Resamling arr into an array having target_dim
-    tnx, tny, tnz = targt_dim
-    curnt_dim = arr.shape
-    nx, ny, nz = arr.shape
-    tnx, tny, tnz = targt_dim
-    assert tnx == tny == tnz
-    assert nx == ny == nz
-    print("pixel size [current, target]: ", curnt_pix, targt_pix)
+    tnz, tny, tnx = targt_dim
+    nz, ny, nx = arr.shape
+    if len(curnt_pix) < 3:
+        curnt_pix.append(curnt_pix[0])
+        curnt_pix.append(curnt_pix[0])
+    if len(targt_pix) < 3:
+        targt_pix.append(targt_pix[0])
+        targt_pix.append(targt_pix[0])
+    print("Current pixel size: ", curnt_pix)
+    print("Target pixel size: ", targt_pix)
     if fobj is not None:
         fobj.write(
             "pixel size [current, target]: "
@@ -353,54 +534,66 @@ def resample2staticmap(curnt_pix, targt_pix, targt_dim, arr, sf=False, fobj=None
             + str(targt_pix)
             + " \n"
         )
-    # new_arr = resample(arr, targt_dim, sf)
-    if abs(curnt_pix - targt_pix) < 10e-3:
-        if targt_dim[0] == curnt_dim[0]:
+    #if abs(curnt_pix - targt_pix) < 10e-3:
+    if np.all(np.array(curnt_pix) - np.array(targt_pix)) < 10e-3:
+        dx = (tnx - nx) // 2
+        dy = (tny - ny) // 2
+        dz = (tnz - nz) // 2
+        if dx == dy == dz == 0:
             print("No change of dims")
             if fobj is not None:
                 fobj.write("No change of dims \n")
             new_arr = arr
-        elif curnt_dim[0] < targt_dim[0]:
+        if np.any(np.array([dx, dy, dz]) > 0):
             print("Padded with zeros")
             if fobj is not None:
                 fobj.write("Padded with zeros \n")
-            dx = abs(tnx - nx) // 2
-            new_arr = np.zeros((tnx, tny, tnz), arr.dtype)
-            new_arr[dx: nx + dx, dx: nx + dx, dx: nx + dx] = arr
-        elif targt_dim[0] < curnt_dim[0]:
+            new_arr = padimage(arr, targt_dim)
+        if np.any(np.array([dx, dy, dz]) < 0):
             print("Cropped image")
             if fobj is not None:
                 fobj.write("Cropped image \n")
-            dx = abs(nx - tnx) // 2
-            new_arr = np.zeros((targt_dim), arr.dtype)
-            new_arr = arr[dx: dx + tnx, dx: dx + tnx, dx: dx + tnx]
-    elif abs(curnt_pix - targt_pix) > 10e-3:
-        newsize = int(round(arr.shape[0] * (curnt_pix / targt_pix)))
-        if newsize % 2 != 0: newsize -= 1
-        #print("newsize: ", newsize)
+            new_arr = cropimage(arr, targt_dim)
+    else:
+        newsize = []
+        for i in range(3):
+            ns = int(round(arr.shape[i] * (curnt_pix[i] / targt_pix[i])))
+            newsize.append(ns)
         print("Resizing in Fourier space and transforming back")
         if fobj is not None:
             fobj.write("Resizing in Fourier space and transforming back \n")
-        new_arr = resample(arr, targt_dim, sf)
-        """ new_arr = resample(arr, [newsize, newsize, newsize], sf)
-        uc = round(targt_pix, 3) * np.asarray([newsize, newsize, newsize], dtype="int")
-        if newsize >= targt_dim[0]:
-            new_arr = cropimage(arr=new_arr, tdim=targt_dim)
-        else:
-            new_arr = padimage(arr=new_arr, tdim=targt_dim) """
+        new_arr = resample(arr, newsize, sf)
+        newsize = new_arr.shape
+        if np.any(np.array(newsize) < np.array(targt_dim)):
+            new_arr = padimage(new_arr, targt_dim)
+        elif np.any(np.array(newsize) > np.array(targt_dim)):
+            new_arr = cropimage(new_arr, targt_dim)
     return new_arr
+
+def resample_on_anothermap(uc1, uc2, arr1, arr2):
+    # arr1 is taken as reference and arr2 is resampled on arr1
+    tpix1 = uc1[0] / arr1.shape[0]
+    tpix2 = uc1[1] / arr1.shape[1]
+    tpix3 = uc1[2] / arr1.shape[2]
+    dim1 = int(round(uc2[0] / tpix1))
+    dim2 = int(round(uc2[1] / tpix2))
+    dim3 = int(round(uc2[2] / tpix3))
+    target_dim = arr1.shape
+    arr2 = resample(arr2, [dim1, dim2, dim3], sf=False)
+    if np.any(np.array(arr2.shape) < np.array(target_dim)):
+        arr2 = padimage(arr2, target_dim)
+    elif np.any(np.array(arr2.shape) > np.array(target_dim)):
+        arr2 = cropimage(arr2, target_dim)
+    return arr2
 
 
 def padimage(arr, tdim):
-    if type(tdim) is list:
-        if len(tdim) == 3:
-            tnz, tny, tnx = tdim
-        elif len(tdim) < 3:
-            tnz = tny = tnx = tdim[0]
-        else:
-            raise SystemExit("More than 3 dimensions given. Cannot handle")
+    if len(tdim) == 3:
+        tnz, tny, tnx = tdim
+    elif len(tdim) < 3:
+        tnz = tny = tnx = tdim[0]
     else:
-        tnz = tny = tnx = tdim
+        raise SystemExit("More than 3 dimensions given. Cannot handle")
     nz, ny, nx = arr.shape
     assert tnx >= nx
     assert tny >= ny
@@ -408,20 +601,17 @@ def padimage(arr, tdim):
     dx = abs(tnx - nx) // 2
     dy = abs(tny - ny) // 2
     dz = abs(tnz - nz) // 2
-    image = np.zeros((tnx, tny, tnz), arr.dtype)
+    image = np.zeros((tnz, tny, tnx), arr.dtype)
     image[dz: nz + dz, dy: ny + dy, dx: nx + dx] = arr
     return image
 
 def cropimage(arr, tdim):
-    if type(tdim) is list:
-        if len(tdim) == 3:
-            tnz, tny, tnx = tdim
-        elif len(tdim) < 3:
-            tnz = tny = tnx = tdim[0]
-        else:
-            raise SystemExit("More than 3 dimensions given. Cannot handle")
+    if len(tdim) == 3:
+        tnz, tny, tnx = tdim
+    elif len(tdim) < 3:
+        tnz = tny = tnx = tdim[0]
     else:
-        tnz = tny = tnx = tdim
+        raise SystemExit("More than 3 dimensions given. Cannot handle")
     nz, ny, nx = arr.shape
     assert tnx <= nx
     assert tny <= ny
@@ -432,24 +622,17 @@ def cropimage(arr, tdim):
     return arr[dz: nz + dz, dy: ny + dy, dx: nx + dx]
 
 
-def resample(x, num, sf):
-    # Check if dims are even
-    if x.shape[0] % 2 != 0:
-        xshape = list(x.shape)
-        xshape[0] = xshape[0] + 1
-        xshape[1] = xshape[1] + 1
-        xshape[2] = xshape[2] + 1
-        temp = np.zeros(xshape, x.dtype)
-        temp[:-1, :-1, :-1] = x
-        x = temp
-    newshape = list(x.shape)
-    newshape[0] = num[0]
-    newshape[1] = num[1]
-    newshape[2] = num[2]
-    if num[0] % 2 != 0:
-        newshape[0] = num[0] + 1
-        newshape[1] = num[1] + 1
-        newshape[2] = num[2] + 1
+def resample(x, newshape, sf):
+    xshape = list(x.shape)
+    for i in range(3):
+        if x.shape[i] % 2 != 0:
+            xshape[i] += 1
+        if newshape[i] % 2 != 0:
+            newshape[i] += 1
+    temp = np.zeros(xshape, x.dtype)
+    temp[:x.shape[0], :x.shape[1], :x.shape[2]] = x
+    x = temp
+    print(xshape, newshape)
     # no-sampling
     if x.shape[0] == newshape[0]:
         return x
@@ -459,19 +642,80 @@ def resample(x, num, sf):
     # Placeholder array for output spectrum
     Y = np.zeros(newshape, X.dtype)
     # upsampling
+    dx = []
     if X.shape[0] < newshape[0]:
-        dx = abs(newshape[0] - X.shape[0]) // 2
-        Y[dx: dx + X.shape[0], dx: dx + X.shape[0], dx: dx + X.shape[0]] = X
+        for i in range(3):
+            dx.append(abs(newshape[i] - X.shape[i]) // 2)
+        #print('dx: ', dx)
+        Y[dx[0]: dx[0] + X.shape[0], dx[1]: dx[1] + X.shape[1], dx[2]: dx[2] + X.shape[2]] = X
     # downsampling
     if newshape[0] < X.shape[0]:
-        dx = abs(newshape[0] - X.shape[0]) // 2
+        for i in range(3):
+            dx.append(abs(newshape[i] - X.shape[i]) // 2)
+        #print('dx: ', dx)
         Y[:, :, :] = X[
-                     dx: dx + newshape[0], dx: dx + newshape[0], dx: dx + newshape[0]
-                     ]
+                    dx[0]: dx[0] + newshape[0], dx[1]: dx[1] + newshape[1], dx[2]: dx[2] + newshape[2]
+                    ]
     if sf:
         return Y
     Y = np.fft.ifftshift(Y)
     return (np.fft.ifftn(Y)).real
+
+
+#def resample(x, num, sf):
+#    xshape = list(x.shape)
+#    print(xshape, num)
+#    for i in range(3):
+#        if x.shape[i] % 2 != 0:
+#            xshape[i] = xshape[i] + 1
+#    temp = np.zeros(xshape, x.dtype)
+#    #temp[:-1, :-1, :-1] = x
+#    temp[:x.shape[0], :x.shape[1], :x.shape[2]] = x
+#    x = temp
+#    """ # Check if dims are even
+#    if x.shape[0] % 2 != 0:
+#        xshape = list(x.shape)
+#        xshape[0] = xshape[0] + 1
+#        xshape[1] = xshape[1] + 1
+#        xshape[2] = xshape[2] + 1
+#        temp = np.zeros(xshape, x.dtype)
+#        temp[:-1, :-1, :-1] = x
+#        x = temp """
+#    newshape = list(x.shape)
+#    newshape[0] = num[0]
+#    newshape[1] = num[1]
+#    newshape[2] = num[2]
+#    if num[0] % 2 != 0:
+#        newshape[0] = num[0] + 1
+#        newshape[1] = num[1] + 1
+#        newshape[2] = num[2] + 1
+#    # no-sampling
+#    if x.shape[0] == newshape[0]:
+#        return x
+#    print(x.shape)
+#    print(newshape)
+#    # Forward transform
+#    X = np.fft.fftn(x)
+#    X = np.fft.fftshift(X)
+#    # Placeholder array for output spectrum
+#    Y = np.zeros(newshape, X.dtype)
+#    # upsampling
+#    if X.shape[0] < newshape[0]:
+#        dx = abs(newshape[0] - X.shape[0]) // 2
+#        dy = abs(newshape[1] - X.shape[1]) // 2
+#        dz = abs(newshape[2] - X.shape[2]) // 2
+#        #Y[dx: dx + X.shape[0], dx: dx + X.shape[0], dx: dx + X.shape[0]] = X
+#        Y[dx: dx + X.shape[0], dy: dy + X.shape[1], dz: dz + X.shape[2]] = X
+#    # downsampling
+#    if newshape[0] < X.shape[0]:
+#        dx = abs(newshape[0] - X.shape[0]) // 2
+#        Y[:, :, :] = X[
+#                     dx: dx + newshape[0], dx: dx + newshape[0], dx: dx + newshape[0]
+#                     ]
+#    if sf:
+#        return Y
+#    Y = np.fft.ifftshift(Y)
+#    return (np.fft.ifftn(Y)).real
 
 
 def read_mmcif(mmcif_file):
@@ -493,12 +737,6 @@ def read_mmcif(mmcif_file):
     # Reading B_iso values
     col_Biso = block.find_values("_atom_site.B_iso_or_equiv")
     # Casting gemmi.Columns into a numpy array
-    # xyz_np = np.zeros((3,len(col_x)), dtype='float')
-    # xyz_np = np.zeros((3,len(col_x)), dtype='float')
-    # xyz_np = np.zeros((3,len(col_x)), dtype='float')
-    # xyz_np[0,:] = np.array(col_x, dtype='float', copy=False)
-    # xyz_np[1,:] = np.array(col_y, dtype='float', copy=False)
-    # xyz_np[2,:] = np.array(col_z, dtype='float', copy=False)
     x_np = np.array(col_x, dtype="float", copy=False)
     y_np = np.array(col_y, dtype="float", copy=False)
     z_np = np.array(col_z, dtype="float", copy=False)
@@ -506,7 +744,7 @@ def read_mmcif(mmcif_file):
     return cell, x_np, y_np, z_np, Biso_np
 
 
-def run_refmac_sfcalc(filename, resol, bfac, lig=True, ligfile=None):
+def run_refmac_sfcalc(filename, resol, lig=True, ligfile=None):
     import os
     import os.path
     import subprocess
@@ -523,7 +761,7 @@ def run_refmac_sfcalc(filename, resol, bfac, lig=True, ligfile=None):
     if lig:
         sfcalc_inp.write("make newligand continue\n")
     sfcalc_inp.write("resolution %f\n" % resol)
-    sfcalc_inp.write("temp set %f\n" % bfac)
+    #sfcalc_inp.write("temp set %f\n" % bfac)
     sfcalc_inp.write("source em mb\n")
     sfcalc_inp.write("make hydrogen yes\n")
     sfcalc_inp.write("end")
@@ -540,7 +778,6 @@ def run_refmac_sfcalc(filename, resol, bfac, lig=True, ligfile=None):
         inp.close()
     else:
         raise SystemExit("File is either missing or not readable")
-
 
 
 def read_atomsf(atm, fpath=None):
@@ -662,7 +899,7 @@ def model_transform_gm(mmcif_file, rotmat=None, trans=None, outfilename=None):
     st = gemmi.read_structure(mmcif_file)
     com = gemmi.Vec3(*st[0].calculate_center_of_mass())
     mat33 = gemmi.Mat33(rotmat) 
-    t = gemmi.Vec3(trans[2], trans[1], trans[0])
+    t = gemmi.Vec3(trans[2], trans[1], trans[0]) # ZYX --> XYZ
     trans = com - mat33.multiply(com) + t
     tr = gemmi.Transform(mat33, trans)
     st[0].transform(tr)
