@@ -223,3 +223,13 @@ def quaternion_inv(q):
     q_conjg = np.array([q[0], -q[1], -q[2], -q[3]], dtype='float')
     q_inv = q_conjg / np.dot(q, q)
     return q_inv
+
+
+def quaternion_multiply(quaternion1, quaternion0):
+    #https://stackoverflow.com/questions/39000758/how-to-multiply-two-quaternions-by-python-or-numpy
+    w0, x0, y0, z0 = quaternion0
+    w1, x1, y1, z1 = quaternion1
+    return np.array([-x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0,
+                     x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
+                     -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0,
+                     x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0], dtype=np.float64)
