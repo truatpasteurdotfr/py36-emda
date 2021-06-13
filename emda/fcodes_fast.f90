@@ -111,6 +111,78 @@ subroutine resolution_grid(uc,mode,maxbin,nx,ny,nz,nbin,res_arr,bin_idx,s_grid)
   if(debug) print*, 'time for calculation(s) = ', finish-start
 end subroutine resolution_grid
 
+
+subroutine resolution_grid_from_given_resarr(uc,res_arr,mode,nbin,nx,ny,nz,bin_idx,s_grid)
+   implicit none
+   integer, intent(in) :: mode,nbin,nx,ny,nz
+   real, dimension(6),intent(in) :: uc
+   real, dimension(0:nbin-1),intent(in) :: res_arr
+   integer,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out) :: bin_idx
+   real, dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out) :: s_grid
+   ! locals
+   real, dimension(6) :: ucstar
+   integer, dimension(3) :: nxyz
+   real       :: low_res,high_res,resol,tmp_val,tmp_min,val,start,finish
+   integer    :: i,j,k,mnloc,xyzmin(3),xyzmax(3),ibin
+   logical    :: debug
+   !
+   debug         = .FALSE.
+   if(mode == 1) debug = .TRUE.
+   call cpu_time(start)
+   !
+   if(debug) print*, 'fcodes_fast...'
+   bin_idx = -100
+   s_grid = 0.0
+   xyzmin = 0; xyzmax = 0
+   nxyz = (/ nx, ny, nz /)
+   xyzmin(1) = int(-nxyz(1)/2)
+   xyzmin(2) = int(-nxyz(2)/2)
+   xyzmin(3) = int(-nxyz(3)/2)
+   xyzmax    = -(xyzmin+1)
+   !
+   print*, 'nbin=', nbin
+   high_res = res_arr(nbin-1)
+   !call get_reciprocal_basis(uc, ucstar)
+   call get_resol(uc,0.0,0.0,0.0,low_res)
+   !call get_resol2(ucstar,0.0,0.0,0.0,low_res)
+   print*,"Low res=",low_res,"High res=",high_res ,'A'
+   print*, 'Creating resolution grid. Please wait...'
+   ! Friedel's Law
+   do i=xyzmin(1), xyzmax(1)
+      do j=xyzmin(2), xyzmax(2)
+         do k=xyzmin(3), 0 !xyzmax(3)
+            call get_resol(uc,real(i),real(j),real(k),resol)
+            !call get_resol2(ucstar,real(i),real(j),real(k),resol)
+            s_grid(i,j,k) = 1.0/resol
+            if(k/=xyzmin(3) .and. j/=xyzmin(2) .and. i/=xyzmin(1))then
+               s_grid(-i,-j,-k) = s_grid(i,j,k)
+            end if
+            if(resol < high_res .or. resol > low_res) cycle
+            ! Find the matching bin to resol
+            do ibin = 0, nbin - 1
+               val = sqrt((res_arr(ibin) - resol)**2)
+               if(ibin == 0)then
+                  tmp_val = val; tmp_min = val
+                  mnloc = ibin 
+               else
+                  tmp_val = val
+                  if(tmp_val < tmp_min)then
+                     tmp_min = val
+                     mnloc = ibin
+                  end if
+               end if
+            end do
+            bin_idx(i,j,k) = mnloc
+            if(k == xyzmin(3) .or. j == xyzmin(2) .or. i == xyzmin(1)) cycle
+            bin_idx(-i,-j,-k) = mnloc
+         end do
+      end do
+   end do
+   call cpu_time(finish)
+   if(debug) print*, 'time for calculation(s) = ', finish-start
+ end subroutine resolution_grid_from_given_resarr
+
+
 subroutine resol_grid_em(uc,mode,maxbin,nx,ny,nz,nbin,res_arr,bin_idx,s_grid)
   implicit none
   real*8, parameter :: PI = 3.141592653589793
@@ -1022,6 +1094,31 @@ subroutine read_into_grid2(bin_idx,bin_fsc,nbin,nx,ny,nz,wgrid)
 
 end subroutine read_into_grid2
 
+subroutine get_reciprocal_basis(uc,ucstar)
+   implicit none
+   real,dimension(6),intent(in) :: uc
+   real,dimension(6),intent(out) :: ucstar
+   real :: vol,sa,sb,sc
+   vol = uc(1) * uc(2) * uc(3)
+   ucstar(1) = uc(2)*uc(3)/vol
+   ucstar(2) = uc(1)*uc(3)/vol
+   ucstar(3) = uc(1)*uc(2)/vol
+end subroutine get_reciprocal_basis
+
+subroutine get_resol2(ucstar,h,k,l,resol)
+   implicit none
+   real,dimension(6),intent(in) :: ucstar
+   real,intent(in) :: h,k,l
+   real :: sa,sb,sc,s2,tmp
+   real,intent(out) :: resol
+   !
+   sa = ucstar(1); sb = ucstar(2); sc = ucstar(3)
+   s2 = ((h*sa)**2 + (k*sb)**2 + (l*sc)**2)/4.0
+   if(s2 == 0.0) s2 = 1.0e-10 ! F(000) resolution hard coded
+   tmp = sqrt(s2)
+   resol = 1.0/(2.0*tmp)
+   return
+end subroutine get_resol2
 
 subroutine get_resol(uc,h,k,l,resol)
   implicit none
@@ -1077,40 +1174,6 @@ subroutine get_st(nx,ny,nz,t,st,s1,s2,s3)
   return
 end subroutine get_st
 
-!!$subroutine get_st(nx,ny,nz,t,st,s1,s2,s3)
-!!$  implicit none
-!!$  real*8, parameter :: PI = 3.141592653589793
-!!$  integer,intent(in) :: nx,ny,nz
-!!$  real*8,dimension(3),intent(in) :: t
-!!$  real*8 :: sv(3)
-!!$  complex*16 :: xj
-!!$  complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out) :: st
-!!$  integer,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out) :: s1,s2,s3
-!!$  integer :: i,j,k,xmin,xmax,ymin,ymax,zmin,zmax
-!!$
-!!$  xj = dcmplx(0.0d0,1.0d0)
-!!$  st = dcmplx(0.0d0,1.0d0)
-!!$  sv = 0.0
-!!$
-!!$  xmin = int(-nx/2); xmax = -(xmin+1)
-!!$  ymin = int(-ny/2); ymax = -(ymin+1)
-!!$  zmin = int(-nz/2); zmax = -(zmin+1)
-!!$
-!!$  do i=xmin, xmax
-!!$     do j=ymin, ymax
-!!$        do k=zmin, zmax
-!!$           s1(k,j,i) = i
-!!$           s2(k,j,i) = j
-!!$           s3(k,j,i) = k
-!!$           sv(1) = i
-!!$           sv(2) = j
-!!$           sv(3) = k
-!!$           st(k,j,i) = exp(2.0d0 * PI * xj * dot_product(t,sv))
-!!$        end do
-!!$     end do
-!!$  end do
-!!$  return
-!!$end subroutine get_st
 
 subroutine fsc_weight_calculation(fsc_weighted_grid,bin_fsc,F1,F2,bin_idx,nbin,mode,nx,ny,nz)
   implicit none
@@ -1730,17 +1793,12 @@ end subroutine prepare_hkl_bfac
 subroutine add_random_phase_beyond(F_ori,F_all_random,bin_idx,rand_idx,nx,ny,nz,F_beyond_random)
   implicit none
   real*8,    parameter :: PI = 3.141592653589793
-
   integer,   intent(in) :: nx,ny,nz,rand_idx
-  !real,      intent(in) :: resol_randomize
-  !real,      dimension(6),intent(in)  :: uc
   integer,  dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in) :: bin_idx
-  !real,dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in) :: resol_grid
   complex*16, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(in)  :: F_ori,F_all_random
   complex*16, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(out) :: F_beyond_random
   ! locals
   integer,dimension(3) :: nxyz
-  real       :: resol
   real       :: start,finish
   integer    :: xyzmin(3),xyzmax(3)
   integer    :: i1,i2,i3
@@ -1759,24 +1817,6 @@ subroutine add_random_phase_beyond(F_ori,F_all_random,bin_idx,rand_idx,nx,ny,nz,
   print*, 'xyzmax = ', xyzmax(1), xyzmax(3), 0
 
   call cpu_time(start)
-
-  !do i1=xyzmin(1), xyzmax(1)
-  !   do i2=xyzmin(2), xyzmax(2)
-  !      do i3=xyzmin(3), 0 !xyzmax(3)
-  !         !call get_resol(uc,real(i1),real(i2),real(i3),resol)
-  !         !if(resol >= resol_randomize)then
-  !         if(resol_grid(i1,i2,i3) >= resol_randomize)then
-  !            F_beyond_random(i1,i2,i3) = F_ori(i1,i2,i3)
-  !            if(i3 == xyzmin(3) .or. i2 == xyzmin(2) .or. i1 == xyzmin(1)) cycle
-  !            F_beyond_random(-i1,-i2,-i3) = conjg(F_ori(i1,i2,i3))
-  !         else
-  !            F_beyond_random(i1,i2,i3) = F_all_random(i1,i2,i3)
-  !            if(i3 == xyzmin(3) .or. i2 == xyzmin(2) .or. i1 == xyzmin(1)) cycle
-  !            F_beyond_random(-i1,-i2,-i3) = conjg(F_beyond_random(i1,i2,i3))
-  !         end if
-  !      end do
-  !   end do
-  !end do
   do i1=xyzmin(1), xyzmax(1)
      do i2=xyzmin(2), xyzmax(2)
         do i3=xyzmin(3), 0
@@ -1792,7 +1832,6 @@ subroutine add_random_phase_beyond(F_ori,F_all_random,bin_idx,rand_idx,nx,ny,nz,
         end do
      end do
   end do
-
   call cpu_time(finish)
   print*, 'time for phase randomisation looping(s) = ', finish-start
   return
@@ -1857,8 +1896,6 @@ subroutine cutmap_arr(fin,bin_idx,smax,mode,nbin,nx,ny,nz,n,fout)
   complex*16, dimension(n, -nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2),intent(out) :: fout
   ! locals
   integer,   dimension(3) :: nxyz
-  integer,   dimension(0:nbin-1) :: bin_arr_count
-  !
   real       :: start,finish
   integer    :: i,j,k,l,xyzmin(3),xyzmax(3)
   logical    :: debug
@@ -1866,13 +1903,9 @@ subroutine cutmap_arr(fin,bin_idx,smax,mode,nbin,nx,ny,nz,n,fout)
   debug         = .FALSE.
   if(mode == 1) debug = .TRUE.
   call cpu_time(start)
-
   fout = dcmplx(0.0d0, 0.0d0)
-
   xyzmin = 0; xyzmax = 0
-
   nxyz = (/ nx, ny, nz /)
-
   xyzmin(1) = int(-nxyz(1)/2)
   xyzmin(2) = int(-nxyz(2)/2)
   xyzmin(3) = int(-nxyz(3)/2)
@@ -2073,6 +2106,88 @@ subroutine trilinear2(F,bin_idx,RM,nbin,ncopies,mode,nx,ny,nz,FRS)
   !print*, 'time for loop = ', finish-start
   return
 end subroutine trilinear2
+
+
+subroutine trilinearn(F,RM,ncopies,mode,nx,ny,nz,FRS)
+  implicit none
+  integer,intent(in):: nx,ny,nz,mode,ncopies
+  real*8,intent(in):: RM(ncopies,3,3)
+  complex*16,dimension(ncopies,-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in):: F
+  complex*16,dimension(ncopies,-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out):: FRS
+  ! locals
+  integer :: x0(3),x1(3)
+  integer :: nxyz(3),nxyzmn(3),nxyzmx(3)
+  real*8 :: x(3),xd(3),s(3)
+  complex*16 :: c000,c001,c010,c011,c100,c101,c110,c111,c00,c01,c10,c11,c0,c1,c
+  integer :: h,k,l,i
+  integer :: xmin,xmax,ymin,ymax,zmin,zmax,ic
+  real      :: start, finish
+
+  FRS = dcmplx(0.0d0, 0.0d0)
+  x = 0.0d0
+  xd = 0.0d0
+
+  nxyz(1) = nx; nxyz(2) = ny; nxyz(3) =nz
+  nxyzmn(1) = -nx/2; nxyzmn(2) = -ny/2; nxyzmn(3) = -nz/2
+  nxyzmx(1) = (nx-2)/2; nxyzmx(2) = (ny-2)/2; nxyzmx(3) = (nz-2)/2
+
+  xmin = int(-nx/2); xmax = -(xmin+1)
+  ymin = int(-ny/2); ymax = -(ymin+1)
+  zmin = int(-nz/2); zmax = -(zmin+1)
+  call cpu_time(start)
+  do l = zmin, zmax
+     do k = ymin, ymax
+        outer: do h = xmin, 0
+           s(1) = h
+           s(2) = k
+           s(3) = l
+           do ic = 1, ncopies
+              x = matmul(transpose(RM(ic,:,:)),s)
+              do i = 1, 3
+                 x0(i) = floor(x(i))
+                 x1(i) = x0(i) + 1
+                 if((nxyzmx(i) < x0(i)) .or. (x0(i) < nxyzmn(i)) &
+                      .or. (nxyzmx(i) < x1(i)) .or. (x1(i) < nxyzmn(i)))then
+                    cycle outer
+                 end if
+                 xd(i) = (x(i)-real(x0(i)))
+                 if(abs(xd(i)).gt.1.0) then
+                    print*, 'Something is wrong ',xd(i)
+                    stop
+                 endif
+              end do
+              do i = 1,3
+                 x1(i) = min(nxyzmx(i),max(nxyzmn(i),x1(i)))
+              enddo
+              c000 = F(ic,x0(1),x0(2),x0(3))
+              c001 = F(ic,x0(1),x0(2),x1(3))
+              c010 = F(ic,x0(1),x1(2),x0(3))
+              c011 = F(ic,x0(1),x1(2),x1(3))
+              c100 = F(ic,x1(1),x0(2),x0(3))
+              c101 = F(ic,x1(1),x0(2),x1(3))
+              c110 = F(ic,x1(1),x1(2),x0(3))
+              c111 = F(ic,x1(1),x1(2),x1(3))
+              ! Interpolation along x direction
+              c00 = c000*(1.0d0-xd(1)) + c100*xd(1)
+              c01 = c001*(1.0d0-xd(1)) + c101*xd(1)
+              c10 = c010*(1.0d0-xd(1)) + c110*xd(1)
+              c11 = c011*(1.0d0-xd(1)) + c111*xd(1)
+              ! Interpolation along y direction
+              c0 = c00*(1.0d0-xd(2)) + c10*xd(2)
+              c1 = c01*(1.0d0-xd(2)) + c11*xd(2)
+              ! Interpolation along z direction
+              c = c0*(1.0d0-xd(3)) + c1*xd(3)
+              FRS(ic,h,k,l) = c
+              if((h == xmin).or.(k == ymin).or.(l == zmin)) cycle
+              FRS(ic,-h,-k,-l) = conjg(c)
+           end do
+        end do outer
+     end do
+  end do
+  call cpu_time(finish)
+  !print*, 'time for loop = ', finish-start
+  return
+end subroutine trilinearn
 
                  
 subroutine trilinear_map(RM,arr1,arr2,nx,ny,nz,mode)
