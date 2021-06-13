@@ -8,8 +8,7 @@ Mozilla Public License, version 2.0; see LICENSE.
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 import numpy as np
-from timeit import default_timer as timer
-from emda import core, ext
+from emda.core import iotools, restools
 import fcodes_fast as fcodes
 
 
@@ -29,7 +28,7 @@ class LineFit:
             self.e0_lf,
             self.cbin_idx_lf,
             self.cbin_lf,
-        ) = core.restools.cut_resolution_for_linefit(e0, cbin_idx, res_arr, smax)
+        ) = restools.cut_resolution_for_linefit(e0, cbin_idx, res_arr, smax)
         self.res_arr = res_arr[: self.cbin_lf]
 
     def f(self, kini):
@@ -38,17 +37,21 @@ class LineFit:
         nx, ny, nz = self.e0_lf.shape
         ncopies = 1
         k = self.k + kini[0] * self.step
-        eck = fcodes.tricubic_zoom(float(k), self.e1_lf, 0, ncopies, nx, ny, nz)
+        eck = fcodes.tricubic_zoom(
+            float(k), self.e1_lf, 0, ncopies, nx, ny, nz)
         eckt = eck[:, :, :, 0]
-        w_grid = utils.get_fsc_wght(self.e0_lf, eckt, self.cbin_idx_lf, self.cbin_lf)
+        w_grid = utils.get_fsc_wght(
+            self.e0_lf, eckt, self.cbin_idx_lf, self.cbin_lf)
         fval = np.sum(w_grid * self.e0_lf * np.conjugate(eckt))
         return -fval.real
 
     def fn2(self, kini):
         nx, ny, nz = self.e0_lf.shape
         ncopies = 1
-        k = self.k + kini[0] * self.step
-        fcks = fcodes.tricubic_zoom(float(k), self.e1_lf, 0, ncopies, nx, ny, nz)
+        #k = self.k + kini[0] * self.step
+        k = self.k + kini * self.step
+        fcks = fcodes.tricubic_zoom(
+            float(k), self.e1_lf, 0, ncopies, nx, ny, nz)
         fckt = fcks[:, :, :, 0]
         _, _, _, fval = fcodes.scalesigmafval_full(
             self.e0_lf,
@@ -73,14 +76,15 @@ class LineFit:
         dx = int((nx - 2 * cx) / 2)
         dy = int((ny - 2 * cy) / 2)
         dz = int((nz - 2 * cz) / 2)
-        self.e1_lf = e1[dx : dx + 2 * cx, dy : dy + 2 * cy, dz : dz + 2 * cz]
+        self.e1_lf = e1[dx: dx + 2 * cx, dy: dy + 2 * cy, dz: dz + 2 * cz]
         assert self.e1_lf.shape == self.e0_lf.shape
         init_guess = [k]
         self.k = k
         if self.mode == "map":  # for map-map
             minimum = optimize.minimize(self.f, init_guess, method="Powell")
         if self.mode == "model":  # for map-model
-            minimum = optimize.minimize(self.fn2, init_guess, method="Powell")
+            #minimum = optimize.minimize(self.fn2, init_guess, method="Powell")
+            minimum = optimize.minimize_scalar(self.fn2, method="brent")
         # end = timer()
         # print(' time for line search: ', end-start)
         return minimum.x
@@ -158,22 +162,26 @@ def dFts(Fc, sv):
     return dt_arr, ddt_arr
 
 
-def get_ll(fmaplist, bin_idx, res_arr, nbin, k, t):
-    nx, ny, nz = fmaplist[-1].shape  # model
+def get_ll(emmap1, fmaplist, bin_idx, res_arr, nbin, k, smax):
+    fref = fmaplist[0]
+    ftar = fmaplist[1]
+    nx, ny, nz = fref.shape  # model
+    ncopies = 1
+    fcks = fcodes.tricubic_zoom(k, fref, 0, ncopies, nx, ny, nz)
+    # optimize translation
+    t = np.array([0.0, 0.0, 0.0], 'float')
+    f1 = fcks[:, :, :, 0]
+    t = optimise_translation(f1, ftar, t, bin_idx, nbin, res_arr, smax)
+    t = np.asarray(t)
     st, s1, s2, s3 = fcodes.get_st(nx, ny, nz, t)
     sv = np.array([s1, s2, s3])
-    ncopies = 1
-    fcks = fcodes.tricubic_zoom(k, fmaplist[-1], 0, ncopies, nx, ny, nz)
+    #
     fckt = fcks[:, :, :, 0] * st
-    """ if len(fmaplist) == 3:
-        fo,scale_d,sigma,noisevar,fval = fcmag.scalesigmafval( \
-            fmaplist[0],fmaplist[1],fckt,bin_idx,res_arr,0,nbin,nx,ny,nz)
-        return fo,fckt,scale_d,sigma,noisevar,fval,sv """
     if len(fmaplist) == 2:
         scale_d, sigma, totalvar, fval = fcodes.scalesigmafval_full(
-            fmaplist[0], fckt, bin_idx, res_arr, 0, nbin, nx, ny, nz
+            ftar, fckt, bin_idx, res_arr, 0, nbin, nx, ny, nz
         )
-        return fmaplist[0], fckt, scale_d, sigma, totalvar, fval, sv
+        return ftar, fckt, scale_d, sigma, totalvar, fval, sv, t
 
 
 def derivatives_mapmodel(fo, fc, bin_idx, sv, D, totalvar, uc):
@@ -184,7 +192,8 @@ def derivatives_mapmodel(fo, fc, bin_idx, sv, D, totalvar, uc):
 
     nbin = len(totalvar)
     nx, ny, nz = fc.shape
-    dll, ddll = fcodes.ll_derivatives(fo, fc, bin_idx, D, totalvar, 1, nbin, nx, ny, nz)
+    dll, ddll = fcodes.ll_derivatives(
+        fo, fc, bin_idx, D, totalvar, 1, nbin, nx, ny, nz)
 
     # 1st derivatives
     df_val = np.zeros(shape=(4), dtype="float")
@@ -205,102 +214,232 @@ def derivatives_mapmodel(fo, fc, bin_idx, sv, D, totalvar, uc):
     return step
 
 
-def minimizer_mapmodel(hfmaplist, uc, ncycles=4):
-    nbin, res_arr, bin_idx = core.restools.get_resolution_array(uc, hfmaplist[0])
-    tol = 1e-2
-    if nbin <= 50:
-        smax = nbin
-    else:
-        smax = 50
-    for ifit in range(len(hfmaplist) - 1):
-        f_list = []
-        k_list = []
-        t_list = []
+def calc_fsc_t(fstatic, frotated, t, bin_idx, nbin):
+    from emda import core
+
+    cx, cy, cz = fstatic.shape
+    st, s1, s2, s3 = fcodes.get_st(cx, cy, cz, t)
+    sv = np.array([s1, s2, s3])
+    frt = frotated * st
+    fsc = core.fsc.anytwomaps_fsc_covariance(fstatic, frt, bin_idx, nbin)[
+        0
+    ]
+    return frt, fsc, sv
+
+
+def get_wght(f0, fsc, bin_idx, nbin):
+    cx, cy, cz = f0.shape
+    w_grid = fcodes.read_into_grid(
+        bin_idx,
+        fsc,  # fsc / (1 - fsc ** 2),
+        nbin,
+        cx,
+        cy,
+        cz,
+    )
+    fsc_sqd = fsc ** 2
+    fsc_combi = fsc_sqd,  # fsc_sqd / (1 - fsc_sqd)
+    w2_grid = fcodes.read_into_grid(
+        bin_idx, fsc_combi, nbin, cx, cy, cz
+    )
+    return w_grid, w2_grid
+
+
+def optimise_translation(f0, f1, t, bin_idx, nbin, res_arr, smax_lf, ncy=2):
+    from emda.ext.sym.refine_symaxis import derivatives_translation, linefit2
+
+    #print("translation optimisation..")
+    for i in range(ncy):
+        frt, fsc, sv = calc_fsc_t(f0, f1, t, bin_idx, nbin)
+        w_grid, w2_grid = get_wght(f0, fsc, bin_idx, nbin)
+        #fval = np.sum(w_grid * f0 * np.conjugate(frt))
+        #print(i, fval.real, t)
+        step = derivatives_translation(f0, frt, w_grid, w2_grid, sv)
+        lft = linefit2()
+        lft.get_linefit_static_data(
+            [f0, frt], bin_idx, res_arr, smax_lf
+        )
+        lft.step = step
+        alpha = lft.scalar_opt_trans()
+        t = t + step * alpha
+    return t
+
+
+def apply_transformation(folist, rmlist):
+    assert len(rmlist) == len(folist)
+    #print(len(folist))
+    #print(folist[0].shape)
+    nx, ny, nz = folist[0].shape
+    frs = fcodes.trilinearn(np.stack((folist[0], folist[1]), axis = 0),
+                            np.stack((rmlist[0], rmlist[1]), axis = 0),
+                            0,
+                            len(folist),
+                            nx, ny, nz)
+    #print(frs.shape)
+    return frs
+
+
+def apply_translation(fo, t):
+    nx, ny, nz = fo.shape
+    st, _, _, _ = fcodes.get_st(nx, ny, nz, t)    
+    return fo * st
+
+
+def cut_resolution_for_linefit(farr, bin_idx, res_arr, smax):
+    # Making data for map fitting
+    ncopies, nx, ny, nz = farr.shape
+    cbin = cx = smax
+    dx = int((nx - 2 * cx) / 2)
+    dy = int((ny - 2 * cx) / 2)
+    dz = int((nz - 2 * cx) / 2)
+    cBIdx = bin_idx[dx : dx + 2 * cx, dy : dy + 2 * cx, dz : dz + 2 * cx]
+    fout = fcodes.cutmap_arr(
+        farr, bin_idx, cbin, 0, len(res_arr), nx, ny, nz, ncopies
+    )[:, dx : dx + 2 * cx, dy : dy + 2 * cx, dz : dz + 2 * cx]
+    return fout, cBIdx, cbin
+
+
+def minimizer_mapmodel(emmap1, resol=4.0, ncycles=10, rmlist=None, tlist=None):
+    print('\nOptimising map magnification...')
+    tol = 1e-2 # tolerence for refinement convergence
+    # apply transformation
+    frs = apply_transformation(folist=emmap1.fo_lst, rmlist=rmlist)
+    # output reference map
+    refmap = np.fft.fftshift(
+        (np.fft.ifftn(np.fft.ifftshift(frs[0,:,:,:]))).real)
+    iotools.write_mrc(refmap, 'reference.mrc', emmap1.map_unit_cell)
+
+    # find the bin for given resolution for fit
+    dist = np.sqrt((emmap1.res_arr[:emmap1.nbin] - resol) ** 2)
+    smax = np.argmin(dist)
+    # cut data
+    fout, cBIdx, cbin = cut_resolution_for_linefit(
+        frs, emmap1.bin_idx, emmap1.res_arr, smax)
+
+    # parameters for magnification refinement
+    bin_idx = cBIdx
+    res_arr = emmap1.res_arr[:cbin]
+    nbin = cbin
+    uc = emmap1.map_unit_cell
+
+    for ifit in range(1, fout.shape[0]):
+        # output moving map before magref refinement
+        movingmap = apply_translation(frs[ifit,:,:,:], tlist[ifit])
+        refmap = np.fft.fftshift(
+                    (np.fft.ifftn(np.fft.ifftshift(movingmap))).real)
+        iotools.write_mrc(refmap, 'startmap_'+str(ifit)+'.mrc', uc)
+        # use cutdata in mag. refinement
+        maplist = [fout[0,:,:,:], apply_translation(fout[ifit,:,:,:], tlist[ifit])]
+        # initial parameters
         t = [0.0, 0.0, 0.0]
         k = 1.0
         for i in range(ncycles):
-            # start = timer()
-            maplist = [hfmaplist[ifit], hfmaplist[-1]]
-            fo, fckt, scale_d, sigma, totalvar, fval, sv = get_ll(
-                maplist, bin_idx, res_arr, nbin, k, t
-            )
-            # maplist = [fo,fckt]
-            f_list.append(fval)
-            k_list.append(k)
-            t_list.append(t)
-            # print(i, fval, k)
+            fo, fckt, scale_d, sigma, totalvar, fval, sv, t = get_ll(
+                emmap1, maplist, bin_idx, res_arr, nbin, k, smax)
             if i == 0:
                 fval_previous = fval
-                k_previous = k
                 print()
                 print("ifit    cycle#    func val.   magnification")
                 print(
-                    "{:5d} {:5d} {:8.4f} {:6.4f} {:6.4f}".format(
-                        ifit, i, fval, k, k_previous
+                    "{:5d} {:5d} {:8.4f} {:6.4f}".format(
+                        ifit, i, fval, k
                     )
                 )
-            if i > 0 and (fval_previous - fval) > tol or i == ncycles - 1:
+            if i > 0 and abs(fval_previous - fval) > tol or i == ncycles - 1:
                 print(
-                    "{:5d} {:5d} {:8.4f} {:6.4f} {:6.4f}".format(
-                        ifit, i, fval, k, k_previous
+                    "{:5d} {:5d} {:8.4f} {:6.4f}".format(
+                        ifit, i, fval, k
                     )
                 )
                 k_previous = k
-            if i > 0 and (fval - fval_previous) > tol or i == ncycles - 1:
-                # parameter output
-                nx, ny, nz = hfmaplist[1].shape
-                # st,_,_,_ = fcodes.get_st(nx,ny,nz,t)
-                magerror = abs(k_previous - 1.0) * 100.0
-                print("magnification error (%): ", "{:.2f}".format(magerror))
-                fck = fcodes.tricubic_zoom(
-                    float(1 / k_previous), maplist[0], 0, 1, nx, ny, nz
+            if i > 0 and abs(fval - fval_previous) <= tol or i == ncycles - 1:
+                print(
+                    "{:5d} {:5d} {:8.4f} {:6.4f}".format(
+                        ifit, i, fval, k
+                    )
                 )
-                fckt = fck[:, :, :, 0]  # * st
-                zoomedmap = np.fft.fftshift((np.fft.ifftn(np.fft.ifftshift(fckt))).real)
-                mapname = "magcorretedmap_" + str(ifit) + ".mrc"
-                core.iotools.write_mrc(zoomedmap, mapname, uc)
+                # output map after mag. refinement
+                magerror = abs(k_previous - 1.0) * 100.0
+                print("magnification error (%): ", "{:.3f}".format(magerror))
+                _, nx, ny, nz = frs.shape
+                fck = fcodes.tricubic_zoom(
+                    float(1 / k_previous), frs[ifit,:,:,:], 0, 1, nx, ny, nz)[:, :, :, 0]
+                t = optimise_translation(frs[0,:,:,:], 
+                                         fck, 
+                                         t, 
+                                         emmap1.bin_idx, 
+                                         emmap1.nbin, 
+                                         emmap1.res_arr, 
+                                         smax, 4)
+                fckt = fck * fcodes.get_st(nx, ny, nz, t)[0]
+                zoomedmap = np.fft.fftshift(
+                    (np.fft.ifftn(np.fft.ifftshift(fckt))).real)
+                mapname = "emda_magcorretedmap_" + str(ifit) + ".mrc"
+                iotools.write_mrc(zoomedmap, mapname, uc)
+                print("Magnification corrected map %s was written." %(mapname) )
                 break
-            step = derivatives_mapmodel(fo, fckt, bin_idx, sv, scale_d, sigma, uc)
+            step = derivatives_mapmodel(
+                fo, fckt, bin_idx, sv, scale_d, sigma, uc)
             if i == 0:
                 linefit = LineFit()
                 linefit.get_linefit_static_data(
                     e0=fo, cbin_idx=bin_idx, res_arr=res_arr, smax=smax
                 )
             linefit.step = step[0]
-            alpha = linefit.calc_fval_for_different_kvalues_at_this_step(k=k, e1=fckt)
-            k = k + (alpha) * step[0]
-            t = t  # + step[1:] # t ignored as maps are analysed for
-            # magnification at the origin of the box
+            alpha = linefit.calc_fval_for_different_kvalues_at_this_step(
+                k=k, e1=maplist[0])
+            k = k + alpha * step[0]
             fval_previous = fval
-            # end = timer()
-            # print('per cycle time: ', end-start)
 
 
-def get_fmaplist(maplist):
-    hfmaplist = []
-    # reference map
-    uc_target, arr_ref, orig = core.iotools.read_map(maplist[-1])
-    core.iotools.write_mrc(arr_ref, "reference.mrc", uc_target, orig)
-    target_dim = list(arr_ref.shape)
-    target_pix_size = uc_target[0] / target_dim[0]
-    for imap in maplist[:-1]:
-        uc, arr, orig = core.iotools.read_map(imap)
-        curnt_pix_size = uc[0] / arr.shape[0]
-        arr = core.iotools.resample2staticmap(
-            curnt_pix=curnt_pix_size,
-            targt_pix=target_pix_size,
-            targt_dim=target_dim,
-            arr=arr,
-        )
-        hfmaplist.append(np.fft.fftshift(np.fft.fftn(np.fft.fftshift(arr))))
-    hfmaplist.append(np.fft.fftshift(np.fft.fftn(np.fft.fftshift(arr_ref))))
-    return hfmaplist, uc_target
+def prepare_data(maplist, masklist=None):
+    from emda.ext.overlay import EmmapOverlay
+    try:
+        emmap1 = EmmapOverlay(maplist, masklist)
+    except:
+        emmap1 = EmmapOverlay(maplist)
+    emmap1.com = False
+    emmap1.load_maps()
+    emmap1.calc_fsc_from_maps()
+    return emmap1
 
 
-def main(maplist, mode="model"):
-    hfmaplist, uc = get_fmaplist(maplist)
-    """ if mode == 'map':
-        minimizer_twomaps(hfmaplist,uc) """
-    if mode == "model":
-        minimizer_mapmodel(hfmaplist, uc)
+def optimize_superposition(emmap1, ncycles=50):
+    from emda.ext.overlay import run_fit
+    from emda.core.quaternions import get_RM
 
+    print("\nOptimising overlay.....\n")
+    rotmat = np.identity(3)
+    t = [0.0, 0.0, 0.0]
+    rotmat_list = []
+    trans_list = []
+    fobj = open("EMDA_overlay.txt", "w")
+    rotmat_list.append(rotmat)
+    trans_list.append(t)
+    for ifit in range(1, len(emmap1.eo_lst)):
+        t, q_final = run_fit(
+                emmap1,
+                rotmat,
+                t,
+                ncycles,
+                ifit,
+            )
+        rotmat_list.append(get_RM(q_final))
+        trans_list.append(t)
+    print("Optimising overlay.....Done")
+    return rotmat_list, trans_list
+
+def main(maplist, masklist=None, resol=None):
+    emmap1 = prepare_data(maplist, masklist)
+    rm_list, t_list = optimize_superposition(emmap1)
+    minimizer_mapmodel(emmap1=emmap1, resol=resol, rmlist=rm_list, tlist=t_list)
+
+
+if __name__ == "__main__":
+    maplist = ["/Users/ranganaw/MRC/REFMAC/haemoglobin/EMD-3651/other/emd_3651_half_map_1.map",
+                "/Users/ranganaw/MRC/REFMAC/haemoglobin/EMD-3651/emda_test/magnification/data_for_emda-paper/emd_3651_half1_k095.mrc"]
+    #maplist = [
+    #    "/Users/ranganaw/MRC/REFMAC/beta_gal/magref_for_paper/xtallography_reference.mrc",
+    #    "/Users/ranganaw/MRC/REFMAC/beta_gal/magref_for_paper/emd_10574_fullmap_resampled2staticmap_pca.map",
+    #           ]
+    main(maplist)
