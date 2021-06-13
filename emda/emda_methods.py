@@ -1082,19 +1082,15 @@ def sphere_kernel_softedge(radius=5):
 
 def overlay_maps(
     maplist,
-    rot=0.0,
-    ncy=5,
-    res=6,
-    interp="linear",
-    hfm=False,
-    modelres=5.0,
+    rot=[0.0],
+    ncy=100,
+    modelres=None,
     masklist=None,
+    modellist=None,
     tra=None,
     axr=None,
-    fobj=None,
-    usemodel=False,
     fitres=None,
-    usecom=False,
+    nocom=False,
 ):
     """Superimposes several maps.
 
@@ -1103,77 +1099,79 @@ def overlay_maps(
 
     Arguments:
         Inputs:
-            maplist: list
-                List of maps to overlay.
-            masklist: list
+            maplist: list of strings
+                List of maps to overlay. The first of the list
+                is take as static and it has to be an EM map. The rest can either
+                be maps or coordinate files [to combine with modelres argument].
+                Coordinate based maps are calculated using REFMAC for fitting. 
+            masklist: list of strings
                 List of masks to apply on maps.
-            rot: float, optional
-                Initial rotation in degrees. Default is 0.0.
-            axr: list, optional
-                Rotation axis. Default is [1, 0, 0].
+            rot: float list, optional
+                List of initial rotations in degrees. Default to 0.0.
+                This list must not include the rotation for the first map to itself
+                (because it is zero). Rotations of each map relative to the first
+                map should be give, eg. [1., 2., 5.]. If only one value is give [1.],
+                that value will be copied to form the full set eg. [1., 1., 1.]
+            axr: list of integers, optional
+                list of rotation axes. Default to [1, 0, 0].
+                Rotation axis for each map except the static map (first map) should eb give.
+                If only one axis is specified, that will be copied to form the full list.
             tra: list, optional
-                Translation vector in fractional units. Default is [0.0, 0.0, 0.0]
-            res: float, optional
-                Fit start resolution in Angstrom units. Default is 6.0 Angstrom.
+                List of translation vector(z, y, x) in Angstroms. Default to [0.0, 0.0, 0.0]
+                If only one vector is give, that will be copied to form the full list.
             ncy: integer, optional
-                Number of fitting cycles. Default is 5.
-            interp: string, optional
-                Interpolation type either "linear" or "cubic".
-                Default is linear.
-            hfm: bool, optional
-                If True, overlay will be carried out on half maps. In this case,
-                maplist will contain half maps.
-                e.g. [map1_half1.mrc, map1_half2.mrc, map2_half1.mrc, map2_half2.mrc, ...].
-                masklist will contain masks for each map. e.g. [map1_mask.mrc, map2_mask.mrc].
-                The length of masklist should be equal to half the length of maplist.
-                If False, uses full maps for overlay. Default is False.
-            fobj: string
-                File object for logging. If None given, EMDA_overlay.txt will be output.
+                Number of fitting cycles. Default to 100.
+            fitres: float, optional
+                Maximum resolution for map overlay. Default to 0.0 A (i.e. all data)
+            modelres: float, optional
+                Resolution for model-based map calculation if there are 
+                coordinate files included in the maplist.
+                In such case, this resolution is mandatory. All maps will be calculated to
+                this resolution.
+            modellist: list of strings, optional
+                List of coornate files to apply the transformation estimated
+                by map overlay. 
 
         Outputs:
-            Outputs a series of overlaid maps (fitted_map_?.mrc).
+            Outputs a series of overlaid maps (fitted_map_x.mrc).
     """
-    from emda.ext.mapfit import mapoverlay
+    #from emda.ext.mapfit import mapoverlay
     from emda.ext.overlay import overlay
 
     if axr is None:
         axr = [1, 0, 0]
     if tra is None:
-        tra = [0.0, 0.0, 0.0]
-    if fobj is None:
-        fobj = open("EMDA_overlay.txt", "w")
-    theta_init = [tuple(axr), rot]
-    mapoverlay.main(
-        maplist=maplist,
-        masklist=masklist,
-        ncycles=ncy,
-        t_init=tra,
-        theta_init=theta_init,
-        smax=res,
-        fobj=fobj,
-        interp=interp,
-        modelres=modelres,
-        halfmaps=hfm,
-        usemodel=usemodel,
-        fitres=fitres,
-        usecom=usecom,
-    )
-    # new overlay function call
-    """ q = quaternions.get_quaternion(theta_init)
-    rm = quaternions.get_RM(q)
+        tra = [0., 0., 0.]
+    axes = [axr[x:x+3] for x in range(0, len(axr), 3)]
+    translations = [tra[x:x+3] for x in range(0, len(tra), 3)]
+    rotations = list(rot)
+    if len(axes) == 1:
+        # duplicate axes
+        l1 = [x for _ in range(len(maplist)-1) for x in axes[0]]
+        axes = [l1[x:x+3] for x in range(0, len(l1), 3)]
+    if len(translations) == 1:
+        # duplicate translations
+        t1 = [x for _ in range(len(maplist)-1) for x in translations[0]]
+        translations = [t1[x:x+3] for x in range(0, len(t1), 3)]
+    if len(rotations) == 1:
+        rotations = np.zeros(len(maplist)-1, 'float') + rotations[0]
+    assert len(maplist) - 1 == len(axes) == len(rotations) == len(translations)
+    qlist = []
+    for axis, ang in zip(axes, rotations):
+        qlist.append(quaternions.get_quaternion([tuple(axis), ang]))
+    fobj = open("EMDA_overlay.txt", "w")
     emmap1, rotmat_list, trans_list = overlay(
         maplist=maplist,
         ncycles=ncy,
-        t_init=tra,
-        rotmat_init=rm,
-        smax=res,
-        interp=interp,
+        tlist=translations,
+        qlist=qlist,
         masklist=masklist,
+        modellist=modellist,
         fobj=fobj,
         fitres=fitres,
         modelres=modelres,
-        usecom=usecom,
-    ) """
+        nocom=nocom,
+    )
 
 
 def average_maps(
@@ -1252,7 +1250,6 @@ def realsp_correlation(
     half2map,
     kernel_size=5,
     norm=False,
-    lig=True,
     model=None,
     model_resol=None,
     mask_map=None,
@@ -1282,10 +1279,6 @@ def realsp_correlation(
             mask_map: string, optional
                 Mask file to apply on correlation maps. If not given, correlation based
                 mask will be employed.
-            lig: bool, optional
-                An argument for model based map calculation using REFMAC.
-                Set True, if there is a ligand in the model, but no description.
-                Default is True.
             lgf: string, optional
                 An argument for model based map calculation using REFMAC.
                 Ligand description file (cif).
@@ -1303,17 +1296,16 @@ def realsp_correlation(
     """
     from emda.ext import realsp_local
 
-    realsp_local.rcc(
-        half1_map=half1map,
-        half2_map=half2map,
-        kernel_size=kernel_size,
-        norm=norm,
-        lig=lig,
-        model=model,
-        model_resol=model_resol,
-        mask_map=mask_map,
-        lgf=lgf,
-    )
+    rcc = realsp_local.RealspaceLocalCC()
+    rcc.hfmap1name = half1map
+    rcc.hfmap2name = half2map
+    rcc.kern_rad = kernel_size
+    rcc.model = model
+    rcc.model_resol = model_resol
+    rcc.maskname = mask_map
+    rcc.lgf = lgf
+    rcc.norm = norm
+    rcc.rcc()
 
 
 def b_from_correlation(
@@ -1339,9 +1331,7 @@ def realsp_correlation_mapmodel(
     model,
     resol,
     kernel_size=5,
-    lig=True,
     norm=False,
-    nomask=False,
     mask_map=None,
     lgf=None,
 ):
@@ -1361,23 +1351,25 @@ def realsp_correlation_mapmodel(
                 Radius of integration kernal in pixels. Default is 5.
             mask_map: string, optional
                 Mask file to apply on correlation maps.
-            nomask: bool, optional
-                If True, correlation maps are not masked. Otherwise, internally
-                calculated mask is used, if a mask is not supplied.
+                To combine with usemask option.
+            usemask: bool, optional
+                Default to False.
+                If True the map is masked before calculating correlation,
+                and the calculated correlation map is masked by the binarised mask
+                before wirting out the correlation map.
+                If the mask is not supplied, an internally calculated mask from the
+                atomic model will be used.
             norm: bool, optional
+                Defalt to False.
                 If True, correlation will be carried out on normalized maps.
                 Default is False.
-            lig: bool, optional
-                An argument for model based map calculation using REFMAC.
-                Set True, if there is a ligand in the model, but no description.
-                Default is True.
             lgf: string, optional
                 An argument for model based map calculation using REFMAC.
                 Ligand description file (cif).
 
         Outputs:
             Following maps are written out:
-            modelmap.mrc - model based map.
+            modelmap.mrc - model based map (only if atomic model is given).
             rcc_mapmodel.mrc - real space local correlation map.
     """
     from emda.ext import realsp_local
@@ -1386,12 +1378,10 @@ def realsp_correlation_mapmodel(
         fullmap=fullmap,
         model=model,
         kernel_size=kernel_size,
-        lig=lig,
         resol=resol,
         mask_map=mask_map,
-        lgf=lgf,
-        nomask=nomask,
         norm=norm,
+        lgf=lgf,
     )
 
 
@@ -1969,12 +1959,23 @@ def compositemap(maps, masks):
     composite.main(mapslist=maps, masklist=masks)
 
 
-def mapmagnification(maplist, rmap):
+def mapmagnification(maplist, rmap, resol=4.0, masklist=None):
+    """Refine magnification of a set of maps relative to a reference map
+
+    This method refines the magnification of a set of maps relative to
+    a given reference map.
+
+    Args:
+        maplist (string): List of maps whose magnifications are to be refined
+        rmap (string): Name of the reference map
+        masklist (string, optional): List of mask maps to apply on the maps.
+        resol (float, optional): Data resolution to use in the magnification refinement.
+                       This cutoff is used for all maps. Default to 4 A.
+    """
     from emda.ext import magnification
 
-    # magnification refinement
-    maplist.append(rmap)
-    magnification.main(maplist=maplist)
+    maplist.insert(0, rmap)
+    magnification.main(maplist=maplist, masklist=masklist, resol=resol)
 
 
 def set_dim_even(x):
