@@ -132,7 +132,7 @@ def main(
     fobj.write("    Rotation matrix: " + str(rotmat) + " \n")
     fobj.write("\n")
     fobj.write("    # fitting cycles: " + str(ncycles) + " \n")
-    t = [itm / emmap1.pixsize for itm in t_init]
+    t = [itm / emmap1.pixsize[i] for i, itm in enumerate(t_init)]
     rotmat_lst = []
     transl_lst = []
     # resolution estimate for line-fit
