@@ -136,3 +136,15 @@ def mtz2map(mtzname, map_size):
     data2write = np.real((ifftn(ifftshift(f3d))))
     return data2write
 
+
+def normalise_fo(fo, bin_idx=None, nbin=None, uc=None):
+    from emda.core.restools import get_resolution_array
+    from emda.core.fsc import halfmaps_fsc_variance
+
+    if bin_idx is None:
+        # calculate resolution grid
+        nbin, res_arr, bin_idx = get_resolution_array(uc=uc, hf1=fo)
+    # normalise Fo
+    eo = halfmaps_fsc_variance(hf1=fo, hf2=fo, bin_idx=bin_idx, nbin=nbin)[5]
+    return eo
+
