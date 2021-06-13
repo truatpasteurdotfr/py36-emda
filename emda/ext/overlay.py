@@ -10,21 +10,21 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from timeit import default_timer as timer
 import numpy as np
 import fcodes_fast
-from numpy.fft import fftn, ifftn, fftshift, ifftshift
+from numpy.fft import fftn, fftshift
 from emda import core
 from emda.core import quaternions
-from emda.ext.mapfit.utils import get_FRS, create_xyz_grid, get_xyz_sum, set_dim_even
-from emda.ext.mapfit import utils, interp_derivatives
+from emda.ext.mapfit.utils import get_FRS, create_xyz_grid, get_xyz_sum
+from emda.ext.mapfit import utils
 import emda.emda_methods as em
 
 
 np.set_printoptions(suppress=True)  # Suppress insignificant values for clarity
 
-timeit = True
+timeit = False
 
 
 class EmmapOverlay:
-    def __init__(self, map_list, modelres=5.0, com=False, mask_list=None):
+    def __init__(self, map_list, nocom=False, mask_list=None, modelres=None):
         self.map_list = map_list
         self.mask_list = mask_list
         self.modelres = modelres
@@ -40,7 +40,7 @@ class EmmapOverlay:
         self.cbin_idx = None
         self.cdim = None
         self.cbin = None
-        self.com = com
+        self.com = not(nocom)
         self.com1 = None
         self.comlist = []
         self.box_centr = None
@@ -52,17 +52,27 @@ class EmmapOverlay:
         self.eo_lst = None
         self.totalvar_lst = None
 
+    def _check_inputs(self):
+        if not self.map_list:
+            raise SystemExit("Map list is empty.")
+        if len(self.map_list) < 2:
+            raise SystemExit("At least 2 maps are needed.")
+        for istr in self.map_list:
+            if istr.endswith((".cif", ".pdb", ".ent")):
+                if self.modelres is None:
+                    raise SystemExit("Please specify resolution for modelbased map.")
+        if self.mask_list is not None:
+            if len(self.map_list) != len(self.mask_list):
+                raise SystemExit("map_list and mask_list must have the same size!")  
+
     def load_maps(self):
         from scipy import ndimage
         from scipy.ndimage.interpolation import shift
 
-        #com = self.com
         cmask = False
         fhf_lst = []
-        full_fhf_lst = []
+        self._check_inputs()
         if self.mask_list is not None:
-            if len(self.map_list) != len(self.mask_list):
-                raise SystemExit("map_list and mask_list must have the same size!")
             for i in range(len(self.mask_list)):
                 if i == 0:
                     _, mask, _ = em.get_data(self.mask_list[i])
@@ -78,7 +88,9 @@ class EmmapOverlay:
                     map_origin = origin
                     uc_target = uc
                     target_dim = arr.shape
-                    target_pix_size = uc_target[0] / target_dim[0]
+                    target_pix_size = []
+                    for j in range(3):
+                        target_pix_size.append(uc_target[j] / target_dim[j])
                     if cmask:
                         corner_mask = utils.remove_unwanted_corners(uc, target_dim)
                     else:
@@ -115,7 +127,9 @@ class EmmapOverlay:
                     except AssertionError:
                         raise SystemExit("Map and Mask Dimension mismatched!")
                     arr = arr * mask
-                    curnt_pix_size = uc[0] / arr.shape[0]
+                    curnt_pix_size = []
+                    for j in range(3):
+                        curnt_pix_size.append(uc[j] / arr.shape[j])
                     arr = core.iotools.resample2staticmap(
                         curnt_pix=curnt_pix_size,
                         targt_pix=target_pix_size,
@@ -152,11 +166,13 @@ class EmmapOverlay:
                     map_origin = origin
                     uc_target = uc
                     target_dim = arr.shape
-                    target_pix_size = uc_target[0] / target_dim[0]
+                    target_pix_size = []
+                    for j in range(3):
+                        target_pix_size.append(uc_target[j] / target_dim[j])
                     if self.com:
                         com1 = ndimage.measurements.center_of_mass(arr * (arr >= 0.0))
-                        print("COM before centering: ", com1)
                         self.comlist.append(com1)
+                        print("COM before centering: ", com1)
                         box_centr = (nx // 2, ny // 2, nz // 2)
                         print("BOX center: ", box_centr)
                         self.com1 = com1
@@ -181,9 +197,9 @@ class EmmapOverlay:
                         maporigin=map_origin,
                     )
                     arr = utils.set_dim_even(arr)
-                    em.write_mrc(arr, "modelmap" + str(i) + ".mrc", uc, origin)
-                    print("origin: ", origin)
-                    curnt_pix_size = uc[0] / arr.shape[0]
+                    curnt_pix_size = []
+                    for j in range(3):
+                        curnt_pix_size.append(uc[j] / arr.shape[j])
                     arr = core.iotools.resample2staticmap(
                         curnt_pix=curnt_pix_size,
                         targt_pix=target_pix_size,
@@ -192,8 +208,8 @@ class EmmapOverlay:
                     )
                     if self.com:
                         com1 = ndimage.measurements.center_of_mass(arr * (arr >= 0.0))
-                        print("COM: ", com1)
                         self.comlist.append(com1)
+                        print("COM: ", com1)
                         arr = shift(arr, np.subtract(box_centr, com1))
                         core.iotools.write_mrc(
                             arr, "moving_centered.mrc", uc_target, map_origin
@@ -221,7 +237,6 @@ class EmmapOverlay:
         self.nbin, self.res_arr, self.bin_idx = core.restools.get_resolution_array(
             self.map_unit_cell, self.fhf_lst[0]
         )
-        #
         for i in range(nmaps):
             _, _, _, totalvar, fo, eo = core.fsc.halfmaps_fsc_variance(
                 self.fhf_lst[i], self.fhf_lst[i], self.bin_idx, self.nbin
@@ -229,7 +244,6 @@ class EmmapOverlay:
             fFo_lst.append(fo)
             fEo_lst.append(eo)
             fBTV_lst.append(totalvar)
-        #
         self.fo_lst = fFo_lst
         self.eo_lst = fEo_lst
         self.totalvar_lst = fBTV_lst
@@ -240,7 +254,6 @@ def cut_resolution_for_linefit(f_list, bin_idx, res_arr, smax):
     f_arr = np.asarray(f_list, dtype='complex')
     nx, ny, nz = f_list[0].shape
     cbin = cx = smax
-    #print("Cut data at ", res_arr[cbin], " A")
     dx = int((nx - 2 * cx) / 2)
     dy = int((ny - 2 * cx) / 2)
     dz = int((nz - 2 * cx) / 2)
@@ -287,20 +300,13 @@ class linefit:
         q = q / np.sqrt(np.dot(q, q))
         rotmat = quaternions.get_RM(q)
         ers = get_FRS(rotmat, self.e1, interp="linear")
-        w_grid = self.get_fsc_wght(self.e0, ers[:, :, :, 0], self.bin_idx, self.nbin)
+        w_grid = self.get_fsc_wght(self.e0, ers[:, :, :, 0], self.bin_idx, self.nbin)   
         fval = np.real(np.sum(w_grid * self.e0 * np.conjugate(ers[:, :, :, 0])))
-        #without weights does seem to work for EMD-6952
-        #fval = np.real(np.sum(self.e0 * np.conjugate(ers[:, :, :, 0])))
         return -fval
 
     def scalar_opt(self, t=None):
         from scipy.optimize import minimize_scalar
 
-        nx, ny, nz = self.e1.shape
-        # self.alpha_t = self.scalar_opt_trans()
-        if t is not None:
-            st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
-            self.e1 = self.e1 * st
         f = self.func
         res = minimize_scalar(f, method="brent")
         return res.x
@@ -416,16 +422,6 @@ def derivatives_translation(e0, e1, wgrid, w2grid, sv):
     return step
 
 
-def rebox_density(density, newdims):
-    nx, ny, nz = density.shape
-    cx, cy, cz = list(newdims)
-    dx = int((density.shape[0] - cx) / 2)
-    dy = int((density.shape[1] - cx) / 2)
-    dz = int((density.shape[2] - cx) / 2)
-    boxed_density = density[dx : dx + cx, dy : dy + cx, dz : dz + cx]
-    return boxed_density
-
-
 class EmFit:
     def __init__(self, mapobj, interp="linear", dfs=None):
         self.mapobj = mapobj
@@ -460,162 +456,123 @@ class EmFit:
         self.lbinindx = None
         self.lnbin = None
 
-    def getst(self):
-        cx, cy, cz = self.e0.shape
-        st, _, _, _ = fcodes_fast.get_st(cx, cy, cz, self.t)
-        return st
-
-    def calc_fsc_t(self):
-        cx, cy, cz = self.e0.shape
-        self.st, s1, s2, s3 = fcodes_fast.get_st(cx, cy, cz, self.t)
-        self.sv = np.array([s1, s2, s3])
-        bin_idx = self.mapobj.cbin_idx
-        nbin = self.mapobj.cbin
-        #self.ert = subroutine2.trilinear2(self.e1 * self.st,bin_idx,self.rotmat,nbin,0,1,cx, cy, cz)[:, :, :, 0]
-        self.ert = fcodes_fast.trilinear2(self.e1 * self.st,bin_idx,self.rotmat,nbin,0,1,cx, cy, cz)[:, :, :, 0]
+    def calc_fsc(self):
         fsc = core.fsc.anytwomaps_fsc_covariance(
-            self.e0, self.ert, self.mapobj.cbin_idx, self.mapobj.cbin
-        )[0]
+            self.e0, self.ert, self.mapobj.cbin_idx, self.mapobj.cbin)[0]
         return fsc
 
-    def calc_fsc_r(self):
-        cx, cy, cz = self.e0.shape
-        self.st, s1, s2, s3 = fcodes_fast.get_st(cx, cy, cz, self.t)
-        self.sv = np.array([s1, s2, s3])
-        maps2send = np.stack((self.e1 * self.st, self.cfo * self.st), axis = -1)
-        nc = 2
-        bin_idx = self.mapobj.cbin_idx
-        nbin = self.mapobj.cbin
-        #maps = subroutine2.trilinear2(maps2send,bin_idx,self.rotmat,nbin,0,nc,cx, cy, cz)
-        maps = fcodes_fast.trilinear2(maps2send,bin_idx,self.rotmat,nbin,0,nc,cx, cy, cz)
-        self.ert = maps[:, :, :, 0]
-        self.crt = maps[:, :, :, 1]
-        fsc = core.fsc.anytwomaps_fsc_covariance(
-            self.e0, self.ert, self.mapobj.cbin_idx, self.mapobj.cbin
-        )[0]
-        return fsc
-
-    def get_wght(self):
-        #import subroutine2
+    def get_wght(self): 
         cx, cy, cz = self.e0.shape
         val_arr = np.zeros((self.mapobj.cbin, 2), dtype='float')
         val_arr[:,0] = self.fsc / (1 - self.fsc ** 2)
         fsc_sqd = self.fsc ** 2
         fsc_combi = fsc_sqd / (1 - fsc_sqd)
         val_arr[:,1] = fsc_combi
-        #wgrid = subroutine2.read_into_grid(self.mapobj.cbin_idx,val_arr, self.mapobj.cbin, cx, cy, cz)
         wgrid = fcodes_fast.read_into_grid2(self.mapobj.cbin_idx,val_arr, self.mapobj.cbin, cx, cy, cz)
-        w_grid = wgrid[:,:,:,0]
-        w2_grid = wgrid[:,:,:,1]
-        return w_grid, w2_grid
+        return wgrid[:,:,:,0], wgrid[:,:,:,1]
 
     def functional(self):
         fval = np.sum(self.w_grid * self.e0 * np.conjugate(self.ert))
         return fval.real
 
-    def minimizer(self, ncycles, t_init, rotmat, ifit, smax_lf, fobj=None, q_init=None):
+    def minimizer(self, ncycles, t, rotmat, ifit, smax_lf, fobj=None, q_init=None):
+        tol = 1e-2
         fsc_lst = []
         fval_list = []
-        q_list = []
-        t_list = []
         self.e0 = self.mapobj.ceo_lst[0]  # Static map e-data for fit
         xyz = create_xyz_grid(self.cell, self.cut_dim)
         xyz_sum = get_xyz_sum(xyz)
         if q_init is None:
             q_init = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
-        print("pixel size: ", self.pixsize)
         print("Cycle#   ", "Fval  ", "Rot(deg)  ", "Trans(A)  ", "avg(FSC)")
+        q0 = quaternions.rot2quart(rotmat)
         self.e1 = self.mapobj.ceo_lst[1]
         self.cfo = self.mapobj.cfo_lst[0]
-        mapdim = self.mapobj.map_dim[0]
-        self.t = np.asarray(t_init, dtype="float")
-        #translation_vec = 0.0
-        #self.st = 1.0
-        self.rotmat = rotmat
-        self.q = quaternions.rot2quart(self.rotmat)
-        theta2 = np.arccos((np.trace(self.rotmat) - 1) / 2) * 180.0 / np.pi
+        assert np.ndim(rotmat) == 2
         for i in range(ncycles):
             start = timer()
-            if i % 2 == 0:
-                # translation
-                self.fsc = self.calc_fsc_t()
-                self.w_grid, self.w2_grid = self.get_wght()
-                fval = self.functional()
-                fval_list.append(fval)
-                self.step = derivatives_translation(self.e0, self.ert, self.w_grid, self.w2_grid, self.sv)
-                lft = linefit()
-                lft.get_linefit_static_data([self.e0, self.ert], self.mapobj.cbin_idx, self.mapobj.res_arr, smax_lf)
-                lft.step = self.step
-                #lft.t = self.t
-                alpha = lft.scalar_opt_trans()
-                # translation
-                self.t = self.t + self.step * alpha
-                t_accum_angstrom = self.t * self.pixsize * mapdim
-                translation_vec = np.sqrt(np.dot(t_accum_angstrom, t_accum_angstrom))
-            else:
-                # rotation
+            cx, cy, cz = self.e0.shape
+            if i == 0:
+                self.t = np.array([0.0, 0.0, 0.0], dtype="float")
+                self.st, s1, s2, s3 = fcodes_fast.get_st(cx, cy, cz, self.t)
+                self.sv = np.array([s1, s2, s3])
+                self.q = q_init
                 self.rotmat = core.quaternions.get_RM(self.q)
-                theta2 = np.arccos((np.trace(self.rotmat) - 1) / 2) * 180.0 / np.pi
-                self.fsc = self.calc_fsc_r()
-                fsc_lst.append(self.fsc)
-                self.w_grid, self.w2_grid = self.get_wght()
-                fval = self.functional()
-                fval_list.append(fval)
+                self.ert = self.e1
+                self.crt = self.cfo
+            else:
+                # first rotate
+                self.rotmat = core.quaternions.get_RM(self.q)
+                maps2send = np.stack((self.e1, self.cfo), axis = -1)
+                bin_idx = self.mapobj.cbin_idx
+                nbin = self.mapobj.cbin
+                maps = fcodes_fast.trilinear2(maps2send,bin_idx,self.rotmat,nbin,0,2,cx, cy, cz)        
+                # then translate
+                self.st, s1, s2, s3 = fcodes_fast.get_st(cx, cy, cz, self.t)
+                self.sv = np.array([s1, s2, s3])
+                self.ert = maps[:, :, :, 0] * self.st
+                self.crt = maps[:, :, :, 1] * self.st
+            self.fsc = self.calc_fsc()
+            fsc_lst.append(self.fsc)
+            self.w_grid, self.w2_grid = self.get_wght()
+            fval = self.functional()
+            fval_list.append(fval)
+            # current rotation and translation to print
+            q = quaternions.quaternion_multiply(self.q, q0)
+            q = q / np.sqrt(np.dot(q, q))
+            theta2 = np.arccos((np.trace(quaternions.get_RM(q)) - 1) / 2) * 180.0 / np.pi
+            t_accum_angstrom = (t + self.t) * self.pixsize * self.mapobj.map_dim[0]
+            translation_vec = np.sqrt(np.dot(t_accum_angstrom, t_accum_angstrom))
+            if i > 0 and abs(fval_list[-1] - fval_list[-2]) < tol:
+                break
+            if i % 2 == 0:
+                # rotation optimisation
                 self.step = derivatives_rotation(
-                    self.e0, self.ert, self.crt, self.w_grid, self.sv, self.q, xyz, xyz_sum
-                )
+                    self.e0, self.ert, self.crt, self.w_grid, self.sv, self.q, xyz, xyz_sum)
                 lft = linefit()
-                """ lft.get_linefit_static_data(
-                    [self.e0, self.e1], self.mapobj.cbin_idx, self.mapobj.res_arr, smax_lf
-                ) """
-                if i == 1:
-                    #f_list = [self.e0, self.e1]
-                    f_list = [self.e0, self.ert]
-                    fout, lbinindx, lnbin = cut_resolution_for_linefit(f_list, self.mapobj.cbin_idx, self.mapobj.res_arr, smax_lf)
-                    self.le0 = fout[0,:,:,:]
-                    self.le1 = fout[1,:,:,:]
-                    self.lbinindx = lbinindx
-                    self.lnbin = lnbin
-                lft.e0 = self.le0
-                lft.e1 = self.le1
-                lft.bin_idx = self.lbinindx
-                lft.nbin = self.lnbin
+                lft.get_linefit_static_data(
+                    [self.e0, self.e1], self.mapobj.cbin_idx, self.mapobj.res_arr, smax_lf)
                 lft.step = self.step
                 lft.q_prev = self.q
                 alpha_r = lft.scalar_opt()
-                tmp = np.insert(self.step * alpha_r, 0, 0.0)
-                self.q = self.q + tmp
+                self.q += np.insert(self.step * alpha_r, 0, 0.0)
                 self.q = self.q / np.sqrt(np.dot(self.q, self.q))
-                self.rotmat = core.quaternions.get_RM(self.q)
-                theta2 = np.arccos((np.trace(self.rotmat) - 1) / 2) * 180.0 / np.pi
-                
+            else:
+                # translation optimisation
+                self.step = derivatives_translation(
+                    self.e0, self.ert, self.w_grid, self.w2_grid, self.sv)
+                lft = linefit()
+                lft.get_linefit_static_data(
+                    [self.e0, self.ert], self.mapobj.cbin_idx, self.mapobj.res_arr, smax_lf)
+                lft.step = self.step
+                alpha_t = lft.scalar_opt_trans()
+                self.t += self.step * alpha_t
             print(
                 "{:5d} {:8.4f} {:6.4f} {:6.4f} {:6.4f}".format(
                     i, fval, theta2, translation_vec, np.average(self.fsc)
                 )
             )
-
             end = timer()
-            #if timeit:
-                #print("time for one cycle:", end - start)
+            if timeit:
+                print("time for one cycle:", end - start)
 
 
 def fsc_between_static_and_transfomed_map(
-    staticmap, movingmap, bin_idx, rm, t, cell, nbin
+    maps, bin_idx, rm, t, nbin
 ):
-    nx, ny, nz = staticmap.shape
+    nx, ny, nz = maps[0].shape
+    maps2send = np.stack((maps[1], maps[2]), axis = -1)
+    frs = fcodes_fast.trilinear2(maps2send,bin_idx,rm,nbin,0,2,nx, ny, nz)
     st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
-    #frt_full = subroutine2.trilinear2(movingmap,bin_idx,rm,nbin,0,1,nx, ny, nz)[:, :, :, 0]
-    frt_full = fcodes_fast.trilinear2(movingmap,bin_idx,rm,nbin,0,1,nx, ny, nz)[:, :, :, 0]
-    f1f2_fsc = core.fsc.anytwomaps_fsc_covariance(staticmap, frt_full, bin_idx, nbin)[0]
+    f1f2_fsc = core.fsc.anytwomaps_fsc_covariance(maps[0], frs[:, :, :, 0] * st, bin_idx, nbin)[0]
     f1f2_fsc = np.nan_to_num(f1f2_fsc, copy=False, nan=0.0) # for aesthetics
-    return f1f2_fsc
+    return f1f2_fsc, frs[:, :, :, 0] * st, frs[:, :, :, 1] * st
 
 
-def get_ibin(bin_fsc):
-    # search from rear end
+def get_ibin(bin_fsc, cutoff):
+    # new search from rear end
     for i, ifsc in reversed(list(enumerate(bin_fsc))):
-        if ifsc > 0.4:
+        if ifsc > cutoff:
             ibin = i
             if ibin % 2 != 0:
                 ibin = ibin - 1
@@ -623,19 +580,40 @@ def get_ibin(bin_fsc):
     return ibin
 
 
+def determine_ibin(bin_fsc, cutoff=0.15):
+    bin_fsc = check_fsc(bin_fsc)
+    ibin = get_ibin(bin_fsc, cutoff)
+    i = 0
+    while ibin < 10:
+        cutoff -= 0.01
+        cutoff = max([cutoff, 0.])
+        ibin = get_ibin(bin_fsc, cutoff)
+        i += 1
+        if i > 200:
+            raise SystemExit("ibin= ", ibin)
+    return ibin
+
+def check_fsc(bin_fsc):
+    bin_fsc_new = np.zeros(bin_fsc.shape, 'float')
+    for i, ifsc in enumerate(bin_fsc):
+        if ifsc > 0.1:
+            bin_fsc_new[i] = ifsc
+        else:
+            if i > 1:
+                break
+    return bin_fsc_new
+
+
 def run_fit(
     emmap1,
-    smax,
     rotmat,
     t,
-    slf,
     ncycles,
     ifit,
     fobj=None,
-    interp=None,
     fitres=None,
 ):
-    from emda.ext.mapfit import frequency_marching
+    from emda.core.quaternions import rot2quart
 
     if fitres is not None:
         if fitres <= emmap1.res_arr[-1]:
@@ -646,23 +624,22 @@ def run_fit(
             if ibin % 2 != 0:
                 ibin = ibin - 1
             fitbin = min([len(dist), ibin])
-    if fitres is None:
+    else:
         fitbin = len(emmap1.res_arr) - 1
     fsc_lst = []
-    nmarchingcycles = 10
-    for i in range(nmarchingcycles):
-        print("Frequency marching cycle # ", i)
+    #
+    q = rot2quart(rotmat)
+    for i in range(10):
+        print("Resolution cycle #: ", i)
         if i == 0:
-            f1f2_fsc = fsc_between_static_and_transfomed_map(
-                staticmap=emmap1.fo_lst[0],
-                movingmap=emmap1.fo_lst[ifit],
+            f1f2_fsc, frt, ert = fsc_between_static_and_transfomed_map(
+                maps = [emmap1.fo_lst[0], emmap1.fo_lst[ifit], emmap1.eo_lst[ifit]],
                 bin_idx=emmap1.bin_idx,
                 rm=rotmat,
                 t=t,
-                cell=emmap1.map_unit_cell,
                 nbin=emmap1.nbin,
             )
-            ibin = get_ibin(f1f2_fsc)
+            ibin = determine_ibin(f1f2_fsc)
             if fitbin < ibin:
                 ibin = fitbin
             ibin_old = ibin
@@ -684,22 +661,18 @@ def run_fit(
                 break
         else:
             # Apply initial rotation and translation to calculate fsc
-            """ f1f2_fsc = fsc_between_static_and_transfomed_map(
-                emmap1.fo_lst[0],
-                emmap1.fo_lst[ifit],
-                emmap1.bin_idx,
-                rotmat,
-                t,
-                emmap1.map_unit_cell,
-                emmap1.nbin,
-            ) """
-            f1f2_fsc = core.fsc.anytwomaps_fsc_covariance(emmap1.fo_lst[0], frt, emmap1.bin_idx, emmap1.nbin)[0]
-            ibin = get_ibin(f1f2_fsc)
+            f1f2_fsc, frt, ert = fsc_between_static_and_transfomed_map(
+                maps = [emmap1.fo_lst[0], emmap1.fo_lst[ifit], emmap1.eo_lst[ifit]],
+                bin_idx=emmap1.bin_idx,
+                rm=rotmat,
+                t=t,
+                nbin=emmap1.nbin,
+            )
+            ibin = determine_ibin(f1f2_fsc)
             if fitbin < ibin:
                 ibin = fitbin
             print("Fitting resolution: ", emmap1.res_arr[ibin], " (A)")
-            print("FSC(ibin): ", f1f2_fsc[ibin])
-            if ibin_old == ibin or i == nmarchingcycles-1:
+            if ibin_old == ibin:
                 fsc_lst.append(f1f2_fsc)
                 q_final = quaternions.rot2quart(rotmat)
                 print("\n***FSC between static and moving maps***\n")
@@ -716,76 +689,55 @@ def run_fit(
         if ibin == 0:
             print("ibin = 0")
             raise SystemExit("Cannot proceed! Stopping now...")
-        e_list = [emmap1.eo_lst[0], emmap1.eo_lst[ifit], emmap1.fo_lst[ifit]]
+        e_list = [emmap1.eo_lst[0], ert, frt]
         eout, cBIdx, cbin = cut_resolution_for_linefit(
             e_list, emmap1.bin_idx, emmap1.res_arr, ibin
         )
-        static_cutmap = eout[0, :, :, :]
-        moving_cutmap = eout[1, :, :, :]
-        cfo = eout[2, :, :, :]
-        emmap1.ceo_lst = [static_cutmap, moving_cutmap]
-        emmap1.cfo_lst = [cfo]
+        emmap1.ceo_lst = [eout[0, :, :, :], eout[1, :, :, :]]
+        emmap1.cfo_lst = [eout[2, :, :, :]]
         emmap1.cbin_idx = cBIdx
-        emmap1.cdim = moving_cutmap.shape
+        emmap1.cdim = eout[1, :, :, :].shape
         emmap1.cbin = cbin
         rfit = EmFit(emmap1)
-        if ibin < slf or slf == 0:
-            slf = ibin
-        #slf = min([ibin, slf])
         slf = ibin
+        slf = min([ibin, 100])
         rfit.minimizer(ncycles, t, rotmat, ifit, smax_lf=slf, fobj=fobj)
-        t = rfit.t
-        rotmat = quaternions.get_RM(rfit.q)
-        # apply transformation on data for next cycle
-        nx, ny, nz = emmap1.map_dim
-        st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
-        frt = utils.get_FRS(rotmat, emmap1.fo_lst[ifit] * st, interp="linear")[:, :, :, 0] 
+        t += rfit.t
+        q = quaternions.quaternion_multiply(rfit.q, q)
+        #print("q: ", q)
+        q = q / np.sqrt(np.dot(q, q))
+        rotmat = quaternions.get_RM(q)
     return t, q_final
 
 
 def overlay(
     maplist,
-    ncycles=10,
-    t_init=[0.0, 0.0, 0.0],
-    rotmat_init=np.identity(3),
-    smax=6,
-    interp="linear",
-    modelres=5.0,
-    usecom=False,
+    tlist,
+    qlist,
+    ncycles=100,
+    modelres=None,
     masklist=None,
-    fobj=None,
+    modellist=None,
     fitres=None,
+    nocom=False,
+    fobj=None
 ):
+    fobj.write("\n This is EMDA map overlay \n")
     try:
-        emmap1 = EmmapOverlay(map_list=maplist, modelres=modelres, com=usecom, mask_list=masklist)
+        emmap1 = EmmapOverlay(map_list=maplist, mask_list=masklist, modelres=modelres, nocom=nocom)
     except:
-        emmap1 = EmmapOverlay(map_list=maplist, modelres=modelres, com=usecom)
+        emmap1 = EmmapOverlay(map_list=maplist, modelres=modelres, nocom=nocom)
     emmap1.load_maps()
     emmap1.calc_fsc_from_maps()
-    t = [itm / emmap1.pixsize for itm in t_init]
-    rotmat_lst = []
-    transl_lst = []
-    # resolution estimate for line-fit
-    dist = np.sqrt((emmap1.res_arr - smax) ** 2)
-    slf = np.argmin(dist) + 1
-    if slf % 2 != 0:
-        slf = slf - 1
-    slf = min([len(dist), slf])
-    q_init_list = []
-    rotaxis_list = []
     rotmat_list = []
     trans_list = []
-    q_final_list = []
     for ifit in range(1, len(emmap1.eo_lst)):
         t, q_final = run_fit(
             emmap1=emmap1,
-            smax=smax,
-            rotmat=rotmat_init,
-            t=t,
-            slf=slf,
+            rotmat=quaternions.get_RM(qlist[ifit-1]),
+            t=[itm / emmap1.pixsize[i] for i, itm in enumerate(tlist[ifit-1])],
             ncycles=ncycles,
             ifit=ifit,
-            interp=interp,
             fitres=fitres,
         )
         rotmat = quaternions.get_RM(q_final)
@@ -793,27 +745,24 @@ def overlay(
         trans_list.append(t)
     # output maps
     output_rotated_maps(emmap1, rotmat_list, trans_list)
-    output_rotated_models(emmap1, maplist, rotmat_list, trans_list)
+    output_rotated_models(emmap1, maplist, rotmat_list, trans_list, modellist)
     return emmap1, rotmat_list, trans_list
 
 
-def output_rotated_maps(emmap1, r_lst, t_lst, Bf_arr=None):
-    from numpy.fft import fftn, fftshift, ifftshift, ifftn, ifftshift
+def output_rotated_maps(emmap1, r_lst, t_lst):
+    from numpy.fft import ifftshift, ifftn, ifftshift
     from emda.ext.mapfit import utils
     from scipy.ndimage.interpolation import shift
 
-    if Bf_arr is None:
-        Bf_arr = [0.0]
     fo_lst = emmap1.fo_lst
     cell = emmap1.map_unit_cell
     comlist = emmap1.comlist
     bin_idx = emmap1.bin_idx
     nbin = emmap1.nbin
-    imap_f = 0
     f_static = fo_lst[0]
     nx, ny, nz = f_static.shape
     data2write = np.real(ifftshift(ifftn(ifftshift(f_static))))
-    print("COM list: ", comlist)
+    print('comlist:', comlist)
     if len(comlist) > 0:
         data2write = em.shift_density(data2write, shift=np.subtract(comlist[0], emmap1.box_centr))
     core.iotools.write_mrc(data2write, "static_map.mrc", cell)
@@ -823,19 +772,20 @@ def output_rotated_maps(emmap1, r_lst, t_lst, Bf_arr=None):
         f1f2_fsc_unaligned = core.fsc.anytwomaps_fsc_covariance(
             f_static, fo, bin_idx, nbin
         )[0]
+        frt = utils.get_FRS(rotmat, fo, interp="cubic")[:, :, :, 0]
         st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
-        frt = utils.get_FRS(rotmat, fo * st, interp="cubic")[:, :, :, 0]
+        frt = frt * st
+        # estimating covaraince between current map vs. static map
+        f1f2_fsc = core.fsc.anytwomaps_fsc_covariance(f_static, frt, bin_idx, nbin)[0]
         data2write = np.real(ifftshift(ifftn(ifftshift(frt))))
-        # apply reverse shift to density
         if len(comlist) > 0:
-            data2write = em.shift_density(data2write, shift=np.subtract(comlist[0], emmap1.box_centr))
+            print(comlist)
+            data2write = em.shift_density(data2write, shift=np.subtract(comlist[0], emmap1.box_centr))        
         core.iotools.write_mrc(
             data2write,
             "{0}_{1}.{2}".format("fitted_map", str(i), "mrc"),
             cell,
         )
-        # estimating covaraince between current map vs. static map
-        f1f2_fsc = core.fsc.anytwomaps_fsc_covariance(f_static, frt, bin_idx, nbin)[0]
         core.plotter.plot_nlines(
             emmap1.res_arr,
             [f1f2_fsc_unaligned[: emmap1.nbin], f1f2_fsc[: emmap1.nbin]],
@@ -844,65 +794,43 @@ def output_rotated_maps(emmap1, r_lst, t_lst, Bf_arr=None):
         )
 
 
-""" def output_rotated_models(emmap1, maplist, r_lst, t_lst):
-    from emda.core.iotools import apply_transformation_on_model, pdb2mmcif
-
-    pixsize = emmap1.pixsize
-    i = 0
-    for model, t, rotmat in zip(maplist[1:], t_lst, r_lst):
-        print(rotmat)
-        t = np.asarray(t, 'float') *  pixsize * np.asarray(emmap1.map_dim, 'int')
-        print(t)
-        i += 1
-        if model.endswith((".mrc", ".map")):
-            continue
-        elif model.endswith((".pdb", ".ent")):
-            pdb2mmcif(model)
-            outcifname = "emda_transformed_model_" + str(i) + ".cif"
-            print(outcifname)
-            _,_,_,_ = apply_transformation_on_model(mmcif_file="./out.cif",rotmat=rotmat, trans=t, outfilename=outcifname)
-        elif model.endswith((".cif")):
-            outcifname = "emda_transformed_model_" + str(i) + ".cif"
-            _,_,_,_ = apply_transformation_on_model(mmcif_file=model,rotmat=rotmat, trans=t, outfilename=outcifname)
- """
-
-def output_rotated_models(emmap1, maplist, r_lst, t_lst):
-    from emda.core.iotools import apply_transformation_on_model, pdb2mmcif, model_transform_gm
+def output_rotated_models(emmap1, maplist, r_lst, t_lst, modellist=None):
+    from emda.core.iotools import model_transform_gm
     from emda.ext.mapfit.utils import rm_zyx2xyz
 
     pixsize = emmap1.pixsize
     comlist = emmap1.comlist
-    box_center = emmap1.box_centr
     if len(comlist) > 0:
         assert len(comlist) == len(maplist)
     i = 0
     for model, t, rotmat in zip(maplist[1:], t_lst, r_lst):
         i += 1
-        print(rotmat)
+        #print(rotmat)
         t = np.asarray(t, 'float') *  pixsize * np.asarray(emmap1.map_dim, 'int')
         # calculate the vector from com to box_center in Angstroms
         if len(comlist) > 0:
             shift = np.subtract(comlist[i], comlist[0]) * pixsize
             t = t + shift
-        t = -t
-        print(t)
         rotmat = rm_zyx2xyz(rotmat)
-        i += 1
         if model.endswith((".mrc", ".map")):
             continue
         else:
             outcifname = "emda_transformed_model_" + str(i) + ".cif"
-            model_transform_gm(mmcif_file=model,rotmat=rotmat, trans=t, outfilename=outcifname)
-        """ elif model.endswith((".pdb", ".ent")):
-            pdb2mmcif(model)
+            model_transform_gm(mmcif_file=model,rotmat=rotmat, trans=-t, outfilename=outcifname)
+    if modellist is not None:
+        i = 0
+        for model, t, rotmat in zip(modellist, t_lst, r_lst):
+            i += 1
+            t = np.asarray(t, 'float') *  pixsize * np.asarray(emmap1.map_dim, 'int')
+            # calculate the vector from com to box_center in Angstroms
+            if len(comlist) > 0:
+                shift = np.subtract(comlist[i], comlist[0]) * pixsize
+                t = t + shift
+            rotmat = rm_zyx2xyz(rotmat)
             outcifname = "emda_transformed_model_" + str(i) + ".cif"
-            print(outcifname)
-            #_,_,_,_ = apply_transformation_on_model(mmcif_file="./out.cif",rotmat=rotmat, trans=t, outfilename=outcifname)
-            model_transform_gm(mmcif_file="./out.cif",rotmat=rotmat, trans=t, outfilename=outcifname)
-        elif model.endswith((".cif")):
-            outcifname = "emda_transformed_model_" + str(i) + ".cif"
-            #_,_,_,_ = apply_transformation_on_model(mmcif_file=model,rotmat=rotmat, trans=t, outfilename=outcifname)
-            model_transform_gm(mmcif_file=model,rotmat=rotmat, trans=t, outfilename=outcifname) """
+            mapcom = np.asarray(comlist[i]) * pixsize
+            model_transform_gm(mmcif_file=model, rotmat=rotmat, trans=-t, mapcom=mapcom, outfilename=outcifname)
+
 
 
 
@@ -914,12 +842,36 @@ if __name__ == "__main__":
         #"/Users/ranganaw/MRC/REFMAC/EMD-6952/emda_test/map_transform/transformed.mrc",
         #"/Users/ranganaw/MRC/REFMAC/Vinoth/emda_test/diffmap/postprocess_nat.mrc",
         #"/Users/ranganaw/MRC/REFMAC/Vinoth/emda_test/diffmap/postprocess_lig.mrc",
-        "/Users/ranganaw/MRC/REFMAC/Takanori_ATPase/EMD-9931/emd_9931.map",
-        "/Users/ranganaw/MRC/REFMAC/Takanori_ATPase/EMD-9934/emd_9934.map",
+        #"/Users/ranganaw/MRC/REFMAC/Takanori_ATPase/EMD-9931/emd_9931.map",
+        #"/Users/ranganaw/MRC/REFMAC/Takanori_ATPase/EMD-9934/emd_9934.map",
+        #"/Users/ranganaw/MRC/REFMAC/COVID19/EMD-21997/emd_21997.map",
+        #"/Users/ranganaw/MRC/REFMAC/COVID19/EMD-21997/emd_21999.map",
+        #"/Users/ranganaw/MRC/REFMAC/COVID19/EMD-21997/extracted_rbds/proshade_fit/ProShade_1/rotStr.map"
+        #"/Users/ranganaw/MRC/REFMAC/COVID19/EMD-21997/extracted_rbds/21997_RDB.mrc",
+        #"/Users/ranganaw/MRC/REFMAC/COVID19/EMD-21997/extracted_rbds/21999_RDB.mrc"
+        #"/Users/ranganaw/MRC/REFMAC/crop_refmactools_01/outward/postprocess_masked_cut.mrc",
+        #"/Users/ranganaw/MRC/REFMAC/crop_refmactools_01/melphalan/postprocess_masked_cut.mrc"
+        #"/Users/ranganaw/MRC/REFMAC/COVID19/EMD-21997/test3/fitted_map_1.mrc",
+        #"/Users/ranganaw/MRC/REFMAC/COVID19/EMD-21997/test3/6x2a.cif"
+        #"/Users/ranganaw/MRC/REFMAC/COVID19/EMD-21997/test3/21999_coordinate_fit/closed_rbd_fit/21997.mrc",
+        #"/Users/ranganaw/MRC/REFMAC/COVID19/EMD-21997/test3/21999_coordinate_fit/closed_rbd_fit/21999_fitted_on_21997.mrc"
+        "/Users/ranganaw/MRC/REFMAC/COVID19/EMD-21997/test3/21999_coordinate_fit/closed_rbd_fit/coordinate_fit/21999_closed_RBD_fitted.mrc",
+        "/Users/ranganaw/MRC/REFMAC/COVID19/EMD-21997/test3/21999_coordinate_fit/closed_rbd_fit/coordinate_fit/6x2a_closed_RBD.pdb"
     ]
 
     masklist = [
-        "/Users/ranganaw/MRC/REFMAC/Takanori_ATPase/DomainMasks/6k7g-9931_A_mask.mrc",
-        "/Users/ranganaw/MRC/REFMAC/Takanori_ATPase/DomainMasks/6k7i-9934_A_mask.mrc"
+        #"/Users/ranganaw/MRC/REFMAC/Takanori_ATPase/DomainMasks/6k7g-9931_A_mask.mrc",
+        #"/Users/ranganaw/MRC/REFMAC/Takanori_ATPase/DomainMasks/6k7i-9934_A_mask.mrc"
+        #"/Users/ranganaw/MRC/REFMAC/COVID19/EMD-21997/rdb_fit/emda_atomic_mask_6x29_RDB.mrc",
+        #"/Users/ranganaw/MRC/REFMAC/COVID19/EMD-21997/rdb_fit/emda_atomic_mask_6x2a_RDB.mrc"
+        #"/Users/ranganaw/MRC/REFMAC/COVID19/EMD-21997/test3/21999_coordinate_fit/closed_rbd_fit/emda_atomic_mask_6x29_closed_RBD.mrc",
+        #"/Users/ranganaw/MRC/REFMAC/COVID19/EMD-21997/test3/21999_coordinate_fit/closed_rbd_fit/emda_atomic_mask_6x2a_closed_RBD.mrc"
     ]
-    emmap1, rotmat_lst, transl_lst = overlay(maplist=maplist, masklist=masklist)
+
+    modellist = [
+        #"/Users/ranganaw/MRC/REFMAC/COVID19/EMD-21997//reworked_RBDmasks/6x2a_transformed_RDB_trimmed.pdb"
+        #"/Users/ranganaw/MRC/REFMAC/COVID19/EMD-21997/6x2a.cif"
+        ]
+    #emmap1, rotmat_lst, transl_lst = overlay(maplist=maplist, masklist=masklist)
+    #emmap1, rotmat_lst, transl_lst = overlay(maplist=maplist, modellist=modellist)
+    emmap1, rotmat_lst, transl_lst = overlay(maplist=maplist, modelres=3.5)
