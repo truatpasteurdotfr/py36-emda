@@ -20,16 +20,14 @@ def calc_fsc_mrc(hf1, hf2, bin_idx, nbin):
 
 
 def calculate_modelmap(
-    uc, model, dim, resol, bfac=0.0, lig=True, lgf=None, maporigin=None
+    uc, model, dim, resol, lgf=None, maporigin=None
 ):
     modelmap = em.model2map(
         modelxyz=model,
         dim=dim,
         resol=resol,
         cell=uc,
-        lig=lig,
         ligfile=lgf,
-        bfac=bfac,
         maporigin=maporigin,
     )
     f_model = np.fft.fftshift(np.fft.fftn(modelmap))
@@ -191,8 +189,6 @@ def map_model_fsc(
                 model=model,
                 dim=dim,
                 resol=map_resol,
-                bfac=bfac,
-                lig=lig,
                 lgf=lgf,
                 maporigin=origin,
             )
@@ -256,9 +252,7 @@ def fsc_mapmodel(
             dim=arr1.shape,
             resol=model_resol,
             cell=uc,
-            lig=lig,
             ligfile=lgf,
-            bfac=bfac,
             maporigin=orig,
         )
         em.write_mrc(modelmap, 'modelmap.mrc', uc, orig)
