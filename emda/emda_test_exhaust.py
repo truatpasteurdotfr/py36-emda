@@ -21,7 +21,7 @@ def main():
     em.write_mrc(arr1, "test.mrc", uc, map_origin=orig)
 
     new_arr = em.resample_data(
-        curnt_pix=1.0, targt_pix=1.0, targt_dim=[100, 100, 100], arr=arr1
+        curnt_pix=[1.0,1.0, 1.0], targt_pix=[1.0,1.0, 1.0], targt_dim=[100, 100, 100], arr=arr1
     )
 
     resol = em.estimate_map_resol(hfmap1name=map1name, hfmap2name=map2name)
