@@ -258,7 +258,10 @@ class EmmapOverlay:
                     map_origin = origin
                     uc_target = uc
                     target_dim = arr.shape
-                    target_pix_size = uc_target[0] / target_dim[0]
+                    target_pix_size = []
+                    for i in range(3):
+                        target_pix_size.append(round(uc_target[i] / target_dim[i], 5))
+                    #target_pix_size = uc_target[0] / target_dim[0]
                     if cmask:
                         corner_mask = utils.remove_unwanted_corners(uc, target_dim)
                     else:
@@ -293,7 +296,10 @@ class EmmapOverlay:
                     except AssertionError:
                         raise SystemExit("Map and Mask Dimension mismatched!")
                     arr = arr * mask
-                    curnt_pix_size = uc[0] / arr.shape[0]
+                    curnt_pix_size = []
+                    for i in range(3):
+                        curnt_pix_size.append(round(uc[i] / arr.shape[i], 5))
+                    #curnt_pix_size = uc[0] / arr.shape[0]
                     arr = core.iotools.resample2staticmap(
                         curnt_pix=curnt_pix_size,
                         targt_pix=target_pix_size,
@@ -315,6 +321,22 @@ class EmmapOverlay:
             self.map_dim = target_dim
             self.fhf_lst = fhf_lst
         if self.mask_list is None:
+            """ uc, arr1, origin = em.get_data(self.map_list[0])
+            uc, arr2, origin = em.get_data(self.map_list[1])
+            f1 = (fftshift(fftn(fftshift(arr1))))
+            f2 = (fftshift(fftn(fftshift(arr2))))
+            #f1 = (fftshift(fftn((arr1))))
+            #f2 = (fftshift(fftn((arr2))))
+            nbin, res_arr, bin_idx = core.restools.get_resolution_array(uc, f1)
+            # test FSC calculation between maps
+            f1f2_fsc = core.fsc.anytwomaps_fsc_covariance(
+                    f1, 
+                    f2, 
+                    bin_idx, 
+                    nbin)[0]
+            for i in range(nbin):
+                print(i, res_arr[i], f1f2_fsc[i])
+            exit() """            
             for i in range(len(self.map_list)):
                 if i == 0:
                     uc, arr, origin = em.get_data(self.map_list[i])
@@ -324,7 +346,10 @@ class EmmapOverlay:
                     map_origin = origin
                     uc_target = uc
                     target_dim = arr.shape
-                    target_pix_size = uc_target[0] / target_dim[0]
+                    target_pix_size = []
+                    for i in range(3):
+                        target_pix_size.append(round(uc_target[i] / target_dim[i], 5))
+                    #target_pix_size = uc_target[0] / target_dim[0]
                     if com:
                         com1 = ndimage.measurements.center_of_mass(arr * (arr >= 0.0))
                         print("COM before centering: ", com1)
@@ -355,13 +380,19 @@ class EmmapOverlay:
                     arr = utils.set_dim_even(arr)
                     em.write_mrc(arr, 'modelmap'+str(i)+'.mrc', uc, origin)
                     print("origin: ", origin)
-                    curnt_pix_size = uc[0] / arr.shape[0]
+                    curnt_pix_size = []
+                    for i in range(3):
+                        curnt_pix_size.append(round(uc[i] / arr.shape[i], 5))
+                    #curnt_pix_size = uc[0] / arr.shape[0]
                     arr = core.iotools.resample2staticmap(
                         curnt_pix=curnt_pix_size,
                         targt_pix=target_pix_size,
                         targt_dim=target_dim,
                         arr=arr,
                     )
+                    print("target_dim", target_dim)
+                    print("arr.shape: ", arr.shape)
+                    assert np.all(target_dim == arr.shape)
                     if com:
                         com1 = ndimage.measurements.center_of_mass(arr * (arr >= 0.0))
                         print("COM: ", com1)
@@ -427,6 +458,15 @@ class EmmapOverlay:
         self.nbin, self.res_arr, self.bin_idx = core.restools.get_resolution_array(
             self.map_unit_cell, self.fhf_lst[0]
         )
+        """ # test FSC calculation between maps - problematic
+        f1f2_fsc = core.fsc.anytwomaps_fsc_covariance(
+                self.fhf_lst[0], 
+                self.fhf_lst[1], 
+                self.bin_idx, 
+                self.nbin)[0]
+        for i in range(self.nbin):
+            print(i, self.res_arr[i], f1f2_fsc[i])
+        exit() """
         #
         for i in range(nmaps):
             _, _, _, totalvar, fo, eo = core.fsc.halfmaps_fsc_variance(
@@ -490,7 +530,10 @@ class Overlay:
                     map_origin = origin
                     uc_target = uc
                     target_dim = arr1.shape
-                    target_pix_size = uc_target[0] / target_dim[0]
+                    target_pix_size = []
+                    for i in range(3):
+                        target_pix_size.append(round(uc_target[i] / target_dim[i], 5))
+                    #target_pix_size = uc_target[0] / target_dim[0]
                     corner_mask = utils.remove_unwanted_corners(uc, target_dim)
                     if com:
                         com1 = ndimage.measurements.center_of_mass(arr1 * (arr1 >= 0.0))
@@ -514,7 +557,10 @@ class Overlay:
                                 )
                             )
                 else:
-                    curnt_pix_size = uc[0] / arr1.shape[0]
+                    curnt_pix_size = []
+                    for i in range(3):
+                        curnt_pix_size.append(round(uc[i] / arr1.shape[i], 5))
+                    #curnt_pix_size = uc[0] / arr1.shape[0]
                     for arr in [arr1, arr2]:
                         arr = core.iotools.resample2staticmap(
                             curnt_pix=curnt_pix_size,
@@ -549,7 +595,10 @@ class Overlay:
                     map_origin = origin
                     uc_target = uc
                     target_dim = arr1.shape
-                    target_pix_size = uc_target[0] / target_dim[0]
+                    target_pix_size = []
+                    for i in range(3):
+                        target_pix_size.append(round(uc_target[i] / target_dim[i], 5))
+                    #target_pix_size = uc_target[0] / target_dim[0]
                     corner_mask = utils.remove_unwanted_corners(uc, target_dim)
                     tmp_lst = []
                     if com:
@@ -595,7 +644,10 @@ class Overlay:
                         )
                 else:
                     tmp_lst = []
-                    curnt_pix_size = uc[0] / arr1.shape[0]
+                    curnt_pix_size = []
+                    for i in range(3):
+                        curnt_pix_size.append(round(uc[i] / arr1.shape[i], 5))
+                    #curnt_pix_size = uc[0] / arr1.shape[0]
                     for _, arr in enumerate([arr1, arr2]):
                         arr = core.iotools.resample2staticmap(
                             curnt_pix=curnt_pix_size,
@@ -732,7 +784,10 @@ class EmmapAverage:
                     fobj.write("Unit cell: " + str(uc_target) + "\n")
                     target_dim = arr1.shape
                     fobj.write("Map dimensions: " + str(target_dim) + "\n")
-                    target_pix_size = uc_target[0] / target_dim[0]
+                    target_pix_size = []
+                    for i in range(3):
+                        target_pix_size.append(round(uc_target[i] / target_dim[i], 5))
+                    #target_pix_size = uc_target[0] / target_dim[0]
                     fobj.write("Map pixel size: " + str(target_pix_size) + "\n")
                     corner_mask = utils.remove_unwanted_corners(uc, target_dim)
                     # get resolution grid
