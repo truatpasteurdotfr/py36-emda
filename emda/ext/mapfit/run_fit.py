@@ -21,8 +21,8 @@ def fsc_between_static_and_transfomed_map(
 
     nx, ny, nz = staticmap.shape
     st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
-    frt_full = utils.get_FRS(rm, movingmap * st, interp="linear")[:, :, :, 0]
-    f1f2_fsc = core.fsc.anytwomaps_fsc_covariance(staticmap, frt_full, bin_idx, nbin)[0]
+    frs_full = utils.get_FRS(rm, movingmap, interp="linear")[:, :, :, 0]
+    f1f2_fsc = core.fsc.anytwomaps_fsc_covariance(staticmap, frs_full*st, bin_idx, nbin)[0]
     return f1f2_fsc
 
 
@@ -30,7 +30,7 @@ def get_ibin(bin_fsc):
     ibin = 0
     # search from rear end
     for i, ifsc in reversed(list(enumerate(bin_fsc))):
-        if ifsc > 0.3:
+        if ifsc > 0.15:
             ibin = i
             if ibin % 2 != 0:
                 ibin = ibin - 1
@@ -66,7 +66,7 @@ def run_fit(
     if fitres is None:
         fitbin = len(emmap1.res_arr) - 1
     fsc_lst = []
-    for i in range(5):
+    for i in range(10):
         if i == 0:
             """ if emmap1.res_arr[0] < smax:
                 ibin = 2
@@ -164,13 +164,6 @@ def run_fit(
         if ibin == 0:
             print('ibin = 0')
             raise SystemExit("Cannot proceed! Stopping now...")
-        """ static_cutmap, cBIdx, cbin = frequency_marching.frequency_marching(
-            emmap1.eo_lst[0], emmap1.bin_idx, emmap1.res_arr, bmax=ibin
-        )
-        moving_cutmap, _, _ = frequency_marching.frequency_marching(
-            emmap1.eo_lst[ifit], emmap1.bin_idx, emmap1.res_arr, bmax=ibin
-        ) """
-
         e_list = [emmap1.eo_lst[0], emmap1.eo_lst[ifit], emmap1.fo_lst[ifit]]
         eout, cBIdx, cbin = cut_resolution_for_linefit(
             e_list, emmap1.bin_idx, emmap1.res_arr, ibin
