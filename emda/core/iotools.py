@@ -43,7 +43,11 @@ def read_map(mapname, fid=None):
 
     try:
         file = mrcfile.open(mapname)
-        if file.header.mapc == 1:
+        order = (file.header.mapc-1, file.header.mapr-1, file.header.maps-1)
+        axes_order = "".join(["ZYX"[i] for i in order])
+        arr = np.asarray(file.data, dtype="float")
+        arr = np.moveaxis(a=arr, source=(0,1,2), destination=order)
+        """ if file.header.mapc == 1:
             if file.header.mapr == 2 and file.header.maps == 3:
                 axes_order = 'ZYX'
                 arr = np.asarray(file.data, dtype="float")
@@ -70,7 +74,7 @@ def read_map(mapname, fid=None):
                 arr = np.asarray(file.data, dtype="float")
                 arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-1,-2,-3])
         else:
-            raise SystemExit("Wrong axes order. Stopping now...")
+            raise SystemExit("Wrong axes order. Stopping now...") """
         if fid is not None:
             fid.write('Axes order: %s\n' % (axes_order))
         unit_cell = np.zeros(6, dtype='float')
@@ -89,47 +93,6 @@ def read_map(mapname, fid=None):
         return unit_cell, arr, origin
     except FileNotFoundError as e:
         print(e)
-
-
-#def read_map(mapname):
-#    """Reads CCP4 type map (.map) or MRC type map.
-#
-#    Arguments:
-#        Inputs:
-#            mapname: string
-#                CCP4/MRC map file name
-#        Outputs:
-#            unit_cell: float, 1D array
-#                Unit cell
-#            arr: float, 3D array
-#                Map values as Numpy array
-#            origin: list
-#                Map origin list
-#     """
-#
-#    try:
-#        file = mrc.open(mapname)
-#        cell = np.array(file.header.cella)
-#        unit_cell = np.zeros(6, dtype='float')
-#        cell = file.header.cella[['x', 'y', 'z']]
-#        unit_cell[:3] = cell.view(('f4', 3))
-#        # Swap cell parameters a, b, c to c, b, a
-#        tmp = unit_cell[:3]
-#        unit_cell[0], unit_cell[2] = tmp[2], tmp[0]
-#        #
-#        unit_cell[3:] = float(90)
-#        origin = [
-#            1 * file.header.nxstart,
-#            1 * file.header.nystart,
-#            1 * file.header.nzstart,
-#        ]
-#        arr = np.asarray(file.data, dtype="float")
-#        file.close()
-#        print(mapname, arr.shape, unit_cell[:3])
-#        return unit_cell, arr, origin
-#    except FileNotFoundError:
-#        print("File Not Found!")
-#        exit()
 
 
 def change_axesorder(arr, uc, axes_order, maporig):
@@ -535,7 +498,7 @@ def resample2staticmap(curnt_pix, targt_pix, targt_dim, arr, sf=False, fobj=None
             + " \n"
         )
     #if abs(curnt_pix - targt_pix) < 10e-3:
-    if np.all(np.array(curnt_pix) - np.array(targt_pix)) < 10e-3:
+    if np.all(abs(np.array(curnt_pix) - np.array(targt_pix)) < 1e-3):
         dx = (tnx - nx) // 2
         dy = (tny - ny) // 2
         dz = (tnz - nz) // 2
@@ -556,6 +519,7 @@ def resample2staticmap(curnt_pix, targt_pix, targt_dim, arr, sf=False, fobj=None
             new_arr = cropimage(arr, targt_dim)
     else:
         newsize = []
+        print("arr.shape: ", arr.shape)
         for i in range(3):
             ns = int(round(arr.shape[i] * (curnt_pix[i] / targt_pix[i])))
             newsize.append(ns)
@@ -563,10 +527,11 @@ def resample2staticmap(curnt_pix, targt_pix, targt_dim, arr, sf=False, fobj=None
         if fobj is not None:
             fobj.write("Resizing in Fourier space and transforming back \n")
         new_arr = resample(arr, newsize, sf)
-        newsize = new_arr.shape
-        if np.any(np.array(newsize) < np.array(targt_dim)):
+        if np.any(np.array(new_arr.shape) < np.array(targt_dim)):
+            print("pading image...")
             new_arr = padimage(new_arr, targt_dim)
-        elif np.any(np.array(newsize) > np.array(targt_dim)):
+        elif np.any(np.array(new_arr.shape) > np.array(targt_dim)):
+            print("cropping image...")
             new_arr = cropimage(new_arr, targt_dim)
     return new_arr
 
@@ -588,21 +553,36 @@ def resample_on_anothermap(uc1, uc2, arr1, arr2):
 
 
 def padimage(arr, tdim):
+    import emda.emda_methods as em
+
     if len(tdim) == 3:
         tnz, tny, tnx = tdim
     elif len(tdim) < 3:
         tnz = tny = tnx = tdim[0]
     else:
         raise SystemExit("More than 3 dimensions given. Cannot handle")
+    print("current shape: ", arr.shape)
+    print("target shape: ", tdim)
     nz, ny, nx = arr.shape
     assert tnx >= nx
     assert tny >= ny
     assert tnz >= nz
-    dx = abs(tnx - nx) // 2
-    dy = abs(tny - ny) // 2
-    dz = abs(tnz - nz) // 2
+    # previous padding
+    """ dx = abs(tnx - nx) // 2; modz = abs(tnx - nx) % 2
+    dy = abs(tny - ny) // 2; mody = abs(tny - ny) % 2
+    dz = abs(tnz - nz) // 2; modx = abs(tnz - nz) % 2 
     image = np.zeros((tnz, tny, tnx), arr.dtype)
-    image[dz: nz + dz, dy: ny + dy, dx: nx + dx] = arr
+    image[dz: nz + dz, dy: ny + dy, dx: nx + dx] = arr """
+    com1 = np.asarray(em.center_of_mass_density(arr))
+    #print('com1', com1)
+    com2 = (com1/np.array(arr.shape)) * np.asarray(tdim)
+    #print('com2: ', com2)
+    dx = int(com2[2] - com1[2]) + int(com2[2] - com1[2] > 0.9)
+    dy = int(com2[1] - com1[1]) + int(com2[1] - com1[1] > 0.9)
+    dz = int(com2[0] - com1[0]) + int(com2[0] - com1[0] > 0.9)
+    print(dz, dy, dx)
+    image = np.zeros((tnz, tny, tnx), arr.dtype)
+    image[-(nz + dz):-dz, -(ny + dy):-dy, -(nx + dx):-dx] = arr
     return image
 
 def cropimage(arr, tdim):
@@ -619,7 +599,7 @@ def cropimage(arr, tdim):
     dx = abs(nx - tnx) // 2
     dy = abs(ny - tny) // 2
     dz = abs(nz - tnz) // 2
-    return arr[dz: nz + dz, dy: ny + dy, dx: nx + dx]
+    return arr[dz: tdim[0] + dz, dy: tdim[1] + dy, dx: tdim[2] + dx]
 
 
 def resample(x, newshape, sf):
@@ -632,9 +612,10 @@ def resample(x, newshape, sf):
     temp = np.zeros(xshape, x.dtype)
     temp[:x.shape[0], :x.shape[1], :x.shape[2]] = x
     x = temp
-    print(xshape, newshape)
-    # no-sampling
-    if x.shape[0] == newshape[0]:
+    print(np.array(x.shape) - np.array(newshape))
+    # nosampling
+    if np.all((np.array(x.shape) - np.array(newshape)) == 0):
+        print('no sampling')
         return x
     # Forward transform
     X = np.fft.fftn(x)
@@ -643,18 +624,22 @@ def resample(x, newshape, sf):
     Y = np.zeros(newshape, X.dtype)
     # upsampling
     dx = []
-    if X.shape[0] < newshape[0]:
+    if np.any((np.array(x.shape) - np.array(newshape)) < 0):
+        print('upsampling...')
         for i in range(3):
             dx.append(abs(newshape[i] - X.shape[i]) // 2)
-        #print('dx: ', dx)
-        Y[dx[0]: dx[0] + X.shape[0], dx[1]: dx[1] + X.shape[1], dx[2]: dx[2] + X.shape[2]] = X
+        Y[dx[0]: dx[0] + X.shape[0], 
+          dx[1]: dx[1] + X.shape[1], 
+          dx[2]: dx[2] + X.shape[2]] = X
     # downsampling
-    if newshape[0] < X.shape[0]:
+    if np.any((np.array(x.shape) - np.array(newshape)) > 0):
+        print('downsampling...')
         for i in range(3):
             dx.append(abs(newshape[i] - X.shape[i]) // 2)
-        #print('dx: ', dx)
         Y[:, :, :] = X[
-                    dx[0]: dx[0] + newshape[0], dx[1]: dx[1] + newshape[1], dx[2]: dx[2] + newshape[2]
+                    dx[0]: dx[0] + newshape[0], 
+                    dx[1]: dx[1] + newshape[1], 
+                    dx[2]: dx[2] + newshape[2]
                     ]
     if sf:
         return Y
@@ -891,15 +876,23 @@ def apply_transformation_on_model(mmcif_file, rotmat=None, trans=None, outfilena
     return cell, x_np, y_np, z_np
 
 
-def model_transform_gm(mmcif_file, rotmat=None, trans=None, outfilename=None):
+def model_transform_gm(mmcif_file, rotmat=None, trans=None, outfilename=None, mapcom=None):
     if rotmat is None:
         rotmat = np.identity(3)
     if outfilename is None:
         outfilename = "gemmi_transformed_model.cif"
     st = gemmi.read_structure(mmcif_file)
     com = gemmi.Vec3(*st[0].calculate_center_of_mass())
-    mat33 = gemmi.Mat33(rotmat) 
+    print("Model COM: ", com)
+    if mapcom is not None:
+        com = gemmi.Vec3(mapcom[2], mapcom[1], mapcom[0])
+        """ comoffset = np.zeros(3, 'float')
+        comoffset[0] = float(com.z) - mapcom[0]
+        comoffset[1] = float(com.y) - mapcom[1]
+        comoffset[2] = float(com.x) - mapcom[2]
+        trans += comoffset """ 
     t = gemmi.Vec3(trans[2], trans[1], trans[0]) # ZYX --> XYZ
+    mat33 = gemmi.Mat33(rotmat)
     trans = com - mat33.multiply(com) + t
     tr = gemmi.Transform(mat33, trans)
     st[0].transform(tr)
