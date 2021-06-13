@@ -263,9 +263,6 @@ realspc.add_argument("--nrm", action="store_true",
 realspc.add_argument(
     "--knl", required=False, type=int, default=5, help="Kernel size (pixels)"
 )
-# realspc.add_argument(
-#    "--lig", action="store_true", help="use if there is ligand, but no description"
-# )
 realspc.add_argument(
     "--lgf", required=False, default=None, type=str, help="ligand description file"
 )
@@ -294,15 +291,6 @@ mmrealspc.add_argument(
 )
 mmrealspc.add_argument(
     "--knl", required=False, type=int, default=5, help="Kernel size (pixels)"
-)
-""" mmrealspc.add_argument(
-    "--tpx", required=False, type=int, default=1, help="mask trim by n pixels"
-) """
-# mmrealspc.add_argument(
-#    "--lig", action="store_true", help="use if there is ligand, but no description"
-# )
-mmrealspc.add_argument(
-    "--nomask", action="store_true", help="if use, correlation maps are not masked"
 )
 mmrealspc.add_argument(
     "--lgf", required=False, default=None, type=str, help="ligand description file"
@@ -382,19 +370,29 @@ mapoverlay.add_argument(
     help="masklist for overlay",
 )
 mapoverlay.add_argument(
+    "--modellist",
+    required=False,
+    default=None,
+    nargs="+",
+    type=str,
+    help="include the list of models on which the \
+        transformation (found by map overlay) be applied",
+)
+mapoverlay.add_argument(
     "--tra",
     required=False,
     default=[0.0, 0.0, 0.0],
     nargs="+",
     type=float,
-    help="translation vector. default=[0.0, 0.0, 0.0]",
+    help="list of translation vectors. default=[0.0, 0.0, 0.0]",
 )
 mapoverlay.add_argument(
     "--rot",
     required=False,
-    default=0.0,
+    default=[0.0],
+    nargs="+",
     type=float,
-    help="rotation in deg. default=0.0",
+    help="list of rotations in deg. default=0.0",
 )
 mapoverlay.add_argument(
     "--axr",
@@ -402,49 +400,32 @@ mapoverlay.add_argument(
     default=[1, 0, 0],
     nargs="+",
     type=int,
-    help="rotation axis. default=[1,0,0]",
+    help="list of rotation axes. default=[1,0,0]",
 )
 mapoverlay.add_argument(
     "--ncy",
     required=False,
-    default=5,
+    default=100,
     type=int,
     help="number of fitting cycles. default=5",
-)
-mapoverlay.add_argument(
-    "--res",
-    required=False,
-    default=6,
-    type=float,
-    help="starting fit resol. (A). default= 6 A",
 )
 mapoverlay.add_argument(
     "--fitres",
     required=False,
     default=0.0,
     type=float,
-    help="final fit resol. (A). default= 0.0 A",
-)
-mapoverlay.add_argument(
-    "--int",
-    required=False,
-    default="linear",
-    type=str,
-    help="interpolation method (linear/cubic). default= linear",
+    help="last resolution to use for fitting. default= 0.0 A",
 )
 mapoverlay.add_argument(
     "--modelres",
     required=False,
-    default=5,
+    default=[5],
+    nargs="+",
     type=float,
-    help="model resol. (A). default= 5 A",
+    help="list of resolutions for model based map calculation.",
 )
-mapoverlay.add_argument("--hfm", action="store_true",
-                        help="if use employ half maps")
-mapoverlay.add_argument("--mod", action="store_true",
-                        help="if use calls model overlay")
-mapoverlay.add_argument("--usecom", action="store_true",
-                        help="if used, center-of-mass is used to superimpose maps")
+mapoverlay.add_argument("--nocom", action="store_true",
+                        help="if used, center-of-mass is not used during map overlay")
 
 
 mapaverage = subparsers.add_parser(
@@ -645,24 +626,40 @@ composite.add_argument(
     "--msk", required=False, default=None, nargs="+", type=str, help="masklist for maps"
 )
 
-magref = subparsers.add_parser(
-    "magref", description="magnification refinement")
+magref = subparsers.add_parser("magref", description="magnification refinement")
 magref.add_argument(
-    "--map",
-    required=True,
-    nargs="+",
-    type=str,
-    help="maplist to correct for magnification [.mrc/.map]",
-)
-magref.add_argument("--ref", required=True, type=str,
+                    "--map",
+                    required=True,
+                    nargs="+",
+                    type=str,
+                    help="maplist to correct for magnification [.mrc/.map]")
+magref.add_argument("--ref", 
+                    required=True, 
+                    type=str,
                     help="reference map [.mrc/.map]")
+magref.add_argument("--res", 
+                    required=False, 
+                    type=float,
+                    default=4.0,
+                    help="data resolution for magnification refinement.\
+                        This limit will be imposed on all maps.")
+magref.add_argument("--msk",
+                    required=False,
+                    default=None,
+                    nargs="+",
+                    type=str,
+                    help="list of masks to apply on maps[.mrc/.map]")
 
 centerofmass = subparsers.add_parser("com", description="center of mass")
-centerofmass.add_argument("--map", required=True,
+centerofmass.add_argument("--map", 
+                          required=True,
                           type=str, help="input map (MRC/MAP)")
 centerofmass.add_argument(
-    "--msk", required=False, default=None, type=str, help="mask to apply on the map"
-)
+                          "--msk", 
+                          required=False, 
+                          default=None, 
+                          type=str, 
+                          help="mask to apply on the map")
 
 fetchdata = subparsers.add_parser("fetch", description="fetch EMmap and model")
 fetchdata.add_argument("--emd", required=True, nargs="+",
@@ -937,7 +934,7 @@ def resample_data(args):
     import emda.ext.mapfit.utils as utils
 
     uc, arr, org = read_map(args.map)
-    arr = utils.set_dim_even(arr)
+    #arr = utils.set_dim_even(arr)
     cpix1 = float(round(uc[0] / arr.shape[0], 5))
     cpix2 = float(round(uc[1] / arr.shape[1], 5))
     cpix3 = float(round(uc[2] / arr.shape[2], 5))
@@ -983,7 +980,6 @@ def realsp_corr(args):
         half2map=args.h2,
         kernel_size=args.knl,
         norm=args.nrm,
-        # lig=args.lig,
         model=args.mdl,
         model_resol=args.res,
         mask_map=args.msk,
@@ -1009,12 +1005,9 @@ def mmrealsp_corr(args):
     realsp_correlation_mapmodel(
         fullmap=args.map,
         kernel_size=args.knl,
-        # lig=args.lig,
         model=args.mdl,
         resol=args.res,
         mask_map=args.msk,
-        nomask=args.nomask,
-        # trimpx=args.tpx,
         norm=args.nrm,
         lgf=args.lgf,
     )
@@ -1061,24 +1054,20 @@ def mapmodel_fsc(args, fobj):
     )
 
 
-def map_overlay(args, fobj):
+def map_overlay(args):
     from emda.emda_methods import overlay_maps
 
     overlay_maps(
         maplist=args.map,
         masklist=args.msk,
+        modellist=args.modellist,
         tra=args.tra,
         rot=args.rot,
         axr=args.axr,
         ncy=args.ncy,
-        res=args.res,
-        fobj=fobj,
         modelres=args.modelres,
-        interp=args.int,
-        hfm=args.hfm,
-        usemodel=args.mod,
         fitres=args.fitres,
-        usecom=args.usecom,
+        nocom=args.nocom,
     )
 
 
@@ -1252,7 +1241,10 @@ def composite_map(args):
 def magnification(args):
     from emda import emda_methods as em
 
-    em.mapmagnification(maplist=args.map, rmap=args.ref)
+    em.mapmagnification(maplist=args.map, 
+                        rmap=args.ref, 
+                        masklist=args.msk, 
+                        resol=args.res)
 
 
 def center_of_mass(args):
@@ -1356,8 +1348,7 @@ def main(command_line=None):
         mapmodel_fsc(args, f)
         f.close()
     if args.command == "overlay":
-        map_overlay(args, f)
-        f.close()
+        map_overlay(args)
     if args.command == "average":
         map_average(args, f)
         f.close()
