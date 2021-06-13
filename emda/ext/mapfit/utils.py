@@ -635,14 +635,19 @@ def calc_averagemaps_simple_allmaps(
 
 def set_dim_even(x):
     # Check if dims are even
-    if x.shape[0] % 2 != 0:
+    """ if x.shape[0] % 2 != 0:
         xshape = list(x.shape)
         xshape[0] = xshape[0] + 1
         xshape[1] = xshape[1] + 1
         xshape[2] = xshape[2] + 1
         temp = np.zeros(xshape, x.dtype)
         temp[:-1, :-1, :-1] = x
-        x = temp
+        x = temp """
+    xshape = list(x.shape)
+    xshape = (np.array(xshape) + np.array(xshape) % 2).tolist()
+    temp = np.zeros(xshape, x.dtype)
+    temp[-x.shape[0]:, -x.shape[1]:, -x.shape[2]:] = x
+    x = temp
     return x
 
 
