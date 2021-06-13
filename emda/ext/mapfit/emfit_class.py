@@ -13,6 +13,7 @@ import fcodes_fast
 from emda.core import fsc as fsctools
 from emda.core import quaternions
 from emda.ext.mapfit.utils import get_FRS, create_xyz_grid, get_xyz_sum
+import emda.emda_methods as em
 
 np.set_printoptions(suppress=True)  # Suppress insignificant values for clarity
 
@@ -49,16 +50,38 @@ class EmFit:
         cx, cy, cz = self.e0.shape
         self.st, s1, s2, s3 = fcodes_fast.get_st(cx, cy, cz, self.t)
         self.sv = np.array([s1, s2, s3])
-        self.ert = get_FRS(self.rotmat, self.e1 * self.st, interp=self.interp)[:, :, :, 0]
-        # f are used for FSC
-        """ frt = get_FRS(self.rotmat, self.f1 * self.st, interp=self.interp)[:, :, :, 0]
-        fsc = core.fsc.anytwomaps_fsc_covariance(
-            self.mapobj.cfo_lst[0], frt, self.mapobj.cbin_idx, self.mapobj.cbin
-        )[0] """
+        #self.ert = get_FRS(self.rotmat, self.e1 * self.st, interp=self.interp)[:, :, :, 0]
+        self.ert = get_FRS(self.rotmat, self.e1, interp=self.interp)[:, :, :, 0]
+        self.ert = self.ert  * self.st
         fsc = fsctools.anytwomaps_fsc_covariance(
             self.e0, self.ert, self.mapobj.cbin_idx, self.mapobj.cbin
         )[0]
         return fsc
+
+    def calc_fsc3d(self):
+        from emda.ext.fouriersp_local import get_3d_fouriercorrelation
+        from emda.core.restools import get_resArr, remove_edge, create_soft_edged_kernel_pxl
+        cx, cy, cz = self.e0.shape
+        self.st, s1, s2, s3 = fcodes_fast.get_st(cx, cy, cz, self.t)
+        self.sv = np.array([s1, s2, s3])
+        self.ert = get_FRS(self.rotmat, self.e1 * self.st, interp=self.interp)[:, :, :, 0]
+        kern = create_soft_edged_kernel_pxl(r1=5)
+        fsc3d = get_3d_fouriercorrelation(hf1=self.e0, hf2=self.ert, kern_sphere=kern)[0]
+        nx, ny, nz = self.e0.shape
+        fResArr = get_resArr(self.mapobj.map_unit_cell, nx)
+        cut_mask = remove_edge(fResArr, fResArr[-1])
+        cc_mask = np.zeros(shape=(nx, ny, nz), dtype="int")
+        cx, cy, cz = cut_mask.shape
+        dx = (nx - cx) // 2
+        dy = (ny - cy) // 2
+        dz = (nz - cz) // 2
+        cc_mask[dx : dx + cx, dy : dy + cy, dz : dz + cz] = cut_mask
+        return fsc3d.real * cc_mask
+
+    def get_wght3d(self, fsc3d):
+        wgrid3d = fsc3d / (1 - fsc3d**2)
+        w2grid3d = fsc3d**2 / (1 - fsc3d**2)
+        return wgrid3d, w2grid3d
 
     def get_wght(self):
         cx, cy, cz = self.e0.shape
@@ -84,7 +107,7 @@ class EmFit:
             interp_derivatives,
             derivatives,
         )
-
+        tol = 1e-2
         fsc_lst = []
         fval_list = []
         q_list = []
@@ -107,13 +130,12 @@ class EmFit:
         print("Cycle#   ", "Fval  ", "Rot(deg)  ", "Trans(A)  ", "avg(FSC)")
         for ifit in range(nfit):
             self.e1 = self.mapobj.ceo_lst[ifit + 1]
-            #self.f1 = self.mapobj.cfo_lst[ifit + 1]
             for i in range(ncycles):
                 start = timer()
                 if i == 0:
                     self.t = np.asarray(t_init, dtype='float')
                     t_accum = self.t
-                    t_accum_angstrom = t_accum * self.pixsize * self.ful_dim[0]#self.cell[:3]
+                    t_accum_angstrom = trans_in_angstrom(t_accum, self.pixsize, self.ful_dim)
                     translation_vec = np.sqrt(
                         np.sum(t_accum_angstrom * t_accum_angstrom)
                     )
@@ -130,8 +152,10 @@ class EmFit:
                         self.rotmat = np.identity(3)
                     else:
                         self.rotmat = quaternions.get_RM(self.q)
- 
-                self.fsc = self.calc_fsc() 
+                self.fsc = self.calc_fsc()
+                #fsc3d = self.calc_fsc3d() 
+                #print(self.fsc)
+                #em.write_mrc(fsc3d, "fsc3d.mrc", self.cell)
                 if np.average(self.fsc) > 0.999:
                     fval = np.sum(self.e0 * np.conjugate(self.ert))
                     print("fval, FSC_avg ", fval.real, np.average(self.fsc))
@@ -143,33 +167,27 @@ class EmFit:
                     print("thets2, trans: ", theta2, translation_vec)
                     break
                 self.w_grid, self.w2_grid = self.get_wght()
+                #self.w_grid, self.w2_grid = self.get_wght3d(fsc3d)
                 fval = self.functional()
                 fval_list.append(fval)
                 q_list.append(q_accum)
                 t_list.append(t_accum)
                 if math.isnan(theta2):
-                    print("Cannot find a solution! Stopping now...")
-                    exit()
+                    raise SystemExit("Cannot find a solution! Stopping now...")
                 if i == 0:
                     fval_previous = fval
                     fsc = self.fsc
                     fsc_lst.append(fsc)
                 if i > 0 and fval_previous < fval or i == ncycles - 1:
                     fsc = self.fsc
-                """ if i > 0 and fval < fval_previous or i == ncycles - 1:
-                    rotmat = core.quaternions.get_RM(q_accum_previous)
-                    fsc_lst.append(fsc)
-                    self.rotmat = rotmat  # final rotation
-                    self.t_accum = t_accum_previous  # final translation
-                    self.fsc_lst = fsc_lst
-                    t_accum_angstrom = self.t_accum * self.pixsize#self.cell[:3]
-                    translation_vec = np.sqrt(
-                        np.sum(t_accum_angstrom * t_accum_angstrom)
-                    )
-                    theta2 = np.arccos((np.trace(self.rotmat) - 1) / 2) * 180.0 / np.pi
-                    print("thets2, trans: ", theta2, translation_vec)
-                    break """
-                if i > 0 and i == ncycles - 1:
+                # stop fitting if converged
+                if i > 0 and abs(fval - fval_previous) <= tol or i == ncycles - 1:
+                    self.rotmat = quaternions.get_RM(q_list[-1])
+                    self.q = q_list[-1]
+                    self.t_accum = t_list[-1]
+                    self.rotmat = quaternions.get_RM(q_list[-1])
+                    break
+                """ if i > 0 and i == ncycles - 1:
                     # search for max fval in the fval_list
                     self.rotmat = quaternions.get_RM(q_list[-1])
                     self.q = q_list[-1]
@@ -178,20 +196,7 @@ class EmFit:
                     translation_vec = trans_in_angstrom(t_accum, self.pixsize, self.ful_dim)
                     theta2 = np.arccos((np.trace(self.rotmat) - 1) / 2) * 180.0 / np.pi
                     print("thets2, trans: ", theta2, translation_vec)
-                    break
-
-                    """ rotmat = core.quaternions.get_RM(q_accum)
-                    fsc_lst.append(fsc)
-                    self.rotmat = rotmat  # final rotation
-                    self.t_accum = t_accum  # final translation
-                    self.fsc_lst = fsc_lst
-                    t_accum_angstrom = self.t_accum * self.pixsize#self.cell[:3]
-                    translation_vec = np.sqrt(
-                        np.sum(t_accum_angstrom * t_accum_angstrom)
-                    )
-                    theta2 = np.arccos((np.trace(self.rotmat) - 1) / 2) * 180.0 / np.pi
-                    print("thets2, trans: ", theta2, translation_vec) """
-
+                    break """
                 print(
                     "{:5d} {:8.4f} {:6.2f} {:6.2f} {:6.2f}".format(
                         i, fval, theta2, translation_vec, np.average(self.fsc)
@@ -235,6 +240,25 @@ class EmFit:
                 end_lf = timer()
                 if timeit:
                     print(" time for line fit: ", end_lf - start_lf)
+                # new linefit
+                """ if i == 0:
+                    lft = linefit_class.linefit2()
+                lft.cbin_idx = self.mapobj.cbin_idx
+                lft.cbin = self.mapobj.cbin
+                lft.res_arr = self.mapobj.res_arr
+                lft.smax = smax_lf
+                lft.e0 = self.e0
+                lft.e1 = self.e1
+                lft.get_linefit_static_data()
+                lft.step = self.step
+                #alpha_t = lft.scalar_opt_trans()
+                lft.q_prev = self.q
+                #alpha_r = lft.scalar_opt_rot()
+                lft.scalar_opt_rot()
+                alpha_t = lft.alpha_t
+                alpha_r = lft.alpha_r
+                self.t = self.step[:3] * alpha_t
+                tmp = np.insert(self.step[3:] * alpha_r, 0, 0.0) """
                 # translation
                 self.t = self.step[:3] * alpha[0]
                 t_accum = t_accum + self.t
@@ -255,5 +279,5 @@ class EmFit:
 
 
 def trans_in_angstrom(t, pixsize, dim):
-    t_angs = t * pixsize * np.asarray(dim)
+    t_angs = np.asarray(t) * np.asarray(pixsize) * np.asarray(dim)
     return np.sqrt(np.sum(t_angs * t_angs))
