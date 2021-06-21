@@ -419,10 +419,10 @@ mapoverlay.add_argument(
 mapoverlay.add_argument(
     "--modelres",
     required=False,
-    default=[5],
-    nargs="+",
+    default=None,
+    #nargs="+",
     type=float,
-    help="list of resolutions for model based map calculation.",
+    help="resolution for model based map calculation.",
 )
 mapoverlay.add_argument("--nocom", action="store_true",
                         help="if used, center-of-mass is not used during map overlay")
