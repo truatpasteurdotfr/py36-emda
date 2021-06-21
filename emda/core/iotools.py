@@ -729,40 +729,48 @@ def read_mmcif(mmcif_file):
     return cell, x_np, y_np, z_np, Biso_np
 
 
-def run_refmac_sfcalc(filename, resol, lig=True, ligfile=None):
+def run_refmac_sfcalc(filename, resol, lig=True, bfac=None, ligfile=None):
     import os
     import os.path
     import subprocess
 
+    # get current path
+    current_path = os.getcwd()
+    # get the path to filename
+    filepath = os.path.abspath(os.path.dirname(filename)) + '/'
+    # navigate to filepath
+    os.chdir(filepath)
     fmtz = filename[:-4] + ".mtz"
     cmd = ["refmac5", "XYZIN", filename, "HKLOUT", fmtz]
     if ligfile is not None:
         cmd = ["refmac5", "XYZIN", filename, "HKLOUT", fmtz, "lib_in", ligfile]
         lig = False
     # Creating the sfcalc.inp with custom parameters (resol, Bfac)
-    sfcalc_inp = open("sfcalc.inp", "w+")
+    sfcalc_inp = open(filepath+"sfcalc.inp", "w+")
     sfcalc_inp.write("mode sfcalc\n")
     sfcalc_inp.write("sfcalc cr2f\n")
     if lig:
         sfcalc_inp.write("make newligand continue\n")
     sfcalc_inp.write("resolution %f\n" % resol)
-    #sfcalc_inp.write("temp set %f\n" % bfac)
+    if bfac is not None and bfac > 0.0:
+        sfcalc_inp.write("temp set %f\n" % bfac)
     sfcalc_inp.write("source em mb\n")
     sfcalc_inp.write("make hydrogen yes\n")
     sfcalc_inp.write("end")
     sfcalc_inp.close()
     # Read in sfcalc_inp
-    PATH = "sfcalc.inp"
-    logf = open("sfcalc.log", "w+")
+    PATH = filepath+"sfcalc.inp"
+    logf = open(filepath+"sfcalc.log", "w+")
     if os.path.isfile(PATH) and os.access(PATH, os.R_OK):
         print("sfcalc.inp exists and is readable")
-        inp = open("sfcalc.inp", "r")
+        inp = open(filepath+"sfcalc.inp", "r")
         # Run the command with parameters from file f2mtz.inp
         subprocess.call(cmd, stdin=inp, stdout=logf)
         logf.close()
         inp.close()
     else:
         raise SystemExit("File is either missing or not readable")
+    os.chdir(current_path)
 
 
 def read_atomsf(atm, fpath=None):
