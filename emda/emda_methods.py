@@ -10,6 +10,7 @@ Mozilla Public License, version 2.0; see LICENSE.
 from __future__ import absolute_import, division, print_function, unicode_literals
 import numpy as np
 import fcodes_fast
+import os
 from emda.config import debug_mode
 from emda.core import iotools, maptools, restools, plotter, fsc, quaternions
 
@@ -1822,7 +1823,7 @@ def mirror_map(mapname):
 
 
 def model2map(
-    modelxyz, dim, resol, cell, maporigin=None, ligfile=None
+    modelxyz, dim, resol, cell, bfac=None, maporigin=None, ligfile=None, outputpath=None,
 ):
     """Calculates EM map from atomic coordinates using REFMAC5
 
@@ -1834,16 +1835,29 @@ def model2map(
         maporigin (list, optional): Location of the first column (nxstart), 
             row (nystart), section (nzstart) of the unit cell. Defaults to [0, 0, 0].
         ligfile (string, optional): Name of the ligand description file. Defaults to None.
+        outputpath (string, optional): Path for auxilliary files. Defaults to current
+            working directory
+        bfac(float, optional): Parameter for refmac. Set all atomic B values to bfac
+            when it is positive. Default to None.
 
     Returns:
         float ndarray: calculated model-based density array
     """
     import gemmi as gm
+    import shutil
 
     # print parameters
     print('Requested resolution (A): ', resol)
     print('Requested sampling: ', dim)
     print('Cell [a, b, c]: ', cell)
+    if outputpath is None:
+        outputpath = os.getcwd()
+    outputpath = os.path.join(outputpath, 'emda_refmacfiles/')
+    print('outputpath: ', outputpath)
+    # make director for files for refmac run
+    if os.path.exists(outputpath):
+        shutil.rmtree(outputpath)
+    os.mkdir(outputpath) 
     # check for valid sampling:
     for i in range(3):
         if dim[i] % 2 != 0:
@@ -1865,17 +1879,19 @@ def model2map(
     structure = gm.read_structure(modelxyz)
     structure.cell.set(a, b, c, 90.0, 90.0, 90.0)
     structure.spacegroup_hm = "P 1"
-    structure.make_mmcif_document().write_file("model.cif")
+    structure.make_mmcif_document().write_file(outputpath+"model.cif")
     # run refmac using model.cif just created
-    iotools.run_refmac_sfcalc("./model.cif", resol, ligfile=ligfile)
-    modelmap = maptools.mtz2map("./sfcalc_from_crd.mtz", dim)
+    iotools.run_refmac_sfcalc(filename=outputpath+"model.cif", 
+                              resol=resol, 
+                              ligfile=ligfile,
+                              bfac=bfac)
+    modelmap = maptools.mtz2map(outputpath+"sfcalc_from_crd.mtz", dim)
     if maporigin is None:
         maporigin = [0, 0, 0]
     else:
         shift_z = modelmap.shape[0] - abs(maporigin[2])
         shift_y = modelmap.shape[1] - abs(maporigin[1])
         shift_x = modelmap.shape[2] - abs(maporigin[0])
-        # print(shift_z, shift_y, shift_x)
         modelmap = np.roll(
             np.roll(np.roll(modelmap, -shift_z, axis=0), -shift_y, axis=1),
             -shift_x,
