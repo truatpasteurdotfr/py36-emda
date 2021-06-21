@@ -156,7 +156,7 @@ class EmmapOverlay:
             self.map_unit_cell = uc_target
             self.map_dim = target_dim
             self.fhf_lst = fhf_lst
-        if self.mask_list is None:
+        else:
             for i in range(len(self.map_list)):
                 if i == 0:
                     uc, arr, origin = em.get_data(self.map_list[i])
@@ -571,12 +571,16 @@ def fsc_between_static_and_transfomed_map(
 
 def get_ibin(bin_fsc, cutoff):
     # new search from rear end
+    ibin = 0
     for i, ifsc in reversed(list(enumerate(bin_fsc))):
         if ifsc > cutoff:
             ibin = i
             if ibin % 2 != 0:
                 ibin = ibin - 1
             break
+    if ibin == 0:
+        print("ibin = 0, resolution is too low.")
+        raise SystemExit("Cannot proceed! Stopping now...")
     return ibin
 
 
