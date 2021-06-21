@@ -1071,7 +1071,7 @@ def mirror_map(mapname):
 
 
 def model2map(
-    modelxyz, dim, resol, cell, maporigin=None, ligfile=None
+    modelxyz, dim, resol, cell, bfac=None, maporigin=None, ligfile=None, outputpath=None,
 ):
     """Calculates EM map from atomic coordinates using REFMAC5
 
@@ -1083,6 +1083,10 @@ def model2map(
         maporigin (list, optional): Location of the first column (nxstart), 
             row (nystart), section (nzstart) of the unit cell. Defaults to [0, 0, 0].
         ligfile (string, optional): Name of the ligand description file. Defaults to None.
+        outputpath (string, optional): Path for auxilliary files. Defaults to current
+            working directory
+        bfac(float, optional): Parameter for refmac. Set all atomic B values to bfac
+            when it is positive. Default to None.
 
     Returns:
         float ndarray: calculated model-based density array
