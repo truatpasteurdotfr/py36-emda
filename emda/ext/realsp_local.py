@@ -81,7 +81,7 @@ class RealspaceLocalCC:
         self.uc, self.origin = uc, origin
         if self.maskname is not None:
             _, cc_mask, _ = core.iotools.read_map(self.maskname)
-            cc_mask_binary = cc_mask > 0. # binary mask
+            cc_mask_binary = cc_mask > 0.5 # binary mask
         else:
             cc_mask = 1
             cc_mask_binary = 1
