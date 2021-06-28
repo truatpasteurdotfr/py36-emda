@@ -12,7 +12,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import numpy as np
 from emda import core
 import emda.emda_methods as em
-from emda.ext.edata_rcc import rcc_from_edata
 
 class RealspaceLocalCC:
     def __init__(self):
