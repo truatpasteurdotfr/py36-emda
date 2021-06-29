@@ -40,7 +40,7 @@ class MaskedMaps:
         kern = core.restools.create_soft_edged_kernel_pxl(
             self.smax
         )  # sphere with radius of n pixles
-        _, fullcc3d = realsp_local.get_3d_realspcorrelation(self.arr1, self.arr2, kern)
+        halfcc3d = realsp_local.get_3d_realspcorrelation(self.arr1, self.arr2, kern)
         """ if self.threshold is None:
             cc_mask, threshold = self.histogram(fullcc3d)
         else:
@@ -50,7 +50,7 @@ class MaskedMaps:
         # dilate and softened the mask
         mask = make_soft(binary_dilation_ccmask(mask * cc_mask, self.iter))
         mask = mask * (mask >= 0.0) """
-        mask = self.histogram2(fullcc3d, prob=self.prob)
+        mask = self.histogram2(halfcc3d, prob=self.prob)
         self.mask = mask
 
     def create_edgemask(self, radius):
