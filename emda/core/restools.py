@@ -120,10 +120,9 @@ def create_soft_edged_kernel_pxl(r1):
     from math import sqrt, cos
 
     if r1 < 3:
-        r1 = 3
-    if r1 % 2 == 0:
-        r1 = r1 - 1
-    boxsize = 2 * r1 + 1
+        boxsize = 5
+    else:
+        boxsize = 2 * r1 + 1
     kern_sphere_soft = np.zeros(shape=(boxsize, boxsize, boxsize), dtype="float")
     kx = ky = kz = boxsize
     center = boxsize // 2
