@@ -117,6 +117,7 @@ class EmmapOverlay:
                         dim=target_dim,
                         uc=uc_target,
                         maporigin=map_origin,
+                        gemmi=True,
                     )
                     arr = utils.set_dim_even(arr)
                     print("origin: ", origin)
@@ -195,6 +196,7 @@ class EmmapOverlay:
                         dim=target_dim,
                         uc=uc_target,
                         maporigin=map_origin,
+                        gemmi=True,
                     )
                     arr = utils.set_dim_even(arr)
                     curnt_pix_size = []
@@ -457,9 +459,11 @@ class EmFit:
         self.lnbin = None
 
     def calc_fsc(self):
-        fsc = core.fsc.anytwomaps_fsc_covariance(
-            self.e0, self.ert, self.mapobj.cbin_idx, self.mapobj.cbin)[0]
-        return fsc
+        binfsc, _, bincounts = core.fsc.anytwomaps_fsc_covariance(
+            self.e0, self.ert, self.mapobj.cbin_idx, self.mapobj.cbin)
+        # return average fsc as well
+        fsc_avg = get_avg_fsc(binfsc=binfsc, bincounts=bincounts)
+        return [binfsc, fsc_avg]
 
     def get_wght(self): 
         cx, cy, cz = self.e0.shape
@@ -512,7 +516,7 @@ class EmFit:
                 self.sv = np.array([s1, s2, s3])
                 self.ert = maps[:, :, :, 0] * self.st
                 self.crt = maps[:, :, :, 1] * self.st
-            self.fsc = self.calc_fsc()
+            self.fsc, fsc_avg = self.calc_fsc()
             fsc_lst.append(self.fsc)
             self.w_grid, self.w2_grid = self.get_wght()
             fval = self.functional()
@@ -549,7 +553,7 @@ class EmFit:
                 self.t += self.step * alpha_t
             print(
                 "{:5d} {:8.4f} {:6.4f} {:6.4f} {:6.4f}".format(
-                    i, fval, theta2, translation_vec, np.average(self.fsc)
+                    i, fval, theta2, translation_vec, fsc_avg
                 )
             )
             end = timer()
@@ -557,20 +561,26 @@ class EmFit:
                 print("time for one cycle:", end - start)
 
 
-def fsc_between_static_and_transfomed_map(
-    maps, bin_idx, rm, t, nbin
-):
+def fsc_between_static_and_transfomed_map(maps, bin_idx, rm, t, nbin):
     nx, ny, nz = maps[0].shape
     maps2send = np.stack((maps[1], maps[2]), axis = -1)
     frs = fcodes_fast.trilinear2(maps2send,bin_idx,rm,nbin,0,2,nx, ny, nz)
     st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
-    f1f2_fsc = core.fsc.anytwomaps_fsc_covariance(maps[0], frs[:, :, :, 0] * st, bin_idx, nbin)[0]
-    f1f2_fsc = np.nan_to_num(f1f2_fsc, copy=False, nan=0.0) # for aesthetics
-    return f1f2_fsc, frs[:, :, :, 0] * st, frs[:, :, :, 1] * st
+    f1f2_fsc, _, bin_count = core.fsc.anytwomaps_fsc_covariance(
+        maps[0], frs[:, :, :, 0] * st, bin_idx, nbin)
+    fsc_avg = get_avg_fsc(binfsc=f1f2_fsc, bincounts=bin_count)
+    return [f1f2_fsc, frs[:, :, :, 0] * st, frs[:, :, :, 1] * st, fsc_avg]
+
+
+def get_avg_fsc(binfsc, bincounts):
+    fsc_filtered = filter_fsc(bin_fsc=binfsc, thresh=0.)
+    fsc_avg = np.average(a=fsc_filtered[np.nonzero(fsc_filtered)], 
+                         weights=bincounts[np.nonzero(fsc_filtered)])
+    return fsc_avg
 
 
 def get_ibin(bin_fsc, cutoff):
-    # new search from rear end
+    # search from rear end
     ibin = 0
     for i, ifsc in reversed(list(enumerate(bin_fsc))):
         if ifsc > cutoff:
@@ -578,29 +588,29 @@ def get_ibin(bin_fsc, cutoff):
             if ibin % 2 != 0:
                 ibin = ibin - 1
             break
-    if ibin == 0:
-        print("ibin = 0, resolution is too low.")
-        raise SystemExit("Cannot proceed! Stopping now...")
     return ibin
 
 
-def determine_ibin(bin_fsc, cutoff=0.15):
-    bin_fsc = check_fsc(bin_fsc)
-    ibin = get_ibin(bin_fsc, cutoff)
+def determine_ibin(bin_fsc, cutoff=0.20):
+    bin_fsc = filter_fsc(bin_fsc)
+    ibin = get_ibin(bin_fsc, cutoff)        
     i = 0
-    while ibin < 10:
+    while ibin < 5:
         cutoff -= 0.01
-        cutoff = max([cutoff, 0.])
-        ibin = get_ibin(bin_fsc, cutoff)
+        ibin = get_ibin(bin_fsc, max([cutoff, 0.1]))
         i += 1
         if i > 200:
-            raise SystemExit("ibin= ", ibin)
+            print("Fit starting configurations are too far.")
+            raise SystemExit()
+    if ibin == 0:
+        print("Fit starting configurations are too far.")
+        raise SystemExit()
     return ibin
 
-def check_fsc(bin_fsc):
+def filter_fsc(bin_fsc, thresh=0.1):
     bin_fsc_new = np.zeros(bin_fsc.shape, 'float')
     for i, ifsc in enumerate(bin_fsc):
-        if ifsc > 0.1:
+        if ifsc >= thresh:
             bin_fsc_new[i] = ifsc
         else:
             if i > 1:
@@ -636,7 +646,7 @@ def run_fit(
     for i in range(10):
         print("Resolution cycle #: ", i)
         if i == 0:
-            f1f2_fsc, frt, ert = fsc_between_static_and_transfomed_map(
+            f1f2_fsc, frt, ert, fsc_avg = fsc_between_static_and_transfomed_map(
                 maps = [emmap1.fo_lst[0], emmap1.fo_lst[ifit], emmap1.eo_lst[ifit]],
                 bin_idx=emmap1.bin_idx,
                 rm=rotmat,
@@ -649,7 +659,7 @@ def run_fit(
             ibin_old = ibin
             print("Fitting starts at ", emmap1.res_arr[ibin], " (A)")
             fsc_lst.append(f1f2_fsc)
-            if np.average(f1f2_fsc) > 0.999:
+            if fsc_avg > 0.999:
                 rotmat = rotmat
                 t = t
                 q_final = quaternions.rot2quart(rotmat)
@@ -665,7 +675,7 @@ def run_fit(
                 break
         else:
             # Apply initial rotation and translation to calculate fsc
-            f1f2_fsc, frt, ert = fsc_between_static_and_transfomed_map(
+            f1f2_fsc, frt, ert, _ = fsc_between_static_and_transfomed_map(
                 maps = [emmap1.fo_lst[0], emmap1.fo_lst[ifit], emmap1.eo_lst[ifit]],
                 bin_idx=emmap1.bin_idx,
                 rm=rotmat,
