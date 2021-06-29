@@ -53,7 +53,7 @@ def read_mtz(mtzfile):
     return uc, df
 
 
-def get_data(struct, resol=5.0, uc=None, dim=None, maporigin=None):
+def get_data(struct, resol=5.0, gemmi=False, uc=None, dim=None, maporigin=None):
     """Returns data of a map or a model into an ndarray.
 
     Reads map data into an ndarray, or if the structure input is an atomic model,
@@ -75,6 +75,9 @@ def get_data(struct, resol=5.0, uc=None, dim=None, maporigin=None):
                     Parameter for modelmap generation. If present, the calculated map
                     will be shifted according to this information. If absent, this
                     parameter is taken as [0, 0, 0].
+                gemmi: bool, optinal
+                    Parameter for modelmap calculation. If true the map from coordinates
+                    are calculated using Gemmi. Default to False.
 
         Outputs:
             uc: float, 1D array
@@ -113,13 +116,22 @@ def get_data(struct, resol=5.0, uc=None, dim=None, maporigin=None):
                 newmodel = "new1.cif"
         if maporigin is None:
             maporigin = orig
-        modelmap = model2map(
-            modelxyz=newmodel,
-            dim=[dim, dim, dim],
-            resol=resol,
-            cell=uc,
-            maporigin=maporigin,
-        )
+        if gemmi:
+            modelmap = model2map_gm(
+                modelxyz=newmodel,
+                dim=[dim, dim, dim],
+                resol=resol,
+                cell=uc,
+                maporigin=maporigin,
+            )  
+        else:          
+            modelmap = model2map(
+                modelxyz=newmodel,
+                dim=[dim, dim, dim],
+                resol=resol,
+                cell=uc,
+                maporigin=maporigin,
+            )
         arr = modelmap
     return uc, arr, orig
 
@@ -1900,7 +1912,7 @@ def model2map(
     return modelmap
 
 
-def model2map_gm(modelxyz, resol, dim, cell=None, maporigin=None):
+def model2map_gm(modelxyz, resol, dim, cell, maporigin=None):
     import gemmi
     from servalcat.utils.model import calc_fc_fft
 
