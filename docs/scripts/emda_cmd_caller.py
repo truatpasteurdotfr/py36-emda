@@ -59,20 +59,18 @@ singlemapfsc.add_argument(
 )
 
 ccmask = subparsers.add_parser(
-    "ccmask", description="Generates mask based on halfmaps correlation."
+    "ccmask", description="Generates a mask based on halfmaps correlation."
 )
 ccmask.add_argument("--h1", required=True, help="input halfmap1 map")
 ccmask.add_argument("--h2", required=True, help="input halfmap2 map")
 ccmask.add_argument(
-    "--knl", required=False, type=int, default=10, help="kernel radius in voxels"
+    "--knl", required=False, type=int, default=4, help="kernel radius in voxels"
 )
-ccmask.add_argument("--nrm", action="store_true",
-                    help="if True use normalized maps")
 ccmask.add_argument(
     "--itr", required=False, type=int, default=1, help="number of dilation cycles"
 )
 ccmask.add_argument(
-    "--thr", required=False, default=0.5, type=float, help="cc threshold"
+    "--dthreshold", required=False, default=None, type=float, help="threshold for density"
 )
 
 map_mask = subparsers.add_parser(
