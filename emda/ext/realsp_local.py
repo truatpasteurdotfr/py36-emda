@@ -430,17 +430,10 @@ def hfdata_normalized(hf1, hf2, bin_idx=None, nbin=None, uc=None):
     # normalise in resol bins
     import fcodes_fast as fc
 
-    if bin_idx is None:
-        if uc is not None:
-            nbin, res_arr, bin_idx = core.restools.get_resolution_array(uc, hf1)
-    binfsc = core.fsc.halfmaps_fsc_variance(hf1, hf2, bin_idx, nbin)[0]
-    e1 = core.fsc.halfmaps_fsc_variance(hf1, hf1, bin_idx, nbin)[5]
-    e2 = core.fsc.halfmaps_fsc_variance(hf2, hf2, bin_idx, nbin)[5]
-    nx, ny, nz = hf1.shape
-    fsc3d = fc.read_into_grid(bin_idx, binfsc, nbin, nx, ny, nz)
-    norm_map1 = np.real(np.fft.ifftn(np.fft.ifftshift(e1 * fsc3d)))
-    norm_map2 = np.real(np.fft.ifftn(np.fft.ifftshift(e2 * fsc3d)))
-    return norm_map1, norm_map2
+    print("Normalising maps...")
+    nm = NormalizedMaps(hf1=hf1, hf2=hf2, cell=uc)
+    nm.get_normdata()
+    return nm.normmap1, nm.normmap2
 
 
 class NormalizedMaps:
