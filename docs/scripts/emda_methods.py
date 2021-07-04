@@ -521,7 +521,7 @@ def get_fsc(arr1, arr2, uc):
     """
 
 
-def mask_from_halfmaps(uc, half1, half2, radius=9, norm=False, iter=1, thresh=0.5):
+def mask_from_halfmaps(uc, half1, half2, radius=4, iter=1, dthresh=None):
     """Generates a mask from half maps.
 
     Generates a mask from half maps based on real space local correlation.
@@ -535,15 +535,18 @@ def mask_from_halfmaps(uc, half1, half2, radius=9, norm=False, iter=1, thresh=0.
             half2: float, 3D array
                 Half map 2 data.
             radius: integer, optional
-                Radius of integrating kernel in voxels. Default is 9.
-            norm: bool, optional
-                If true, normalized maps will be used to generate correlation mask.
-                Default is False.
+                Radius of integrating kernel in voxels. Default is 4.
             iter: integer,optional
                 Number of dilation cycles. Default is 1 cycle.
-            thresh: float, optional
-                Correlation cutoff for mask generation. Program automatically
-                decides the best value, however, user can overwrite this.
+            dthresh: float, optional
+                The halfmap densities will be thresholded at this value prior
+                calculating local correlation. If the value is not given,
+                EMDA takes this values as the value at which the cumulative
+                density probability is 0.99. This is the default. However,
+                it is recommomded that this value should be supplied
+                by the user and proven to be useful for cases those have
+                micellular densities around protein.
+                
 
         Outputs:
             mask: float, 3D array
