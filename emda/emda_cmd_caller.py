@@ -57,24 +57,22 @@ singlemapfsc.add_argument("--h1", required=True, help="input map1 map")
 singlemapfsc.add_argument(
     "--knl", required=False, type=int, default=3, help="kernel radius in voxels"
 )
-
+######## CCMASK ########
 ccmask = subparsers.add_parser(
-    "ccmask", description="Generates mask based on halfmaps correlation."
+    "ccmask", description="Generates a mask based on halfmaps correlation."
 )
 ccmask.add_argument("--h1", required=True, help="input halfmap1 map")
 ccmask.add_argument("--h2", required=True, help="input halfmap2 map")
 ccmask.add_argument(
-    "--knl", required=False, type=int, default=10, help="kernel radius in voxels"
+    "--knl", required=False, type=int, default=4, help="kernel radius in voxels"
 )
-ccmask.add_argument("--nrm", action="store_true",
-                    help="if True use normalized maps")
 ccmask.add_argument(
     "--itr", required=False, type=int, default=1, help="number of dilation cycles"
 )
 ccmask.add_argument(
-    "--thr", required=False, default=0.5, type=float, help="cc threshold"
+    "--dthreshold", required=False, default=None, type=float, help="threshold for density"
 )
-
+######## MAPMASK ########
 map_mask = subparsers.add_parser(
     "mapmask", description="Generate a mask from a map.")
 map_mask.add_argument("--map", required=True, help="input map")
@@ -798,9 +796,8 @@ def cc_mask(args):
         half1=arr1,
         half2=arr2,
         radius=args.knl,
-        norm=args.nrm,
         iter=args.itr,
-        thresh=args.thr,
+        dthresh=args.dthreshold,
     )
     em.write_mrc(ccmask, maskname, uc, origin)
 
