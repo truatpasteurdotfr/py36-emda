@@ -22,9 +22,9 @@ class MaskedMaps:
         self.arr2 = None
         self.origin = None
         self.iter = 3
-        self.smax = 9
+        self.smax = 9 # kernel radius in pixels
         self.prob = 0.99
-        self.threshold = None
+        self.dthresh = None
 
     def read_halfmaps(self):
         for n in range(0, len(self.hfmap_list), 2):
@@ -37,21 +37,12 @@ class MaskedMaps:
 
     def generate_mask(self):
         from emda.ext import realsp_local
-        kern = core.restools.create_soft_edged_kernel_pxl(
-            self.smax
-        )  # sphere with radius of n pixles
+        kern = core.restools.create_soft_edged_kernel_pxl(self.smax)
+        self.arr1 = threshold_map(arr=self.arr1, prob=self.prob, dthresh=self.dthresh)
+        self.arr2 = threshold_map(arr=self.arr2, prob=self.prob, dthresh=self.dthresh)
         halfcc3d = realsp_local.get_3d_realspcorrelation(self.arr1, self.arr2, kern)
-        """ if self.threshold is None:
-            cc_mask, threshold = self.histogram(fullcc3d)
-        else:
-            cc_mask, _ = self.histogram(fullcc3d)
-        print("threshold: ", threshold)
-        mask = fullcc3d * (fullcc3d >= threshold)
-        # dilate and softened the mask
-        mask = make_soft(binary_dilation_ccmask(mask * cc_mask, self.iter))
-        mask = mask * (mask >= 0.0) """
-        mask = self.histogram2(halfcc3d, prob=self.prob)
-        self.mask = mask
+        #self.mask = self.histogram2(halfcc3d, prob=self.prob)
+        self.mask = self.thereshol_ccmap(ccmap=halfcc3d)
 
     def create_edgemask(self, radius):
         # Remove everything outside radius
@@ -68,11 +59,10 @@ class MaskedMaps:
         mask = dist_from_center <= radius
         return mask
 
-    def histogram2(self, arr, prob=0.65):
+    def histogram2(self, arr, prob=0.99):
         from scipy import stats
         from scipy.ndimage.morphology import binary_dilation
         import matplotlib
-        #matplotlib.use("Agg")
         matplotlib.use(matplotlib.get_backend())
         import matplotlib.pyplot as plt
 
@@ -81,8 +71,8 @@ class MaskedMaps:
         F2 = np.array(range(len(X2))) / float(len(X2) - 1)
         loc = np.where(F2 >= prob)
         thresh = X2[loc[0][0]]
-        thresh = max([thresh, np.max(X2) * 0.02])
-        print("threshold: ", thresh) 
+        #thresh = max([thresh, np.max(X2) * 0.02])
+        #print("threshold: ", thresh) 
         # plot the sorted data:
         fig = plt.figure()
         ax1 = fig.add_subplot(121)
@@ -94,7 +84,6 @@ class MaskedMaps:
         ax2.set_xlabel("$x$")
         ax2.set_ylabel("$p$")
         plt.savefig("cdf.png", format="png", dpi=300)
-
         nx, ny, nz = arr.shape
         maxbin = np.amax(np.array([nx // 2, ny // 2, nz // 2]))
         counts = stats.binned_statistic(
@@ -114,8 +103,16 @@ class MaskedMaps:
         binary_arr = (arr_tmp > thresh).astype(int)
         dilate = binary_dilation(binary_arr, iterations=self.iter)
         mask = make_soft(dilate, kern_rad=self.smax)
-        mask = mask * (mask >= 0.0)
+        mask = mask * (mask >= 1e-3)
         return mask
+
+    def thereshol_ccmap(self, ccmap):
+        from scipy.ndimage.morphology import binary_dilation
+
+        ccmap_binary = (ccmap >= 1e-3).astype(int)
+        dilate = binary_dilation(ccmap_binary, iterations=self.iter)
+        mask = make_soft(dilate, kern_rad=2)
+        return mask * (mask >= 1e-3)      
 
     def histogram(self, arr1):
         from scipy import stats
@@ -180,6 +177,17 @@ class MaskedMaps:
         plt.show()
 
 
+def threshold_map(arr, prob = 0.99, dthresh=None):
+    if dthresh is None:
+        X2 = np.sort(arr.flatten())
+        F2 = np.array(range(len(X2))) / float(len(X2) - 1)
+        loc = np.where(F2 >= prob)
+        thresh = X2[loc[0][0]]
+    else:
+        thresh = dthresh
+    return arr * (arr > thresh)
+
+
 def binary_dilation_ccmask(ccmask, iter=1):
     from scipy.ndimage.morphology import binary_dilation
 
@@ -187,7 +195,7 @@ def binary_dilation_ccmask(ccmask, iter=1):
 
 
 def make_soft(dilated_mask, kern_rad=3):
-    # convoluting with gaussian shere
+    # convoluting with gaussian sphere
     import scipy.signal
 
     kern_sphere = core.restools.create_soft_edged_kernel_pxl(kern_rad)
