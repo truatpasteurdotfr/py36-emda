@@ -821,9 +821,7 @@ def realsp_correlation_mapmodel(
     model,
     resol,
     kernel_size=5,
-    lig=True,
     norm=False,
-    nomask=False,
     mask_map=None,
     lgf=None,
 ):
@@ -839,27 +837,23 @@ def realsp_correlation_mapmodel(
             resol: float
                 An argument for model based map calculation using REFMAC.
                 Resolution to calculate model based map.
+                All maps are lowpass filtered to this resolution
+                before calculating local correlation.
             kernel_size: integer, optional
                 Radius of integration kernal in pixels. Default is 5.
             mask_map: string, optional
                 Mask file to apply on correlation maps.
-            nomask: bool, optional
-                If True, correlation maps are not masked. Otherwise, internally
-                calculated mask is used, if a mask is not supplied.
             norm: bool, optional
+                Defalt to False.
                 If True, correlation will be carried out on normalized maps.
                 Default is False.
-            lig: bool, optional
-                An argument for model based map calculation using REFMAC.
-                Set True, if there is a ligand in the model, but no description.
-                Default is True.
             lgf: string, optional
                 An argument for model based map calculation using REFMAC.
                 Ligand description file (cif).
 
         Outputs:
             Following maps are written out:
-            modelmap.mrc - model based map.
+            modelmap.mrc - model based map (only if atomic model is given).
             rcc_mapmodel.mrc - real space local correlation map.
     """
 
