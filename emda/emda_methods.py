@@ -1362,18 +1362,12 @@ def realsp_correlation_mapmodel(
             resol: float
                 An argument for model based map calculation using REFMAC.
                 Resolution to calculate model based map.
+                All maps are lowpass filtered to this resolution
+                before calculating local correlation.
             kernel_size: integer, optional
                 Radius of integration kernal in pixels. Default is 5.
             mask_map: string, optional
                 Mask file to apply on correlation maps.
-                To combine with usemask option.
-            usemask: bool, optional
-                Default to False.
-                If True the map is masked before calculating correlation,
-                and the calculated correlation map is masked by the binarised mask
-                before wirting out the correlation map.
-                If the mask is not supplied, an internally calculated mask from the
-                atomic model will be used.
             norm: bool, optional
                 Defalt to False.
                 If True, correlation will be carried out on normalized maps.
