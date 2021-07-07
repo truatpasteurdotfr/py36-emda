@@ -293,15 +293,6 @@ mmrealspc.add_argument(
 mmrealspc.add_argument(
     "--knl", required=False, type=int, default=5, help="Kernel size (pixels)"
 )
-""" mmrealspc.add_argument(
-    "--tpx", required=False, type=int, default=1, help="mask trim by n pixels"
-) """
-# mmrealspc.add_argument(
-#    "--lig", action="store_true", help="use if there is ligand, but no description"
-# )
-mmrealspc.add_argument(
-    "--nomask", action="store_true", help="if use, correlation maps are not masked"
-)
 mmrealspc.add_argument(
     "--lgf", required=False, default=None, type=str, help="ligand description file"
 )
