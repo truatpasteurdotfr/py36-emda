@@ -320,57 +320,76 @@ def mapmodel_rcc(
     mask_map=None,
     lgf=None,
 ):
-    print(
-        "Calculating 3D correlation between map and model. \
-         Please wait..."
-    )
-    uc, arr1, origin = core.iotools.read_map(fullmap)
-    nx, ny, nz = arr1.shape
-    if mask_map is not None:
-        print("Correlation is calculated using a mask.")
-        print("Input map is masked before calculating correlation.")
-        _, mask, _ = core.iotools.read_map(mask_map)
-        mask_binary = mask > 0.
-    else:
-        mask = 1
-        mask_binary = 1
-    print("\nMap-model correlation!\n")
-    dim = [nx, ny, nz]
-    if model.endswith((".pdb", ".ent", ".cif")):
-        print("map will be calculated up to " + str(resol) + "A")
-        print("Calculating map from model using REFMAC!")
-        model_arr = calculate_modelmap(
-            modelxyz=model, 
-            dim=dim, 
-            resol=resol, 
+    try:
+        print(
+            "Calculating 3D correlation between map and model. \
+            Please wait..."
+        )
+        uc, arr1, origin = core.iotools.read_map(fullmap)
+        nx, ny, nz = arr1.shape
+        # lowpass filter the map to given resolution
+        _, arr1 = em.lowpass_map(
             uc=uc, 
-            lgf=lgf, 
-            maporigin=origin,
+            arr1=arr1, 
+            resol=resol, 
+            filter='butterworth')
+        if mask_map is not None:
+            print("Correlation is calculated using a mask.")
+            print("Input map is masked before calculating correlation.")
+            _, mask, _ = core.iotools.read_map(mask_map)
+            mask_binary = mask > 0.
+        else:
+            mask = 1
+            mask_binary = 1
+        print("\nMap-model correlation!\n")
+        dim = [nx, ny, nz]
+        if model.endswith((".pdb", ".ent", ".cif")):
+            print("map will be calculated up to " + str(resol) + "A")
+            print("Calculating map from model using REFMAC!")
+            model_arr = calculate_modelmap(
+                modelxyz=model, 
+                dim=dim, 
+                resol=resol, 
+                uc=uc, 
+                lgf=lgf, 
+                maporigin=origin,
+            )
+        elif model.lower().endswith((".mrc", ".map")):
+            _, model_arr, _ = core.iotools.read_map(model)
+            _, model_arr = em.lowpass_map(
+                uc=uc, 
+                arr1=model_arr, 
+                resol=resol, 
+                filter='butterworth')
+        elif model.lower().endswith(".mtz"):
+            model_arr = core.maptools.mtz2map(model, (nx, ny, nz))
+            _, model_arr = em.lowpass_map(
+                uc=uc, 
+                arr1=model_arr, 
+                resol=resol, 
+                filter='butterworth')
+        core.iotools.write_mrc(
+            mapdata=model_arr, filename="modelmap.mrc", unit_cell=uc, map_origin=origin
         )
-    elif model.lower().endswith((".mrcs", ".mrc", ".map")):
-        _, model_arr, _ = core.iotools.read_map(model)
-    elif model.lower().endswith(".mtz"):
-        model_arr = core.maptools.mtz2map(model, (nx, ny, nz))
-    core.iotools.write_mrc(
-        mapdata=model_arr, filename="modelmap.mrc", unit_cell=uc, map_origin=origin
-    )
-    print("Calculating model-map correlation...\n")
-    kern_sphere_soft = core.restools.create_soft_edged_kernel_pxl(kernel_size)
-    if norm:
-        print("Normalisation needs half maps. If you have half maps, then \
-            use rcc instead of mmcc. For now, local cc map-model will be \
-                calculated using un-normalized map and model.")
-    mapmodelcc = get_3d_realspcorrelation(
-            arr1 * mask, model_arr, kern_sphere_soft
+        print("Calculating model-map correlation...\n")
+        kern_sphere_soft = core.restools.create_soft_edged_kernel_pxl(kernel_size)
+        if norm:
+            print("Normalisation needs half maps. If you have half maps, then \
+                use rcc instead of mmcc. For now, local cc map-model will be \
+                    calculated using un-normalized map and model.")
+        mapmodelcc = get_3d_realspcorrelation(
+                arr1 * mask, model_arr, kern_sphere_soft
+            )
+        core.iotools.write_mrc(
+            mapdata=mapmodelcc * mask_binary,
+            filename="mmcc_mapmodel.mrc",
+            unit_cell=uc,
+            map_origin=origin,
+            label=True,
         )
-    core.iotools.write_mrc(
-        mapdata=mapmodelcc * mask_binary,
-        filename="mmcc_mapmodel.mrc",
-        unit_cell=uc,
-        map_origin=origin,
-        label=True,
-    )
-    print("Map-model correlation calculated! Maps were written!")
+        print("Map-model correlation calculated! Maps were written!")
+    except:
+        print('Input error!')
 
 
 def normalized(map, bin_idx=None, nbin=None, uc=None):
