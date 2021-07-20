@@ -362,8 +362,8 @@ def mtz2map(mtzname, map_size):
             outarr: float
             3D Numpy array of map values.
     """
-    data2write = maptools.mtz2map(mtzname=mtzname, map_size=map_size)
-    return data2write
+    arr = maptools.mtz2map(mtzname=mtzname, map_size=map_size)
+    return arr
 
 
 def lowpass_map(uc, arr1, resol, filter="ideal", order=4):
@@ -1379,7 +1379,7 @@ def realsp_correlation_mapmodel(
         Outputs:
             Following maps are written out:
             modelmap.mrc - model based map (only if atomic model is given).
-            rcc_mapmodel.mrc - real space local correlation map.
+            mmcc_mapmodel.mrc - real space local correlation map.
     """
     from emda.ext import realsp_local
 
