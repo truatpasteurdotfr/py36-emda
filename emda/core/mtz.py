@@ -97,11 +97,12 @@ def mtz2f(mtzname):
 def _check_inputdata(mapdata):
     if isinstance(mapdata, np.ndarray):
         if mapdata.ndim == 3:
-            if mapdata.dtype == np.complex64:
+            if mapdata.dtype == np.complex128:
                 return mapdata
             elif mapdata.dtype == np.float64:
                 return np.fft.fftshift(np.fft.fftn(mapdata))
             else:
+                print('data type: ', mapdata.dtype)
                 raise SystemExit("wrong data type.")
     else:
         raise SystemExit("Not a numpy array")
