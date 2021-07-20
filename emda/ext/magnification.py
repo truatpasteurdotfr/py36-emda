@@ -332,7 +332,7 @@ def minimizer_mapmodel(emmap1, resol=4.0, ncycles=10, rmlist=None, tlist=None):
         maplist = [fout[0,:,:,:], apply_translation(fout[ifit,:,:,:], tlist[ifit])]
         # initial parameters
         t = [0.0, 0.0, 0.0]
-        k = 1.0
+        k = k_previous = 1.0
         for i in range(ncycles):
             fo, fckt, scale_d, sigma, totalvar, fval, sv, t = get_ll(
                 emmap1, maplist, bin_idx, res_arr, nbin, k, smax)
