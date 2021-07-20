@@ -123,18 +123,10 @@ def map2mtz(mapname, mtzname="map2mtz.mtz", factor=1.0, resol=None):
 
 
 def mtz2map(mtzname, map_size):
-    from numpy.fft import ifftn, ifftshift
+    from emda.core.mtz import mtz2map
 
-    _, dataframe = iotools.read_mtz(mtzname)
-    h = dataframe["H"].astype("int")
-    k = dataframe["K"].astype("int")
-    l = dataframe["L"].astype("int")
-    f = dataframe["Fout0"] * np.exp(np.pi * 1j * dataframe["Pout0"] / 180.0)
-    #f = dataframe["FWT"] * np.exp(np.pi * 1j * dataframe["PHWT"] / 180.0)
-    nx, ny, nz = map_size
-    f3d = fcodes_fast.mtz2_3d(h, k, l, f, nx, ny, nz, len(f))
-    data2write = np.real((ifftn(ifftshift(f3d))))
-    return data2write
+    arr, unit_cell = mtz2map(mtzname=mtzname, map_size=map_size)
+    return arr
 
 
 def normalise_fo(fo, bin_idx=None, nbin=None, uc=None):
