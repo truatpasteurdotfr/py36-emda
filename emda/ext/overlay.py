@@ -10,18 +10,15 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from timeit import default_timer as timer
 import numpy as np
 import fcodes_fast
-from numpy.fft import fftn, fftshift
+import emda.ext.utils as utils
+import emda.emda_methods as em
+from numpy.fft import fftn, fftshift, ifftshift, ifftn, ifftshift
 from emda import core
 from emda.core import quaternions
-from emda.ext.mapfit.utils import get_FRS, create_xyz_grid, get_xyz_sum
-from emda.ext.mapfit import utils
-import emda.emda_methods as em
-
-
-np.set_printoptions(suppress=True)  # Suppress insignificant values for clarity
+from emda.ext.mapfit import utils as maputils
+#from emda.ext.maskmap_class import threshold_map
 
 timeit = False
-
 
 class EmmapOverlay:
     def __init__(self, map_list, nocom=False, mask_list=None, modelres=None):
@@ -51,6 +48,8 @@ class EmmapOverlay:
         self.fo_lst = None
         self.eo_lst = None
         self.totalvar_lst = None
+        self.gemmi = False
+        self.mask_around_model = False
 
     def _check_inputs(self):
         if not self.map_list:
@@ -76,12 +75,14 @@ class EmmapOverlay:
             for i in range(len(self.mask_list)):
                 if i == 0:
                     _, mask, _ = em.get_data(self.mask_list[i])
-                    mask = utils.set_dim_even(mask)
+                    mask = maputils.set_dim_even(mask)
                     uc, arr, origin = em.get_data(self.map_list[i])
-                    arr = utils.set_dim_even(arr)
+                    arr = maputils.set_dim_even(arr)
                     try:
                         assert arr.shape == mask.shape
                     except AssertionError:
+                        print('arr shape: ', arr.shape)
+                        print('mask shape', mask.shape)
                         raise SystemExit("Map and Mask Dimension mismatched!")
                     arr = arr * mask
                     nx, ny, nz = arr.shape
@@ -92,7 +93,7 @@ class EmmapOverlay:
                     for j in range(3):
                         target_pix_size.append(uc_target[j] / target_dim[j])
                     if cmask:
-                        corner_mask = utils.remove_unwanted_corners(uc, target_dim)
+                        corner_mask = maputils.remove_unwanted_corners(uc, target_dim)
                     else:
                         corner_mask = 1.0
                     if self.com:
@@ -117,15 +118,17 @@ class EmmapOverlay:
                         dim=target_dim,
                         uc=uc_target,
                         maporigin=map_origin,
-                        gemmi=True,
+                        gemmi=self.gemmi,
                     )
-                    arr = utils.set_dim_even(arr)
+                    arr = maputils.set_dim_even(arr)
                     print("origin: ", origin)
                     _, mask, _ = em.get_data(self.mask_list[i])
-                    mask = utils.set_dim_even(mask)
+                    mask = maputils.set_dim_even(mask)
                     try:
                         assert arr.shape == mask.shape
                     except AssertionError:
+                        print('arr shape: ', arr.shape)
+                        print('mask shape', mask.shape)
                         raise SystemExit("Map and Mask Dimension mismatched!")
                     arr = arr * mask
                     curnt_pix_size = []
@@ -161,7 +164,9 @@ class EmmapOverlay:
             for i in range(len(self.map_list)):
                 if i == 0:
                     uc, arr, origin = em.get_data(self.map_list[i])
-                    arr = utils.set_dim_even(arr)
+                    # threshold map
+                    #arr = threshold_map(arr=arr, dthresh=0.03)
+                    arr = maputils.set_dim_even(arr)
                     print("origin: ", origin)
                     nx, ny, nz = arr.shape
                     map_origin = origin
@@ -196,9 +201,10 @@ class EmmapOverlay:
                         dim=target_dim,
                         uc=uc_target,
                         maporigin=map_origin,
-                        gemmi=True,
+                        gemmi=self.gemmi,
                     )
-                    arr = utils.set_dim_even(arr)
+                    #arr = threshold_map(arr=arr) # threshold map
+                    arr = maputils.set_dim_even(arr)
                     curnt_pix_size = []
                     for j in range(3):
                         curnt_pix_size.append(uc[j] / arr.shape[j])
@@ -301,7 +307,7 @@ class linefit:
         q = tmp + self.q_prev
         q = q / np.sqrt(np.dot(q, q))
         rotmat = quaternions.get_RM(q)
-        ers = get_FRS(rotmat, self.e1, interp="linear")
+        ers = maputils.get_FRS(rotmat, self.e1, interp="linear")
         w_grid = self.get_fsc_wght(self.e0, ers[:, :, :, 0], self.bin_idx, self.nbin)   
         fval = np.real(np.sum(w_grid * self.e0 * np.conjugate(ers[:, :, :, 0])))
         return -fval
@@ -461,16 +467,16 @@ class EmFit:
     def calc_fsc(self):
         binfsc, _, bincounts = core.fsc.anytwomaps_fsc_covariance(
             self.e0, self.ert, self.mapobj.cbin_idx, self.mapobj.cbin)
-        # return average fsc as well
-        fsc_avg = get_avg_fsc(binfsc=binfsc, bincounts=bincounts)
+        fsc_avg = utils.get_avg_fsc(binfsc=binfsc, bincounts=bincounts)
         return [binfsc, fsc_avg]
 
     def get_wght(self): 
         cx, cy, cz = self.e0.shape
         val_arr = np.zeros((self.mapobj.cbin, 2), dtype='float')
-        val_arr[:,0] = self.fsc / (1 - self.fsc ** 2)
+        denominator = utils.regularize_fsc_weights(1 - self.fsc ** 2)
+        val_arr[:,0] = self.fsc / denominator #(1 - self.fsc ** 2) 
         fsc_sqd = self.fsc ** 2
-        fsc_combi = fsc_sqd / (1 - fsc_sqd)
+        fsc_combi = fsc_sqd / denominator #(1 - fsc_sqd)
         val_arr[:,1] = fsc_combi
         wgrid = fcodes_fast.read_into_grid2(self.mapobj.cbin_idx,val_arr, self.mapobj.cbin, cx, cy, cz)
         return wgrid[:,:,:,0], wgrid[:,:,:,1]
@@ -484,8 +490,8 @@ class EmFit:
         fsc_lst = []
         fval_list = []
         self.e0 = self.mapobj.ceo_lst[0]  # Static map e-data for fit
-        xyz = create_xyz_grid(self.cell, self.cut_dim)
-        xyz_sum = get_xyz_sum(xyz)
+        xyz = maputils.create_xyz_grid(self.cell, self.cut_dim)
+        xyz_sum = maputils.get_xyz_sum(xyz)
         if q_init is None:
             q_init = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
         print("Cycle#   ", "Fval  ", "Rot(deg)  ", "Trans(A)  ", "avg(FSC)")
@@ -568,15 +574,8 @@ def fsc_between_static_and_transfomed_map(maps, bin_idx, rm, t, nbin):
     st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
     f1f2_fsc, _, bin_count = core.fsc.anytwomaps_fsc_covariance(
         maps[0], frs[:, :, :, 0] * st, bin_idx, nbin)
-    fsc_avg = get_avg_fsc(binfsc=f1f2_fsc, bincounts=bin_count)
+    fsc_avg = utils.get_avg_fsc(binfsc=f1f2_fsc, bincounts=bin_count)
     return [f1f2_fsc, frs[:, :, :, 0] * st, frs[:, :, :, 1] * st, fsc_avg]
-
-
-def get_avg_fsc(binfsc, bincounts):
-    fsc_filtered = filter_fsc(bin_fsc=binfsc, thresh=0.)
-    fsc_avg = np.average(a=fsc_filtered[np.nonzero(fsc_filtered)], 
-                         weights=bincounts[np.nonzero(fsc_filtered)])
-    return fsc_avg
 
 
 def get_ibin(bin_fsc, cutoff):
@@ -592,7 +591,7 @@ def get_ibin(bin_fsc, cutoff):
 
 
 def determine_ibin(bin_fsc, cutoff=0.20):
-    bin_fsc = filter_fsc(bin_fsc)
+    bin_fsc = utils.filter_fsc(bin_fsc)
     ibin = get_ibin(bin_fsc, cutoff)        
     i = 0
     while ibin < 5:
@@ -606,16 +605,6 @@ def determine_ibin(bin_fsc, cutoff=0.20):
         print("Fit starting configurations are too far.")
         raise SystemExit()
     return ibin
-
-def filter_fsc(bin_fsc, thresh=0.1):
-    bin_fsc_new = np.zeros(bin_fsc.shape, 'float')
-    for i, ifsc in enumerate(bin_fsc):
-        if ifsc >= thresh:
-            bin_fsc_new[i] = ifsc
-        else:
-            if i > 1:
-                break
-    return bin_fsc_new
 
 
 def run_fit(
@@ -653,13 +642,15 @@ def run_fit(
                 t=t,
                 nbin=emmap1.nbin,
             )
+            print('Bin FSC: ', f1f2_fsc)
+            print('Avg. FSC: ', fsc_avg)
             ibin = determine_ibin(f1f2_fsc)
             if fitbin < ibin:
                 ibin = fitbin
             ibin_old = ibin
             print("Fitting starts at ", emmap1.res_arr[ibin], " (A)")
             fsc_lst.append(f1f2_fsc)
-            if fsc_avg > 0.999:
+            if fsc_avg > 0.998:
                 rotmat = rotmat
                 t = t
                 q_final = quaternions.rot2quart(rotmat)
@@ -764,10 +755,6 @@ def overlay(
 
 
 def output_rotated_maps(emmap1, r_lst, t_lst):
-    from numpy.fft import ifftshift, ifftn, ifftshift
-    from emda.ext.mapfit import utils
-    from scipy.ndimage.interpolation import shift
-
     fo_lst = emmap1.fo_lst
     cell = emmap1.map_unit_cell
     comlist = emmap1.comlist
@@ -786,7 +773,7 @@ def output_rotated_maps(emmap1, r_lst, t_lst):
         f1f2_fsc_unaligned = core.fsc.anytwomaps_fsc_covariance(
             f_static, fo, bin_idx, nbin
         )[0]
-        frt = utils.get_FRS(rotmat, fo, interp="cubic")[:, :, :, 0]
+        frt = maputils.get_FRS(rotmat, fo, interp="cubic")[:, :, :, 0]
         st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
         frt = frt * st
         # estimating covaraince between current map vs. static map
@@ -810,7 +797,6 @@ def output_rotated_maps(emmap1, r_lst, t_lst):
 
 def output_rotated_models(emmap1, maplist, r_lst, t_lst, modellist=None):
     from emda.core.iotools import model_transform_gm
-    from emda.ext.mapfit.utils import rm_zyx2xyz
 
     pixsize = emmap1.pixsize
     comlist = emmap1.comlist
@@ -819,13 +805,12 @@ def output_rotated_models(emmap1, maplist, r_lst, t_lst, modellist=None):
     i = 0
     for model, t, rotmat in zip(maplist[1:], t_lst, r_lst):
         i += 1
-        #print(rotmat)
         t = np.asarray(t, 'float') *  pixsize * np.asarray(emmap1.map_dim, 'int')
         # calculate the vector from com to box_center in Angstroms
         if len(comlist) > 0:
             shift = np.subtract(comlist[i], comlist[0]) * pixsize
             t = t + shift
-        rotmat = rm_zyx2xyz(rotmat)
+        rotmat = maputils.rm_zyx2xyz(rotmat)
         if model.endswith((".mrc", ".map")):
             continue
         else:
@@ -840,7 +825,7 @@ def output_rotated_models(emmap1, maplist, r_lst, t_lst, modellist=None):
             if len(comlist) > 0:
                 shift = np.subtract(comlist[i], comlist[0]) * pixsize
                 t = t + shift
-            rotmat = rm_zyx2xyz(rotmat)
+            rotmat = maputils.rm_zyx2xyz(rotmat)
             outcifname = "emda_transformed_model_" + str(i) + ".cif"
             mapcom = np.asarray(comlist[i]) * pixsize
             model_transform_gm(mmcif_file=model, rotmat=rotmat, trans=-t, mapcom=mapcom, outfilename=outcifname)
