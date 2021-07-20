@@ -199,18 +199,11 @@ def read_mtz(mtzfile):
             data_frame: Pandas data frame
                 Map values in Pandas Dataframe
     """
-    try:
-        mtz = gemmi.read_mtz_file(mtzfile)
-        unit_cell = np.zeros(6, dtype="float")
-        unit_cell[0] = mtz.dataset(0).cell.a
-        unit_cell[1] = mtz.dataset(0).cell.b
-        unit_cell[2] = mtz.dataset(0).cell.c
-        unit_cell[3:] = float(90)
-        all_data = np.array(mtz, copy=False)
-        data_frame = pandas.DataFrame(data=all_data, columns=mtz.column_labels())
-        return unit_cell, data_frame
-    except FileNotFoundError as e:
-        print(e)
+    from emda.core.mtz import Mtz
+
+    mtz = Mtz()
+    mtz.read(mtzfilename=mtzfile)
+    return mtz.unit_cell, mtz.df
 
 
 def write_3d2mtz(unit_cell, mapdata, outfile="map2mtz.mtz", resol=None):
@@ -230,41 +223,12 @@ def write_3d2mtz(unit_cell, mapdata, outfile="map2mtz.mtz", resol=None):
             outfile: string
             Output file name. Default is map2mtz.mtz.
     """
-    from emda.core import restools
+    from emda.core.mtz import write_3d2mtz
 
-    nx, ny, nz = mapdata.shape
-    assert nx == ny == nz
-    nbin, res_arr, bin_idx = restools.get_resolution_array(unit_cell, mapdata)
-    if resol is None:
-        cbin = nx // 2
-    else:
-        dist = np.sqrt((res_arr - resol) ** 2)
-        cbin = np.argmin(dist) + 1
-        if cbin % 2 != 0: cbin += 1
-        if nbin < cbin: cbin = nbin
-    mtz = gemmi.Mtz()
-    mtz.spacegroup = gemmi.find_spacegroup_by_name("P 1")
-    mtz.cell.set(unit_cell[0], unit_cell[1], unit_cell[2], 90, 90, 90)
-    mtz.add_dataset("HKL_base")
-    for label in ["H", "K", "L"]:
-        mtz.add_column(label, "H")
-    mtz.add_column("Fout0", "F")
-    mtz.add_column("Pout0", "P")
-    # calling fortran function
-    h, k, l, ampli, phase = fcodes_fast.prepare_hkl(mapdata, bin_idx, cbin, debug_mode, nx, ny, nz)
-    print("hmin, hmax ", np.amin(h), np.amax(h))
-    print("kmin, kmax ", np.amin(k), np.amax(k))
-    print("lmin, lmax ", np.amin(l), np.amax(l))
-    nrows = len(h)
-    ncols = 5  # Change this according to what columns to write
-    data = np.ndarray(shape=(nrows, ncols), dtype=object)
-    data[:, 0] = -l.astype(int)
-    data[:, 1] = -k.astype(int)
-    data[:, 2] = -h.astype(int)
-    data[:, 3] = ampli.astype(np.float32)
-    data[:, 4] = phase.astype(np.float32)
-    mtz.set_data(data)
-    mtz.write_to_file(outfile)
+    write_3d2mtz(unit_cell=unit_cell,
+                 mapdata=mapdata,
+                 outfile=outfile,
+                 resol=resol)
 
 
 def write_3d2mtz_full(unit_cell, hf1data, hf2data, outfile="halfnfull.mtz"):
@@ -367,21 +331,6 @@ def write_3d2mtz_refmac(unit_cell, sgrid, fdata, fnoise, bfac, outfile="output.m
     mtz.write_to_file(outfile)
 
 
-""" def write_mtz2_3d(h, k, l, f, nx, ny, nz):
-    # Output mtz data into numpy 3D array
-    # NEED CAREFUL TEST
-    arr = np.zeros((nx * ny * nx), dtype=np.complex)
-    xv, yv, zv = np.meshgrid(h, k, l)
-    xvf = xv.flatten(order="F")
-    lb = (len(arr) - len(xvf)) // 2
-    ub = lb + len(xvf)
-    print(lb, ub)
-    arr[lb:ub] = f
-    f3d = arr.reshape(nx, ny, nz)
-    mapdata = np.fft.ifftn(np.fft.fftshift(f3d))
-    return mapdata """
-
-
 def write_mtz2_3d_gemmi(mtzfile, map_size):
     # Writing out mtz data into ccp4.map format
     # Note that write_ccp4_map only supports numbers with factors 2, 3 and 5
@@ -391,74 +340,6 @@ def write_mtz2_3d_gemmi(mtzfile, map_size):
     ccp4.update_ccp4_header(2, True)
     ccp4.write_ccp4_map("output.ccp4")
     return
-
-
-#def resample2staticmap(curnt_pix, targt_pix, targt_dim, arr, sf=False, fobj=None):
-#    """Resamples a 3D array.
-#
-#    Arguments:
-#        Inputs:
-#            curnt_pix: float, Current pixel size.
-#            targt_pix: float, Target pixel size.
-#            targt_dim: list, List of three integer values.
-#            arr: float, 3D array of map values.
-#            sf: bool, optional
-#                If True, returns a complex array. Otherwise, float array
-#            fobj: optional. Logger file object
-#
-#        Outputs:
-#            new_arr: float, 3D array
-#                Resampled 3D array. If sf was used, return is a complex array
-#    """
-#    # Resamling arr into an array having target_dim
-#    tnx, tny, tnz = targt_dim
-#    curnt_dim = arr.shape
-#    nx, ny, nz = arr.shape
-#    tnx, tny, tnz = targt_dim
-#    print("pixel size [current, target]: ", curnt_pix, targt_pix)
-#    if fobj is not None:
-#        fobj.write(
-#            "pixel size [current, target]: "
-#            + str(curnt_pix)
-#            + " "
-#            + str(targt_pix)
-#            + " \n"
-#        )
-#    if abs(curnt_pix - targt_pix) < 10e-3:
-#        if targt_dim[0] == curnt_dim[0]:
-#            print("No change of dims")
-#            if fobj is not None:
-#                fobj.write("No change of dims \n")
-#            new_arr = arr
-#        elif curnt_dim[0] < targt_dim[0]:
-#            print("Padded with zeros")
-#            if fobj is not None:
-#                fobj.write("Padded with zeros \n")
-#            dx = abs(tnx - nx) // 2
-#            new_arr = np.zeros((tnx, tny, tnz), arr.dtype)
-#            new_arr[dx: nx + dx, dx: nx + dx, dx: nx + dx] = arr
-#        elif targt_dim[0] < curnt_dim[0]:
-#            print("Cropped image")
-#            if fobj is not None:
-#                fobj.write("Cropped image \n")
-#            dx = abs(nx - tnx) // 2
-#            new_arr = np.zeros((targt_dim), arr.dtype)
-#            new_arr = arr[dx: dx + tnx, dx: dx + tnx, dx: dx + tnx]
-#    elif abs(curnt_pix - targt_pix) > 10e-3:
-#        newsize = []
-#        for i in range(3):
-#            ns = int(round(arr.shape[i] * (curnt_pix / targt_pix)))
-#            if ns % 2 != 0: ns -= 1
-#            newsize.append(ns)
-#        print("Resizing in Fourier space and transforming back")
-#        if fobj is not None:
-#            fobj.write("Resizing in Fourier space and transforming back \n")
-#        new_arr = resample(arr, newsize, sf)
-#        if newsize[0] < targt_dim[0]:
-#            new_arr = padimage(new_arr, targt_dim)
-#        elif newsize[0] > targt_dim[0]:
-#            new_arr = cropimage(new_arr, targt_dim)
-#    return new_arr
 
 
 def resample2staticmap(curnt_pix, targt_pix, targt_dim, arr, sf=False, fobj=None):
@@ -567,16 +448,8 @@ def padimage(arr, tdim):
     assert tnx >= nx
     assert tny >= ny
     assert tnz >= nz
-    # previous padding
-    """ dx = abs(tnx - nx) // 2; modz = abs(tnx - nx) % 2
-    dy = abs(tny - ny) // 2; mody = abs(tny - ny) % 2
-    dz = abs(tnz - nz) // 2; modx = abs(tnz - nz) % 2 
-    image = np.zeros((tnz, tny, tnx), arr.dtype)
-    image[dz: nz + dz, dy: ny + dy, dx: nx + dx] = arr """
     com1 = np.asarray(em.center_of_mass_density(arr))
-    #print('com1', com1)
     com2 = (com1/np.array(arr.shape)) * np.asarray(tdim)
-    #print('com2: ', com2)
     dx = int(com2[2] - com1[2]) + int(com2[2] - com1[2] > 0.9)
     dy = int(com2[1] - com1[1]) + int(com2[1] - com1[1] > 0.9)
     dz = int(com2[0] - com1[0]) + int(com2[0] - com1[0] > 0.9)
@@ -645,62 +518,6 @@ def resample(x, newshape, sf):
         return Y
     Y = np.fft.ifftshift(Y)
     return (np.fft.ifftn(Y)).real
-
-
-#def resample(x, num, sf):
-#    xshape = list(x.shape)
-#    print(xshape, num)
-#    for i in range(3):
-#        if x.shape[i] % 2 != 0:
-#            xshape[i] = xshape[i] + 1
-#    temp = np.zeros(xshape, x.dtype)
-#    #temp[:-1, :-1, :-1] = x
-#    temp[:x.shape[0], :x.shape[1], :x.shape[2]] = x
-#    x = temp
-#    """ # Check if dims are even
-#    if x.shape[0] % 2 != 0:
-#        xshape = list(x.shape)
-#        xshape[0] = xshape[0] + 1
-#        xshape[1] = xshape[1] + 1
-#        xshape[2] = xshape[2] + 1
-#        temp = np.zeros(xshape, x.dtype)
-#        temp[:-1, :-1, :-1] = x
-#        x = temp """
-#    newshape = list(x.shape)
-#    newshape[0] = num[0]
-#    newshape[1] = num[1]
-#    newshape[2] = num[2]
-#    if num[0] % 2 != 0:
-#        newshape[0] = num[0] + 1
-#        newshape[1] = num[1] + 1
-#        newshape[2] = num[2] + 1
-#    # no-sampling
-#    if x.shape[0] == newshape[0]:
-#        return x
-#    print(x.shape)
-#    print(newshape)
-#    # Forward transform
-#    X = np.fft.fftn(x)
-#    X = np.fft.fftshift(X)
-#    # Placeholder array for output spectrum
-#    Y = np.zeros(newshape, X.dtype)
-#    # upsampling
-#    if X.shape[0] < newshape[0]:
-#        dx = abs(newshape[0] - X.shape[0]) // 2
-#        dy = abs(newshape[1] - X.shape[1]) // 2
-#        dz = abs(newshape[2] - X.shape[2]) // 2
-#        #Y[dx: dx + X.shape[0], dx: dx + X.shape[0], dx: dx + X.shape[0]] = X
-#        Y[dx: dx + X.shape[0], dy: dy + X.shape[1], dz: dz + X.shape[2]] = X
-#    # downsampling
-#    if newshape[0] < X.shape[0]:
-#        dx = abs(newshape[0] - X.shape[0]) // 2
-#        Y[:, :, :] = X[
-#                     dx: dx + newshape[0], dx: dx + newshape[0], dx: dx + newshape[0]
-#                     ]
-#    if sf:
-#        return Y
-#    Y = np.fft.ifftshift(Y)
-#    return (np.fft.ifftn(Y)).real
 
 
 def read_mmcif(mmcif_file):
@@ -905,69 +722,3 @@ def model_transform_gm(mmcif_file, rotmat=None, trans=None, outfilename=None, ma
     tr = gemmi.Transform(mat33, trans)
     st[0].transform(tr)
     st.make_mmcif_document().write_file(outfilename)
-
-
-##### below function are not frequently used.#####
-def read_mrc(mapname11):
-    file11 = mrc.open(mapname11)
-    cell1 = np.array(file11.header.cella)
-    a1 = cell1["x"]
-    b1 = cell1["y"]
-    c1 = cell1["z"]
-    uc = np.asarray([a1 * 1.0, b1 * 1.0, c1 * 1.0, 90.0, 90.0, 90.0])
-    origin = [
-        1 * file11.header.nxstart,
-        1 * file11.header.nystart,
-        1 * file11.header.nzstart,
-    ]
-    ar11 = np.asarray(file11.data, dtype="float")
-    ar11_centered = np.fft.fftshift(ar11)  # CENTERED IMAGE
-    nx, ny, nz = ar11_centered.shape
-    print(mapname11, nx, ny, nz, uc[:3])
-    file11.close()
-    hf11 = np.fft.fftshift(np.fft.fftn(ar11_centered))  # CENTERED FFT OF CENTERED IMAGE
-    return uc, hf11, origin
-
-# def write_3d2mtz_full(uc, arr, outfile="output.mtz"):
-#    # Write numpy 3D array into MTZ file.
-#    # Issue: It write out full sphere data
-#    import numpy.fft as fft
-#
-#    print(arr.shape)
-#    nx, ny, nz = arr.shape
-#    mtz = gemmi.Mtz()
-#    mtz.spacegroup = gemmi.find_spacegroup_by_name("P 1")
-#    mtz.cell.set(uc[0], uc[1], uc[2], 90, 90, 90)
-#    mtz.add_dataset("HKL_base")
-#    for label in ["H", "K", "L"]:
-#        mtz.add_column(label, "H")
-#    mtz.add_column("Fout0", "F")
-#    mtz.add_column("Pout0", "P")
-#    # Add more columns if you need
-#    x = fft.fftshift(fft.fftfreq(arr.shape[0]) * nx)
-#    y = fft.fftshift(fft.fftfreq(arr.shape[1]) * ny)
-#    z = fft.fftshift(fft.fftfreq(arr.shape[2]) * nz)
-#    xv, yv, zv = np.meshgrid(x, y, z)
-#    xvf = xv.flatten(order="F")
-#    yvf = yv.flatten(order="F")
-#    zvf = zv.flatten(order="F")
-#
-#    arr_real = np.real(arr)
-#    arr_imag = np.imag(arr)
-#    ampli = np.sqrt(np.power(arr_real, 2) + np.power(arr_imag, 2))
-#    phase = np.arctan2(arr_imag, arr_real) * 180 / np.pi
-#
-#    ampli_1d = ampli.flatten(order="F")
-#    phase_1d = phase.flatten(order="F")
-#
-#    nrows = len(xvf)
-#    ncols = 5  # Change this according to what columns to write
-#    data = np.ndarray(shape=(nrows, ncols), dtype=object)
-#    data[:, 0] = zvf.astype(int)
-#    data[:, 1] = xvf.astype(int)
-#    data[:, 2] = yvf.astype(int)
-#    data[:, 3] = ampli_1d.astype(np.float32)
-#    data[:, 4] = phase_1d.astype(np.float32)
-#    print(data.shape)
-#    mtz.set_data(data)
-#    mtz.write_to_file(outfile)
