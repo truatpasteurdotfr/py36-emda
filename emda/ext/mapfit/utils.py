@@ -324,7 +324,7 @@ def remove_unwanted_corners(uc, target_dim):
 
 def double_the_axes(arr1):
     nx, ny, nz = arr1.shape
-    big_arr1 = np.zeros((2 * nx, 2 * ny, 2 * nz), dtype="float")
+    big_arr1 = np.zeros((2 * nx, 2 * ny, 2 * nz), dtype=arr1.dtype)
     dx = int(nx / 2)
     dy = int(ny / 2)
     dz = int(nz / 2)
