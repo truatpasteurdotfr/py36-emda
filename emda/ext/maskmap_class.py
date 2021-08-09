@@ -236,7 +236,7 @@ def mapmask(arr, uc, itr=3, kern_rad=3, prob=0.99):
     return mask
 
 
-def mask_from_coordinates(mapname, modelname, atmrad=3):
+def mask_from_coordinates(mapname, modelname, atmrad=3, binary_mask=False):
     import scipy.signal
     from emda.core import iotools, restools
     from scipy.ndimage.morphology import binary_dilation
@@ -279,6 +279,8 @@ def mask_from_coordinates(mapname, modelname, atmrad=3):
         axis=2,
     )
     iotools.write_mrc(mask, "emda_atomic_mask.mrc", uc, orig)
+    if binary_mask:      
+        iotools.write_mrc(mask > 1e-4, "emda_atomic_mask_binary.mrc", uc, orig)
     return mask
 
 
