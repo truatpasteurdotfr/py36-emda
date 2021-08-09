@@ -111,6 +111,8 @@ model_mask.add_argument("--mdl", required=True,
                         help="input atomic model PDB/CIF")
 model_mask.add_argument("--atmrad", required=False, default=3.0,
                         type=float, help="radius of the atomic sphere in Angstroms")
+model_mask.add_argument("--binarymask", action="store_true",
+                        help="use this to output binary mask")
 
 lowpass = subparsers.add_parser(
     "lowpass", description="Lowpass filter to specified resolution."
@@ -613,6 +615,10 @@ model2map.add_argument(
 model2map.add_argument(
     "--gemmi", action="store_true", 
     help="if used, GEMMI is used instead REFMAC for structure factor calculation"
+)
+model2map.add_argument(
+    "--shift_to_boxcenter", action="store_true", 
+    help="if used, calculated map is placed at the boxcenter"
 )
 
 composite = subparsers.add_parser(
@@ -1189,7 +1195,9 @@ def modeltomap(args):
             resol=args.res,
             dim=args.dim, 
             cell=args.cel, 
-            maporigin=args.org)
+            maporigin=args.org,
+            shift_to_boxcenter=args.shift_to_boxcenter,
+            )
         write_mrc(modelmap, "modelmap_gm.mrc", args.cel, args.org)
     else:
         # REFMAC sfcalc
@@ -1201,6 +1209,7 @@ def modeltomap(args):
             maporigin=args.org,
             # lig=args.lig,
             ligfile=args.lgf,
+            shift_to_boxcenter=args.shift_to_boxcenter,
         )
         write_mrc(modelmap, "modelmap_refmac.mrc", args.cel, args.org)
     
@@ -1226,7 +1235,8 @@ def mask4mmodel(args):
     from emda import emda_methods as em
 
     _ = em.mask_from_atomic_model(
-        mapname=args.map, modelname=args.mdl, atmrad=args.atmrad)
+        mapname=args.map, modelname=args.mdl, atmrad=args.atmrad, 
+        binary_mask=args.binarymask)
 
 
 def composite_map(args):
