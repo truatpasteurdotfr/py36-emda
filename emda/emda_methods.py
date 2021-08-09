@@ -346,10 +346,7 @@ def mtz2map(mtzname, map_size):
     """Converts an MTZ file into MRC format.
 
     This function converts data in an MTZ file into a 3D Numpy array.
-    It combines amplitudes and phases with "Fout0" and
-    "Pout0" labels to form Fourier coefficients. If the MTZ contains
-    several aplitude columns, only the one corresponding to "Fout0"
-    will be used.
+    It combines amplitudes and phases to form Fourier coefficients.
 
     Arguments:
         Inputs:
@@ -1048,7 +1045,7 @@ def mask_from_map(
     return mask
 
 
-def mask_from_atomic_model(mapname, modelname, atmrad=5):
+def mask_from_atomic_model(mapname, modelname, atmrad=5, binary_mask=False):
     """Generates a mask from atomic coordinates.
 
     Generates a mask from coordinates. First, atomic positions are
@@ -1068,6 +1065,8 @@ def mask_from_atomic_model(mapname, modelname, atmrad=5):
             atmrad: float
                 Radius of the sphere to be placed on atomic positions in Angstroms.
                 Default is 5 A.
+            binary_mask: bool
+                If used, binary mask will also be output. Default to False
 
         Outputs:
             mask: float, 3D array
@@ -1076,7 +1075,10 @@ def mask_from_atomic_model(mapname, modelname, atmrad=5):
     """
     from emda.ext.maskmap_class import mask_from_coordinates
 
-    return mask_from_coordinates(mapname=mapname, modelname=modelname, atmrad=atmrad)
+    return mask_from_coordinates(mapname=mapname, 
+                                 modelname=modelname, 
+                                 atmrad=atmrad, 
+                                 binary_mask=binary_mask)
 
 
 def sphere_kernel_softedge(radius=5):
@@ -1831,7 +1833,7 @@ def mirror_map(mapname):
 
 
 def model2map(
-    modelxyz, dim, resol, cell, bfac=None, maporigin=None, ligfile=None, outputpath=None,
+    modelxyz, dim, resol, cell, bfac=None, maporigin=None, ligfile=None, outputpath=None, shift_to_boxcenter=False,
 ):
     """Calculates EM map from atomic coordinates using REFMAC5
 
@@ -1844,9 +1846,12 @@ def model2map(
             row (nystart), section (nzstart) of the unit cell. Defaults to [0, 0, 0].
         ligfile (string, optional): Name of the ligand description file. Defaults to None.
         outputpath (string, optional): Path for auxilliary files. Defaults to current
-            working directory
+            working directory.
         bfac(float, optional): Parameter for refmac. Set all atomic B values to bfac
             when it is positive. Default to None.
+        shift_to_boxcenter (bool, optional): This parameter is useful if the calculated
+            map from the model needs to be placed at the center of the box. Default to
+            False. Also, the shifted model will be written to outputpath directory.
 
     Returns:
         float ndarray: calculated model-based density array
@@ -1883,6 +1888,12 @@ def model2map(
             print("!!! Please lower the requested resolution or increase the grid dimensions !!!")
             raise SystemExit()
     # replace/add cell and write model.cif
+    if shift_to_boxcenter:
+        from emda.core.modeltools import shift_to_origin,shift_model
+        doc = shift_to_origin(modelxyz)
+        doc.write_file(outputpath+"model1.cif")
+        modelxyz = outputpath+"model1.cif"
+    # run refmac using model.cif just created
     a, b, c = cell[:3]
     structure = gm.read_structure(modelxyz)
     structure.cell.set(a, b, c, 90.0, 90.0, 90.0)
@@ -1894,6 +1905,12 @@ def model2map(
                               ligfile=ligfile,
                               bfac=bfac)
     modelmap = maptools.mtz2map(outputpath+"sfcalc_from_crd.mtz", dim)
+    if shift_to_boxcenter:
+        maporigin = None # no origin shift allowed
+        modelmap = np.fft.fftshift(modelmap) #bring modelmap to boxcenter
+        # shift model to boxcenter
+        doc = shift_model(mmcif_file=outputpath+"model.cif", shift=[a/2, b/2, c/2])
+        doc.write_file(outputpath+"emda_shifted_model.cif")
     if maporigin is None:
         maporigin = [0, 0, 0]
     else:
@@ -1908,13 +1925,44 @@ def model2map(
     return modelmap
 
 
-def model2map_gm(modelxyz, resol, dim, cell, maporigin=None):
-    import gemmi
+def model2map_gm(modelxyz, resol, dim, cell, maporigin=None, outputpath=None, shift_to_boxcenter=False,):
+    import gemmi, shutil
     from servalcat.utils.model import calc_fc_fft
 
+    if outputpath is None:
+        outputpath = os.getcwd()
+    outputpath = os.path.join(outputpath, 'emda_gemmifiles/')
+    print('outputpath: ', outputpath)
+    # make director for files for refmac run
+    if os.path.exists(outputpath):
+        shutil.rmtree(outputpath)
+    os.mkdir(outputpath) 
+    # check for valid sampling:
+    for i in range(3):
+        if dim[i] % 2 != 0:
+            dim[i] += 1
+    # check for minimum sampling
+    min_pix_size = resol / 2  # in Angstrom
+    min_dim = np.asarray(cell[:3], dtype="float") / min_pix_size
+    min_dim = np.ceil(min_dim).astype(int)
+    for i in range(3):
+        if min_dim[i] % 2 != 0:
+            min_dim += 1
+        if min_dim[0] > dim[0]:
+            print("Requested dims: ", dim)
+            print("Minimum dims needed (for requested resolution): ", min_dim)
+            print("!!! Please lower the requested resolution or increase the grid dimensions !!!")
+            raise SystemExit()
+    if shift_to_boxcenter:
+        from emda.core.modeltools import shift_to_origin,shift_model
+        doc = shift_to_origin(modelxyz)
+        doc.write_file(outputpath+"model1.cif")
+        modelxyz = outputpath+"model1.cif"
+    a, b, c = cell[:3]
     st = gemmi.read_structure(modelxyz)
     st.spacegroup_hm = "P 1"
-    st.cell.set(cell[0], cell[1], cell[2], 90., 90., 90.)
+    st.cell.set(a, b, c, 90., 90., 90.)
+    st.make_mmcif_document().write_file(outputpath+"model.cif")
     asu_data = calc_fc_fft(st=st, 
                            d_min=resol, 
                            source='electron', 
@@ -1946,6 +1994,12 @@ def model2map_gm(modelxyz, resol, dim, cell, maporigin=None):
         asu_data.get_size_for_hkl(min_size=dim))
     griddata_np = (np.array(griddata, copy=False)).transpose()
     modelmap = (np.fft.ifftn(np.conjugate(griddata_np))).real
+    if shift_to_boxcenter:
+        maporigin = None # no origin shift allowed
+        modelmap = np.fft.fftshift(modelmap) #bring modelmap to boxcenter
+        # shift model to boxcenter
+        doc = shift_model(mmcif_file=outputpath+"model.cif", shift=[a/2, b/2, c/2])
+        doc.write_file(outputpath+"emda_shifted_model.cif")
     if maporigin is None:
         maporigin = [0, 0, 0]
     else:
