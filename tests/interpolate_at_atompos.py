@@ -1,6 +1,6 @@
 # Test code to get atomic correlation values by interpolation
 # To use as a tool for local correlation example 2 in the tutorial
-# 13.11.2021
+# 13.08.2021
 
 import sys
 import numpy as np
