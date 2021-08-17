@@ -223,8 +223,8 @@ resample_d.add_argument(
 )
 resample_d.add_argument(
     "--dim",
-    required=True,
-    #default=None,
+    required=False,
+    default=None,
     nargs="+",
     type=np.int,
     help="target map dimensions. e.g. 100 100 100 ",
