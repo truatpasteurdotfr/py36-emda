@@ -181,16 +181,16 @@ def write_mtz(uc, arr, outfile="map2mtz.mtz", resol=None):
                          outfile=outfile, resol=resol)
 
 
-def resample_data(curnt_pix, targt_pix, targt_dim, arr):
+def resample_data(curnt_pix, targt_pix, arr, targt_dim=None):
     """Resamples a 3D array.
 
     Arguments:
         Inputs:
             curnt_pix: float list, Current pixel sizes along c, b, a.
             targt_pix: float list, Target pixel sizes along c, b a.
-            targt_dim: int list, Target sampling along z, y, x.
             arr: float, 3D array of map values.
-
+            targt_dim: int list, Target sampling along z, y, x.
+            
         Outputs:
             new_arr: float, 3D array
                 Resampled 3D array.
