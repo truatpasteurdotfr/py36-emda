@@ -126,7 +126,13 @@ def plot_nlines(
     n_bins = res_arr.shape[0]
     pos[pos < 0] = 0
     pos[pos >= n_bins] = n_bins - 1
-    ax1.set_xticklabels(np.round(res_arr[pos], decimals=2))
+    #
+    import matplotlib.ticker as mticker
+    label_format = '{:5.2f}'
+    ax1.xaxis.set_major_locator(mticker.FixedLocator(pos))
+    ax1.set_xticklabels([label_format.format(res_arr[x]) for x in pos])
+    #
+    #ax1.set_xticklabels(np.round(res_arr[pos], decimals=2))
     ax1.set_xlabel("Resolution ($\AA$)")
     plt.legend(loc=0)
     plt.ylabel("Fourier Shell Correlation")
@@ -297,3 +303,14 @@ def plot_from_twofiles_csv(filename, labels):
     plt.ylabel("Overall Correlation Coefficient")
     plt.savefig("overall_CC_both.eps", format="eps", dpi=300)
     plt.show()
+
+
+def plot_fval(fval_list,i=0):
+    fig = plt.figure(figsize=(6, 4))
+    ax1 = fig.add_subplot(111)
+    ax1.plot(fval_list, label="fval", linewidth=2)
+    plt.legend(loc=0)
+    plt.ylabel("functional value")
+    outname = "fval_mcycle_%i" %i
+    plt.savefig(outname+".eps", format="eps", dpi=300)
+    plt.show()    
