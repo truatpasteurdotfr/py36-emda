@@ -1189,7 +1189,7 @@ def overlay_maps(
         modelres=modelres,
         nocom=nocom,
     )
-
+    return emmap1, rotmat_list, trans_list
 
 def average_maps(
     maplist,
@@ -1521,7 +1521,9 @@ def mapmodel_fsc(
     return res_arr, bin_fsc
 
 
-def difference_map(maplist, diffmapres=3.0, ncy=5, mode="norm", fit=False, usehalfmaps=False, usecom=False, fitres=None, masklist=None):
+def difference_map(maplist, diffmapres=3.0, ncy=100, mode="norm", fit=False, 
+        usehalfmaps=False, usecom=False, fitres=None, masklist=None, 
+        rot=None, axr=None, trans=None):
     """Calculates difference map.
 
     Arguments:
@@ -1577,8 +1579,17 @@ def difference_map(maplist, diffmapres=3.0, ncy=5, mode="norm", fit=False, useha
     """
     from emda.ext import diffmap_with_fit
 
-    diffmap_with_fit.difference_map(maplist=maplist, masklist=masklist,
-                                    diffmapres=diffmapres, mode=mode, ncy=ncy, fit=fit, usecom=usecom, fitres=fitres, usehalfmaps=usehalfmaps)
+    diffmap_with_fit.difference_map(maplist=maplist, 
+                                    masklist=masklist,
+                                    diffmapres=diffmapres, 
+                                    mode=mode, 
+                                    ncy=ncy, 
+                                    fit=fit, 
+                                    usecom=usecom, 
+                                    fitres=fitres, 
+                                    usehalfmaps=usehalfmaps,
+                                    rot=rot, axr=axr,
+                                    trans=trans)
 
 
 def applymask(mapname, maskname, outname):
