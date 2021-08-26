@@ -360,7 +360,11 @@ def resample2staticmap(curnt_pix, targt_pix, targt_dim, arr, sf=False, fobj=None
                 Resampled 3D array. If sf was used, return is a complex array
     """
     # Resamling arr into an array having target_dim
-    tnz, tny, tnx = targt_dim
+    if targt_dim is not None:
+        tnz, tny, tnx = targt_dim
+    else:
+        targt_dim = arr.shape
+        tnz, tny, tnx = targt_dim
     nz, ny, nx = arr.shape
     if len(curnt_pix) < 3:
         curnt_pix.append(curnt_pix[0])
