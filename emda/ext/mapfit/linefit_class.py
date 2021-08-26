@@ -35,10 +35,10 @@ class LineFit:
 
         # w = 1.0 for line search
         nx, ny, nz = self.e0_lf.shape
-        t = self.step[:3] * k[0]
+        t = np.asarray(self.step[:3], 'float') * k[0]
         st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
         q_init = np.array([1.0, 0.0, 0.0, 0.0])
-        tmp = np.insert(self.step[3:] * k[1], 0, 0.0)
+        tmp = np.insert(np.asarray(self.step[3:], 'float') * k[1], 0, 0.0)
         tmp = tmp + q_init
         q = tmp / np.sqrt(np.dot(tmp, tmp))
         rotmat = quaternions.get_RM(q)
