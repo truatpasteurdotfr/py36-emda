@@ -16,9 +16,9 @@ from numpy.fft import fftn, fftshift, ifftshift, ifftn, ifftshift
 from emda import core
 from emda.core import quaternions
 from emda.ext.mapfit import utils as maputils
-#from emda.ext.maskmap_class import threshold_map
 
 timeit = False
+
 
 class EmmapOverlay:
     def __init__(self, map_list, nocom=False, mask_list=None, modelres=None):
@@ -49,7 +49,6 @@ class EmmapOverlay:
         self.eo_lst = None
         self.totalvar_lst = None
         self.gemmi = False
-        self.mask_around_model = False
 
     def _check_inputs(self):
         if not self.map_list:
@@ -473,10 +472,9 @@ class EmFit:
     def get_wght(self): 
         cx, cy, cz = self.e0.shape
         val_arr = np.zeros((self.mapobj.cbin, 2), dtype='float')
-        denominator = utils.regularize_fsc_weights(1 - self.fsc ** 2)
-        val_arr[:,0] = self.fsc / denominator #(1 - self.fsc ** 2) 
+        val_arr[:,0] = self.fsc #/ (1 - self.fsc ** 2)
         fsc_sqd = self.fsc ** 2
-        fsc_combi = fsc_sqd / denominator #(1 - fsc_sqd)
+        fsc_combi = fsc_sqd #/ (1 - fsc_sqd)
         val_arr[:,1] = fsc_combi
         wgrid = fcodes_fast.read_into_grid2(self.mapobj.cbin_idx,val_arr, self.mapobj.cbin, cx, cy, cz)
         return wgrid[:,:,:,0], wgrid[:,:,:,1]
@@ -514,9 +512,14 @@ class EmFit:
                 # first rotate
                 self.rotmat = core.quaternions.get_RM(self.q)
                 maps2send = np.stack((self.e1, self.cfo), axis = -1)
-                bin_idx = self.mapobj.cbin_idx
-                nbin = self.mapobj.cbin
-                maps = fcodes_fast.trilinear2(maps2send,bin_idx,self.rotmat,nbin,0,2,cx, cy, cz)        
+                #bin_idx = self.mapobj.cbin_idx
+                #nbin = self.mapobj.cbin
+                #maps = fcodes_fast.trilinear2(maps2send,bin_idx,self.rotmat,nbin,0,2,cx, cy, cz)
+                maps = fcodes_fast.tricubic(rm=self.rotmat,
+                                    f=maps2send,
+                                    mode=0,
+                                    nc=2,
+                                    nx=cx, ny=cy, nz=cz)        
                 # then translate
                 self.st, s1, s2, s3 = fcodes_fast.get_st(cx, cy, cz, self.t)
                 self.sv = np.array([s1, s2, s3])
@@ -531,6 +534,8 @@ class EmFit:
             q = quaternions.quaternion_multiply(self.q, q0)
             q = q / np.sqrt(np.dot(q, q))
             theta2 = np.arccos((np.trace(quaternions.get_RM(q)) - 1) / 2) * 180.0 / np.pi
+            #print('rotation in Euler angles:')
+            #print(np.rad2deg(quaternions.rotationMatrixToEulerAngles(quaternions.get_RM(q))))
             t_accum_angstrom = (t + self.t) * self.pixsize * self.mapobj.map_dim[0]
             translation_vec = np.sqrt(np.dot(t_accum_angstrom, t_accum_angstrom))
             if i > 0 and abs(fval_list[-1] - fval_list[-2]) < tol:
@@ -545,7 +550,17 @@ class EmFit:
                 lft.step = self.step
                 lft.q_prev = self.q
                 alpha_r = lft.scalar_opt()
+                #print('alpha_r: ', alpha_r)
                 self.q += np.insert(self.step * alpha_r, 0, 0.0)
+                """ from emda.ext.overlay_x import ndlinefit
+                lft = ndlinefit()
+                lft.get_linefit_static_data(
+                    [self.e0, self.e1], self.mapobj.cbin_idx, self.mapobj.res_arr, smax_lf)
+                lft.step = self.step
+                lft.q_prev = self.q
+                alpha_r = lft.scalar_opt()
+                print('alpha_r: ', alpha_r)
+                self.q += np.insert(self.step * np.asarray(alpha_r, 'float'), 0, 0.0) """
                 self.q = self.q / np.sqrt(np.dot(self.q, self.q))
             else:
                 # translation optimisation
@@ -565,46 +580,6 @@ class EmFit:
             end = timer()
             if timeit:
                 print("time for one cycle:", end - start)
-
-
-def fsc_between_static_and_transfomed_map(maps, bin_idx, rm, t, nbin):
-    nx, ny, nz = maps[0].shape
-    maps2send = np.stack((maps[1], maps[2]), axis = -1)
-    frs = fcodes_fast.trilinear2(maps2send,bin_idx,rm,nbin,0,2,nx, ny, nz)
-    st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
-    f1f2_fsc, _, bin_count = core.fsc.anytwomaps_fsc_covariance(
-        maps[0], frs[:, :, :, 0] * st, bin_idx, nbin)
-    fsc_avg = utils.get_avg_fsc(binfsc=f1f2_fsc, bincounts=bin_count)
-    return [f1f2_fsc, frs[:, :, :, 0] * st, frs[:, :, :, 1] * st, fsc_avg]
-
-
-def get_ibin(bin_fsc, cutoff):
-    # search from rear end
-    ibin = 0
-    for i, ifsc in reversed(list(enumerate(bin_fsc))):
-        if ifsc > cutoff:
-            ibin = i
-            if ibin % 2 != 0:
-                ibin = ibin - 1
-            break
-    return ibin
-
-
-def determine_ibin(bin_fsc, cutoff=0.20):
-    bin_fsc = utils.filter_fsc(bin_fsc)
-    ibin = get_ibin(bin_fsc, cutoff)        
-    i = 0
-    while ibin < 5:
-        cutoff -= 0.01
-        ibin = get_ibin(bin_fsc, max([cutoff, 0.1]))
-        i += 1
-        if i > 200:
-            print("Fit starting configurations are too far.")
-            raise SystemExit()
-    if ibin == 0:
-        print("Fit starting configurations are too far.")
-        raise SystemExit()
-    return ibin
 
 
 def run_fit(
@@ -635,22 +610,20 @@ def run_fit(
     for i in range(10):
         print("Resolution cycle #: ", i)
         if i == 0:
-            f1f2_fsc, frt, ert, fsc_avg = fsc_between_static_and_transfomed_map(
+            f1f2_fsc, frt, ert, fsc_avg = utils.fsc_between_static_and_transfomed_map(
                 maps = [emmap1.fo_lst[0], emmap1.fo_lst[ifit], emmap1.eo_lst[ifit]],
                 bin_idx=emmap1.bin_idx,
                 rm=rotmat,
                 t=t,
                 nbin=emmap1.nbin,
             )
-            print('Bin FSC: ', f1f2_fsc)
-            print('Avg. FSC: ', fsc_avg)
-            ibin = determine_ibin(f1f2_fsc)
+            ibin = utils.determine_ibin(f1f2_fsc)
             if fitbin < ibin:
                 ibin = fitbin
             ibin_old = ibin
             print("Fitting starts at ", emmap1.res_arr[ibin], " (A)")
             fsc_lst.append(f1f2_fsc)
-            if fsc_avg > 0.998:
+            if fsc_avg > 0.999:
                 rotmat = rotmat
                 t = t
                 q_final = quaternions.rot2quart(rotmat)
@@ -666,14 +639,14 @@ def run_fit(
                 break
         else:
             # Apply initial rotation and translation to calculate fsc
-            f1f2_fsc, frt, ert, _ = fsc_between_static_and_transfomed_map(
+            f1f2_fsc, frt, ert, fsc_avg = utils.fsc_between_static_and_transfomed_map(
                 maps = [emmap1.fo_lst[0], emmap1.fo_lst[ifit], emmap1.eo_lst[ifit]],
                 bin_idx=emmap1.bin_idx,
                 rm=rotmat,
                 t=t,
                 nbin=emmap1.nbin,
             )
-            ibin = determine_ibin(f1f2_fsc)
+            ibin = utils.determine_ibin(f1f2_fsc)
             if fitbin < ibin:
                 ibin = fitbin
             print("Fitting resolution: ", emmap1.res_arr[ibin], " (A)")
