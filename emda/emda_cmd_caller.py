@@ -505,11 +505,35 @@ diffmap.add_argument(
     type=float,
     help="final fit resol. (A). default= 0.0 A",
 )
-diffmap.add_argument("--usecom", action="store_true",
-                     help="if used, center-of-mass is used to superimpose maps")
+diffmap.add_argument("--nocom", action="store_true",
+                     help="if used, center-of-mass is not used during overlay")
 
 diffmap.add_argument("--usehalfmaps", action="store_true",
                      help="if used, halfmaps are used to calculate difference map")
+diffmap.add_argument(
+    "--tra",
+    required=False,
+    default=[0.0, 0.0, 0.0],
+    nargs="+",
+    type=float,
+    help="list of translation vectors. default=[0.0, 0.0, 0.0]",
+)
+diffmap.add_argument(
+    "--rot",
+    required=False,
+    default=[0.0],
+    nargs="+",
+    type=float,
+    help="list of rotations in deg. default=0.0",
+)
+diffmap.add_argument(
+    "--axr",
+    required=False,
+    default=[1, 0, 0],
+    nargs="+",
+    type=int,
+    help="list of rotation axes. default=[1,0,0]",
+)
 
 
 applymask = subparsers.add_parser(
@@ -1114,7 +1138,9 @@ def diff_map(args):
 
     difference_map(maplist=args.map, masklist=args.msk,
                    diffmapres=args.res, mode=args.mod, ncy=args.ncy,
-                   fit=args.fit, usehalfmaps=args.usehalfmaps, usecom=args.usecom, fitres=args.fitres)
+                   fit=args.fit, usehalfmaps=args.usehalfmaps, 
+                   usecom=args.nocom, fitres=args.fitres, rot=args.rot,
+                   axr=args.axr, trans=args.tra, )
 
 
 def scale_map(args):
