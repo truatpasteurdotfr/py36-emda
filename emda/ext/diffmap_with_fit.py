@@ -21,19 +21,22 @@ maplist = [
 ] """
 
 
-def fitmaps(maplist, ncy=5, usecom=False, masklist=None, fitres=None):
+def fitmaps(maplist, ncy=100, usecom=False, masklist=None, fitres=None, 
+        fobs=None, rot=None, trans=None, axr=None):
     print(maplist)
-    try:
-        emmap1 = EmmapOverlay(map_list=maplist, mask_list=masklist, com=usecom)
+
+    """ try:
+        emmap1 = EmmapOverlay(map_list=maplist, mask_list=masklist, nocom=usecom)
     except ValueError:
-        emmap1 = EmmapOverlay(map_list=maplist, com=usecom)
+        emmap1 = EmmapOverlay(map_list=maplist, nocom=usecom)
     emmap1.load_maps()
     emmap1.calc_fsc_from_maps()
     #emmap1.eo_lst = emmap1.fo_lst
     rotmat_init = np.identity(3)
     t_init=[0.0, 0.0, 0.0]
     smax = 6
-    t = [itm / emmap1.pixsize for itm in t_init]
+    #t=[itm / emmap1.pixsize[i] for i, itm in enumerate(tlist[ifit-1])]
+    t = [itm / emmap1.pixsize[i] for i, itm in enumerate(t_init)]
     # resolution estimate for line-fit
     dist = np.sqrt((emmap1.res_arr - smax) ** 2)
     slf = np.argmin(dist) + 1
@@ -45,18 +48,30 @@ def fitmaps(maplist, ncy=5, usecom=False, masklist=None, fitres=None):
     for ifit in range(1, len(emmap1.eo_lst)):
         t, q_final = run_fit(
             emmap1=emmap1,
-            smax=smax,
+            #smax=smax,
             rotmat=rotmat_init,
             t=t,
-            slf=slf,
+            #slf=slf,
             ncycles=ncy,
             ifit=ifit,
-            interp="linear",
-            fitres=fitres
+            #interp="linear",
+            fitres=fitres,
+            fobj=fobs
         )
         rotmat = quaternions.get_RM(q_final)
         rotmat_list.append(rotmat)
-        trans_list.append(t)
+        trans_list.append(t) """
+    import emda.emda_methods as em
+    emmap1, rotmat_list, trans_list = em.overlay_maps(
+        maplist=maplist,
+        masklist=masklist,
+        ncy=ncy,
+        rot=rot,
+        fitres=fitres,
+        nocom=usecom,
+        axr=axr,
+        tra=trans,
+    )
     return emmap1, rotmat_list, trans_list 
 
 
@@ -141,7 +156,8 @@ class MapOut:
         self.origin = None
 
 
-def main(maplist, diffmapres=3, ncy=5, fit=False, usecom=False, usehalfmaps=False, fitres=None, masklist=None):
+def main(maplist, diffmapres=3, ncy=5, fit=False, usecom=False, 
+        usehalfmaps=False, fitres=None, masklist=None, rot=None, axr=None, trans=None):
     results = MapOut()
     modelres = diffmapres
     if usehalfmaps:
@@ -151,9 +167,22 @@ def main(maplist, diffmapres=3, ncy=5, fit=False, usecom=False, usehalfmaps=Fals
         if masklist is not None:
             assert len(masklist) == 2
         try:
-            results = diffmap_snr.main(maplist=maplist, fit=fit, ncy=ncy, usecom=usecom, fitres=fitres, resol=diffmapres, masklist=masklist, results=results)
+            results = diffmap_snr.main(maplist=maplist, 
+                                       fit=fit, 
+                                       ncy=ncy, 
+                                       usecom=usecom, 
+                                       fitres=fitres, 
+                                       resol=diffmapres, 
+                                       masklist=masklist, 
+                                       results=results)
         except ValueError:
-            results = diffmap_snr.main(maplist=maplist, fit=fit, ncy=ncy, usecom=usecom, fitres=fitres, resol=diffmapres, results=results)
+            results = diffmap_snr.main(maplist=maplist, 
+                                       fit=fit, 
+                                       ncy=ncy, 
+                                       usecom=usecom, 
+                                       fitres=fitres, 
+                                       resol=diffmapres, 
+                                       results=results)
     else:
         if maplist[0].endswith(((".mrc", ".map"))) and maplist[1].endswith(((".pdb", ".cif", ".ent"))):
             uc, arr1, origin = em.get_data(maplist[0])
@@ -172,7 +201,14 @@ def main(maplist, diffmapres=3, ncy=5, fit=False, usecom=False, usehalfmaps=Fals
             em.write_mrc(modelmap, "emda_modelmap.mrc", uc, origin)
             maplist[1] = "emda_modelmap.mrc"
         if fit:
-            emmap1, rotmat_list, trans_list = fitmaps(maplist=maplist, masklist=masklist, usecom=usecom, ncy=ncy, fitres=fitres)
+            emmap1, rotmat_list, trans_list = fitmaps(maplist=maplist, 
+                                                masklist=masklist, 
+                                                usecom=usecom, 
+                                                ncy=ncy, 
+                                                fitres=fitres,
+                                                rot=rot,
+                                                trans=trans,
+                                                axr=axr)
             flist = apply_transformation_on_f(emmap1, rotmat_list, trans_list)
             output_rotated_models(emmap1=emmap1, maplist=maplist, r_lst=rotmat_list, t_lst=trans_list)
             print("resol: ", diffmapres)
@@ -200,7 +236,9 @@ def main(maplist, diffmapres=3, ncy=5, fit=False, usecom=False, usehalfmaps=Fals
 
 
 
-def difference_map(maplist, diffmapres=3.0, mode="norm", fit=False, ncy=5, usecom=False, usehalfmaps=False, fitres=None, masklist=None):
+def difference_map(maplist, diffmapres=3.0, mode="norm", fit=False, 
+        ncy=100, usecom=False, usehalfmaps=False, fitres=None, masklist=None,
+        rot=None, axr=None, trans=None):
     """Calculates difference map.
 
     Arguments:
@@ -257,7 +295,11 @@ def difference_map(maplist, diffmapres=3.0, mode="norm", fit=False, ncy=5, useco
     from emda.ext import difference
 
     if mode == "norm":
-        results = main(maplist=maplist, diffmapres=diffmapres, fit=fit, ncy=ncy, fitres=fitres, usecom=usecom, usehalfmaps=usehalfmaps, masklist=masklist)
+        results = main(maplist=maplist, diffmapres=diffmapres, 
+                       fit=fit, ncy=ncy, fitres=fitres, usecom=usecom, 
+                       usehalfmaps=usehalfmaps, masklist=masklist,
+                       rot=rot, axr=axr, trans=trans
+                       )
         diffmap = results.diffmap
         list_maps = []
         list_masks = results.masklist
