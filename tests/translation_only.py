@@ -16,6 +16,7 @@ import emda.emda_methods as em
 from numpy.fft import fftn, ifftn, fftshift, ifftshift
 from emda import core
 from emda.ext.mapfit import utils
+from emda.ext.overlay import cut_resolution_for_linefit
 
 
 
@@ -205,17 +206,17 @@ class linefit:
 
 
     def get_linefit_static_data(self):
-        (
-            self.e0,
-            self.bin_idx,
-            self.nbin,
-        ) = core.restools.cut_resolution_for_linefit(self.e0, self.cbin_idx, self.res_arr, self.smax)
-        (    
-            self.e1,
-            _,
-            _,
-        ) = core.restools.cut_resolution_for_linefit(self.e1, self.cbin_idx, self.res_arr, self.smax)
-
+        if self.cbin == self.smax:
+            self.nbin = self.cbin
+            self.bin_idx = self.cbin_idx
+        else:
+            e_list = [self.e0, self.e1]
+            eout, cBIdx, cbin = cut_resolution_for_linefit(
+                e_list, self.cbin_idx, self.res_arr, self.smax
+            )
+            self.e0, self.e1 = [eout[0, :, :, :], eout[1, :, :, :]]
+            self.bin_idx = cBIdx
+            self.nbin = cbin
 
     def get_fsc_wght(self, e0, ert, bin_idx, nbin):
         cx, cy, cz = e0.shape
@@ -466,7 +467,6 @@ def run_fit(
             print("ibin = 0")
             raise SystemExit("Cannot proceed! Stopping now...")
 
-        from emda.ext.overlay import cut_resolution_for_linefit
         e_list = [emmap1.eo_lst[0], emmap1.eo_lst[ifit]]
         eout, cBIdx, cbin = cut_resolution_for_linefit(
             e_list, emmap1.bin_idx, emmap1.res_arr, ibin
@@ -486,7 +486,7 @@ def overlay(
     maplist,
     ncycles=50,
     t_init=[0.0, 0.0, 0.0],
-    symorder=2,
+    symorder=3,
     rotaxis=[0,0,1],
     interp='linear',
     fitres=4,
@@ -585,8 +585,16 @@ def output_rotated_maps(emmap1, tlist):
 
 if __name__ == "__main__":
     maplist = [
-        "/Users/ranganaw/MRC/REFMAC/haemoglobin/EMD-3651/emda_test/map_transform/emd_3651.map",
+        #"/Users/ranganaw/MRC/REFMAC/haemoglobin/EMD-3651/emda_test/map_transform/emd_3651.map",
         #"/Users/ranganaw/MRC/REFMAC/haemoglobin/EMD-3651/emda_test/map_transform/transformed.mrc"
+        "/Users/ranganaw/MRC/REFMAC/EMD-6952/map/emd_6952.map"
         ] 
     
-    emmap1, transl_lst = overlay(maplist)
+    emmap1, transl_lst = overlay(maplist,
+                                 ncycles=50,
+                                 t_init=[0.0, 0.0, 0.0],
+                                 symorder=3,
+                                 rotaxis=[0,0,1],
+                                 fitres=6,
+                                 )
+ 
