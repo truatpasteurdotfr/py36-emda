@@ -192,6 +192,9 @@ def derivatives_translation(e0, e1, wgrid, w2grid, sv):
     step = ddf_inv.dot(-df)
     return step
 
+def trans2angstroms(t, pixsize, dim):
+    t_angstrom = np.asarray(t, 'float') * np.asarray(pixsize, 'float') * np.asarray(dim, 'int')
+    return np.sqrt(np.dot(t_angstrom, t_angstrom))
 
 class linefit:
     def __init__(self):
@@ -319,8 +322,7 @@ class EmFit:
             if i == 0:
                 self.t = np.asarray(t_init, dtype="float")
                 t_accum = self.t
-                t_accum_angstrom = t_accum * self.pixsize[0] * self.mapobj.map_dim[0]
-                translation_vec = np.sqrt(np.dot(t_accum_angstrom, t_accum_angstrom))
+                translation_vec = trans2angstroms(t_accum, self.pixsize, self.mapobj.map_dim)
             # check FSC and return parameters accordingly
             self.fsc = self.calc_fsc()
             self.w_grid, self.w2_grid = self.get_wght()
@@ -336,8 +338,9 @@ class EmFit:
             if i > 0 and i == ncycles - 1:
                 self.t_accum = t_accum
                 self.fsc_lst = fsc_lst
-                t_accum_angstrom = self.t_accum * self.pixsize[0] * self.mapobj.map_dim[0]
-                translation_vec = np.sqrt(np.dot(t_accum_angstrom, t_accum_angstrom))
+                translation_vec = trans2angstroms(self.t_accum, self.pixsize, self.mapobj.map_dim)
+                #t_accum_angstrom = self.t_accum * self.pixsize[0] * self.mapobj.map_dim[0]
+                #translation_vec = np.sqrt(np.dot(t_accum_angstrom, t_accum_angstrom))
                 break
             if i > 0 and abs(fval_list[-1] - fval_list[-2]) < tol:
                 self.t_accum = t_accum
@@ -566,9 +569,10 @@ def output_rotated_maps(emmap1, tlist):
     f1f2_fsc_unaligned = core.fsc.anytwomaps_fsc_covariance(
             f0, f1, bin_idx, nbin)[0]
     # average t
+    print('tlist: ', tlist)
     t = np.mean(np.asarray(tlist), axis=0)
     print('average translation vector (A): ')
-    print(t * emmap1.pixsize * emmap1.map_unit_cell[:3])
+    print(t * np.asarray(emmap1.pixsize, 'float') * np.asarray(emmap1.map_dim, 'int'))
 
     st, _, _, _ = fcodes_fast.get_st(nz, ny, nx, t)
     frt = f1 * st
@@ -587,14 +591,15 @@ if __name__ == "__main__":
     maplist = [
         #"/Users/ranganaw/MRC/REFMAC/haemoglobin/EMD-3651/emda_test/map_transform/emd_3651.map",
         #"/Users/ranganaw/MRC/REFMAC/haemoglobin/EMD-3651/emda_test/map_transform/transformed.mrc"
-        "/Users/ranganaw/MRC/REFMAC/EMD-6952/map/emd_6952.map"
+        #"/Users/ranganaw/MRC/REFMAC/EMD-6952/map/emd_6952.map"
+        "/Users/ranganaw/MRC/REFMAC/Keitaro/EMD-21951/emd_21951.map"
         ] 
     
     emmap1, transl_lst = overlay(maplist,
                                  ncycles=50,
                                  t_init=[0.0, 0.0, 0.0],
-                                 symorder=3,
-                                 rotaxis=[0,0,1],
+                                 symorder=2,
+                                 rotaxis=[1,0,0],
                                  fitres=6,
                                  )
  
