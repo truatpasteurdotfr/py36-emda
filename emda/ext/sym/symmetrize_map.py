@@ -5,7 +5,7 @@ import fcodes_fast
 from emda.core.restools import get_resolution_array
 from emda.ext.mapfit.utils import double_the_axes
 from numpy.fft import fftn, ifftn, fftshift, ifftshift
-from emda.ext.sym.GenerateOperators_v9_ky4 import from_two_axes_to_group_v2, operators_from_symbol
+from emda.ext.sym.GenerateOperators_v9_ky5 import from_two_axes_to_group_v2, operators_from_symbol
 
 
 def apply_op(f1, op, bin_idx, nbin):
