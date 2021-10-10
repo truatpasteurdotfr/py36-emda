@@ -192,15 +192,34 @@ def get_3d_realspcorrelation(half1, half2, kern, mask=None):
     return halfmaps_cc
 
 
-def calculate_modelmap(modelxyz, dim, resol, uc, lgf=None, maporigin=None):
-    modelmap = em.model2map(
-        modelxyz=modelxyz,
-        dim=dim,
-        resol=resol,
-        cell=uc,
-        ligfile=lgf,
-        maporigin=maporigin,
-    )
+
+def calculate_modelmap(modelxyz, dim, resol, uc, refmac=False, lgf=None, maporigin=None):
+    if refmac:
+        print('Modelmap calculation using REFMAC')
+        modelmap = em.model2map(
+            modelxyz=modelxyz,
+            dim=dim,
+            resol=resol,
+            cell=uc,
+            ligfile=lgf,
+            maporigin=maporigin,
+        )
+    else:
+        # use gemmi for modelmap calculation
+        print('Modelmap calculation using GEMMI')
+        modelmap = em.model2map_gm(
+            modelxyz=modelxyz,
+            dim=dim,
+            resol=resol,
+            cell=uc,
+            maporigin=maporigin,
+        )  
+        # check if modelmap dims are OK
+        curnt_pix = [float(round(uc[i]/shape, 5)) for i, shape in enumerate(modelmap.shape)]
+        targt_pix = [float(round(uc[i]/dim[i], 5)) for i in range(3)]
+        modelmap = em.resample_data(
+            curnt_pix=curnt_pix, targt_pix=targt_pix, targt_dim=dim, arr=modelmap
+        )
     return modelmap
 
 
