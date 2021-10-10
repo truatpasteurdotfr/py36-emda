@@ -97,7 +97,7 @@ def phase_randomized_fsc(arr1, arr2, mask, bin_idx, res_arr, fobj, resol_rand=No
         curve_label=["total", "noise", "true"],
         fscline=0.5,
     )
-    return fsc_list, bin_count
+    return fsc_list, bin_count, resol_rand
 
 
 def main():
