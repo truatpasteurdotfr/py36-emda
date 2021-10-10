@@ -105,26 +105,9 @@ def main(maplist, results, fit=True, resol=3, ncy=5, usecom=False, fitres=None, 
     bestmap_list = []
     msk_list = []
     nmaps = len(maplist)
-    if nmaps == 3:
-        print("TO DO.")
-        """ uc, arr1, origin = iotools.read_map(maplist[0])
-        uc, arr2, origin = iotools.read_map(maplist[1])
-        target_uc = uc
-        target_dim = arr1.shape
-        tpix = target_uc[0] / target_dim[0]
-        nbin, res_arr, bin_idx = restools.get_resolution_array(uc, arr1)
-        bestmap_list.append(get_bestmap(arr1, arr2, bin_idx, nbin, mode))
-        if maplist[2].endswith(((".pdb", ".cif", ".ent"))):
-            # calculate map from model
-            modelmap = em.model2map(
-                modelxyz=maplist[2],
-                dim=arr1.shape,
-                resol=resol,
-                cell=uc,
-                maporigin=origin,
-            )
-            bestmap_list.append(fftshift(fftn(modelmap))) """
-    elif nmaps == 4:
+    if nmaps != 4:
+        raise SystemExit("Likelihood based difference map needs half maps for each map")
+    else:
         if masklist is not None and len(maplist) // 2 != len(masklist):
             print("Number of masks should be equal \
                 to half of the number of maps")
@@ -144,10 +127,10 @@ def main(maplist, results, fit=True, resol=3, ncy=5, usecom=False, fitres=None, 
                 target_uc = uc
                 map_origin = origin
                 target_dim = arr1.shape
-                tpix = target_uc[0] / target_dim[0]
+                tpix = [uc[i]/shape for i, shape in enumerate(arr1.shape)]
                 nbin, res_arr, bin_idx = restools.get_resolution_array(uc, arr1)
             else:
-                cpix = uc[0] / arr1.shape[0]
+                cpix = [uc[i]/shape for i, shape in enumerate(arr1.shape)]
             bestmap_list.append(get_bestmap(arr1, arr2, bin_idx, nbin, mode))
 
     # check for sampling in best maps
