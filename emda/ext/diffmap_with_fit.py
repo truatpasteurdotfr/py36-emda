@@ -23,45 +23,8 @@ maplist = [
 
 def fitmaps(maplist, ncy=100, usecom=False, masklist=None, fitres=None, 
         fobs=None, rot=None, trans=None, axr=None):
-    print(maplist)
-
-    """ try:
-        emmap1 = EmmapOverlay(map_list=maplist, mask_list=masklist, nocom=usecom)
-    except ValueError:
-        emmap1 = EmmapOverlay(map_list=maplist, nocom=usecom)
-    emmap1.load_maps()
-    emmap1.calc_fsc_from_maps()
-    #emmap1.eo_lst = emmap1.fo_lst
-    rotmat_init = np.identity(3)
-    t_init=[0.0, 0.0, 0.0]
-    smax = 6
-    #t=[itm / emmap1.pixsize[i] for i, itm in enumerate(tlist[ifit-1])]
-    t = [itm / emmap1.pixsize[i] for i, itm in enumerate(t_init)]
-    # resolution estimate for line-fit
-    dist = np.sqrt((emmap1.res_arr - smax) ** 2)
-    slf = np.argmin(dist) + 1
-    if slf % 2 != 0:
-        slf = slf - 1
-    slf = min([len(dist), slf])
-    rotmat_list = []
-    trans_list = []
-    for ifit in range(1, len(emmap1.eo_lst)):
-        t, q_final = run_fit(
-            emmap1=emmap1,
-            #smax=smax,
-            rotmat=rotmat_init,
-            t=t,
-            #slf=slf,
-            ncycles=ncy,
-            ifit=ifit,
-            #interp="linear",
-            fitres=fitres,
-            fobj=fobs
-        )
-        rotmat = quaternions.get_RM(q_final)
-        rotmat_list.append(rotmat)
-        trans_list.append(t) """
     import emda.emda_methods as em
+    print(maplist)
     emmap1, rotmat_list, trans_list = em.overlay_maps(
         maplist=maplist,
         masklist=masklist,
@@ -125,7 +88,7 @@ def mapoutput(list_maps, uc, origin, masklist=None):
     if masklist is None: 
         masklist = []
     if len(masklist) > 0:
-        for i, msk in enumerate(masklist):
+        """ for i, msk in enumerate(masklist):
             if i < 2:
                 # calculate rmsd
                 masked_mean = np.sum(list_maps[i] * msk) / np.sum(msk)
@@ -137,7 +100,19 @@ def mapoutput(list_maps, uc, origin, masklist=None):
             fname_dif = "emda_diffmap_m%s.mrc" % (str(i+1))
             iotools.write_mrc(list_maps[i] * msk, fname_dif, uc, origin)
             fname_map = "emda_map%s.mrc" % (str(i+1))
-            iotools.write_mrc(list_maps[i+2] * msk, fname_map, uc, origin)  
+            iotools.write_mrc(list_maps[i+2] * msk, fname_map, uc, origin)  """ 
+        from emda.ext.utils import binarize_mask
+        msk = binarize_mask(mask=masklist[0]) * binarize_mask(mask=masklist[1])
+        # calculate rmsd
+        for i, _ in enumerate(masklist):
+            masked_mean = np.sum(list_maps[i] * msk) / np.sum(msk)
+            diff = (list_maps[i] - masked_mean) * msk
+            rmsd = np.sqrt(np.sum(diff * diff) / np.sum(msk))
+            print("rmsd: ", rmsd)   
+            fname_dif = "emda_diffmap_m%s.mrc" % (str(i+1))
+            iotools.write_mrc((list_maps[i] / rmsd) * msk, fname_dif, uc, origin)
+            fname_map = "emda_map%s.mrc" % (str(i+1))
+            iotools.write_mrc(list_maps[i+2] * msk, fname_map, uc, origin)
     else:
         for i , _ in enumerate(list_maps):
             if i < 2:
@@ -161,8 +136,13 @@ def main(maplist, diffmapres=3, ncy=5, fit=False, usecom=False,
     results = MapOut()
     modelres = diffmapres
     if usehalfmaps:
-        print("difference map using half maps")
+        print("Likelihood difference map using half maps")
         # call other module
+        import emda.ext.likelihood_map as lhmap
+        lhmap.main(maplist=maplist, fit=fit, fitres=fitres)
+        raise SystemExit() #
+
+        """ #previous differnce map
         assert len(maplist) == 4
         if masklist is not None:
             assert len(masklist) == 2
@@ -182,7 +162,7 @@ def main(maplist, diffmapres=3, ncy=5, fit=False, usecom=False,
                                        usecom=usecom, 
                                        fitres=fitres, 
                                        resol=diffmapres, 
-                                       results=results)
+                                       results=results) """
     else:
         if maplist[0].endswith(((".mrc", ".map"))) and maplist[1].endswith(((".pdb", ".cif", ".ent"))):
             uc, arr1, origin = em.get_data(maplist[0])
