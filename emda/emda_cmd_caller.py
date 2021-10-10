@@ -1245,6 +1245,7 @@ def mask4mmap(args):
     from emda import emda_methods as em
 
     uc, arr, orig = em.read_map(args.map)
+    em.write_mrc(arr, "arr.mrc", uc, orig)
     _ = em.mask_from_map(
         uc=uc,
         arr=arr,
