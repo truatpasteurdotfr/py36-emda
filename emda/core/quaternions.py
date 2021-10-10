@@ -3,6 +3,12 @@ import math
 
 
 def get_quaternion(theta):
+    """Return quaternion from axis-angle notation
+    Inputs: 
+        theta - a list containing axis and angle
+        e.g: theta = [[axis], [angle]]
+        angle is in degrees.
+    """
     # angle should be in degrees
     rv = theta[0]
     rv = np.asarray(rv, dtype='float')
