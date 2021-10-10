@@ -84,9 +84,9 @@ def read_map(mapname, fid=None):
         unit_cell[0], unit_cell[2] = unit_cell[2], unit_cell[0]
         unit_cell[3:] = float(90)
         origin = [
-                1 * file.header.nxstart,
-                1 * file.header.nystart,
                 1 * file.header.nzstart,
+                1 * file.header.nystart,
+                1 * file.header.nxstart,
             ]
         file.close()
         print(mapname, arr.shape, unit_cell[:3])
