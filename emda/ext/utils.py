@@ -47,10 +47,12 @@ def get_ibin(bin_fsc, cutoff):
     return ibin
 
 
-def determine_ibin(bin_fsc, cutoff=0.20):
+def determine_ibin(bin_fsc, fscavg, cutoff=0.20):
     bin_fsc = filter_fsc(bin_fsc)
     bin_fsc = bin_fsc[np.nonzero(bin_fsc)]
-    cutoff = np.average(bin_fsc) * 0.1
+    #cutoff = np.average(bin_fsc) * 0.2
+    #cutoff = max([fscavg*0.2, 0.2])
+    cutoff = fscavg * 0.1
     ibin = get_ibin(bin_fsc, cutoff)        
     """ i = 0
     while ibin < 5:
@@ -82,3 +84,21 @@ def fsc_between_static_and_transfomed_map(maps, bin_idx, rm, t, nbin):
         maps[0], frs[:, :, :, 0] * st, bin_idx, nbin)
     fsc_avg = get_avg_fsc(binfsc=f1f2_fsc, bincounts=bin_count)
     return [f1f2_fsc, frs[:, :, :, 0] * st, frs[:, :, :, 1] * st, fsc_avg]
+
+
+def binarize_mask(mask, threshold=1e-4):
+    return mask > threshold
+
+def cut_resolution_for_linefit(f_list, bin_idx, res_arr, smax):
+    # Making data for map fitting
+    f_arr = np.asarray(f_list, dtype='complex')
+    nx, ny, nz = f_list[0].shape
+    cbin = cx = smax
+    dx = int((nx - 2 * cx) / 2)
+    dy = int((ny - 2 * cx) / 2)
+    dz = int((nz - 2 * cx) / 2)
+    cBIdx = bin_idx[dx : dx + 2 * cx, dy : dy + 2 * cx, dz : dz + 2 * cx]
+    fout = fcodes_fast.cutmap_arr(
+        f_arr, bin_idx, cbin, 0, len(res_arr), nx, ny, nz, len(f_list)
+    )[:, dx : dx + 2 * cx, dy : dy + 2 * cx, dz : dz + 2 * cx]
+    return fout, cBIdx, cbin
