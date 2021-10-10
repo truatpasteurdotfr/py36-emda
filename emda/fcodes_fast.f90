@@ -618,7 +618,8 @@ subroutine calc_fsc(hf1,hf2,bin_idx,nbin,mode,binstats,bin_arr_count,nx,ny,nz)
      binstats(ibin,1) = binstats(ibin,0) / (sqrt(bindata(ibin,10)) * sqrt(bindata(ibin,11)))
      if(debug)then
         print*,ibin,binstats(ibin,0),bindata(ibin,10),bindata(ibin,11), &
-             binstats(ibin,1),bin_arr_count(ibin)
+             binstats(ibin,1),bin_arr_count(ibin), &
+             bindata(ibin,8), bindata(ibin,9), bindata(ibin,2), bindata(ibin,3)
      end if
   end do
   call cpu_time(finish)
@@ -1081,6 +1082,99 @@ subroutine get_normalized_sf(hf1,hf2,bin_idx,nbin,mode,nx,ny,nz, &
 end subroutine get_normalized_sf
 
 
+!!$subroutine calc_covar_and_fsc_betwn_anytwomaps(hf1,hf2,bin_idx,nbin,mode,&
+!!$     F1F2_covar,bin_fsc,bin_arr_count,nx,ny,nz)
+!!$  implicit none
+!!$  integer,intent(in) :: nbin,mode,nx,ny,nz
+!!$  integer,  dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in)  :: bin_idx
+!!$  complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in)  :: hf1,hf2
+!!$  real*8,   dimension(0:nbin-1), intent(out) :: F1F2_covar,bin_fsc
+!!$  integer,  dimension(0:nbin-1),intent(out) :: bin_arr_count
+!!$  !
+!!$  real*8,   dimension(0:nbin-1) :: F1_var,F2_var,A1_sum,B1_sum,A2_sum,B2_sum,A1A2_sum,B1B2_sum
+!!$  real*8,   dimension(0:nbin-1) :: A1A1_sum,B1B1_sum,A2A2_sum,B2B2_sum
+!!$  real*8    :: A1,A2,B1,B2
+!!$  integer   :: i,j,k,xmin,xmax,ymin,ymax,zmin,zmax,ibin
+!!$  real      :: start, finish
+!!$  logical   :: debug, make_all_zero 
+!!$  !
+!!$  debug = .FALSE.
+!!$  make_all_zero = .FALSE.
+!!$  if(mode == 1) debug = .TRUE.
+!!$  call cpu_time(start)
+!!$
+!!$  F1F2_covar = 0.0
+!!$  F1_var = 0.0
+!!$  F2_var = 0.0
+!!$  bin_fsc = 0.0
+!!$
+!!$  A1_sum = 0.0; A2_sum = 0.0
+!!$  B1_sum = 0.0; B2_sum = 0.0
+!!$  A1A2_sum = 0.0; B1B2_sum = 0.0
+!!$  A1A1_sum = 0.0; B1B1_sum = 0.0
+!!$  A2A2_sum = 0.0; B2B2_sum = 0.0
+!!$
+!!$  xmin = int(-nx/2); xmax = -(xmin+1)
+!!$  ymin = int(-ny/2); ymax = -(ymin+1)
+!!$  zmin = int(-nz/2); zmax = -(zmin+1)
+!!$  !if(debug) print*, '[',xmin,xmax,'],[', ymin,ymax,'],[',zmin,zmax,']'
+!!$  if(debug) print*, '[',xmin,xmax,'],[', ymin,ymax,'],[',zmin,0,']'
+!!$
+!!$  bin_arr_count = 0
+!!$  if(debug) print*, 'using hemisphere data...'
+!!$  do i=xmin, xmax
+!!$     do j=ymin, ymax
+!!$        do k=zmin, 0 !zmax
+!!$           if(bin_idx(i,j,k) < 0 .or. bin_idx(i,j,k) > nbin-1)then
+!!$              cycle
+!!$           else
+!!$              bin_arr_count(bin_idx(i,j,k)) = bin_arr_count(bin_idx(i,j,k)) + 1
+!!$              ! correspondence hf1 : A1 + iB1 ; hf2 = A2 + iB2
+!!$              A1 = real(hf1(i,j,k));  A2 = real(hf2(i,j,k))
+!!$              B1 = aimag(hf1(i,j,k)); B2 = aimag(hf2(i,j,k))
+!!$              A1_sum(bin_idx(i,j,k)) = A1_sum(bin_idx(i,j,k)) + A1
+!!$              A2_sum(bin_idx(i,j,k)) = A2_sum(bin_idx(i,j,k)) + A2
+!!$              B1_sum(bin_idx(i,j,k)) = B1_sum(bin_idx(i,j,k)) + B1
+!!$              B2_sum(bin_idx(i,j,k)) = B2_sum(bin_idx(i,j,k)) + B2
+!!$
+!!$              A1A2_sum(bin_idx(i,j,k)) = A1A2_sum(bin_idx(i,j,k)) + A1 * A2
+!!$              B1B2_sum(bin_idx(i,j,k)) = B1B2_sum(bin_idx(i,j,k)) + B1 * B2
+!!$
+!!$              A1A1_sum(bin_idx(i,j,k)) = A1A1_sum(bin_idx(i,j,k)) + A1 * A1
+!!$              B1B1_sum(bin_idx(i,j,k)) = B1B1_sum(bin_idx(i,j,k)) + B1 * B1
+!!$
+!!$              A2A2_sum(bin_idx(i,j,k)) = A2A2_sum(bin_idx(i,j,k)) + A2 * A2
+!!$              B2B2_sum(bin_idx(i,j,k)) = B2B2_sum(bin_idx(i,j,k)) + B2 * B2
+!!$           end if
+!!$        end do
+!!$     end do
+!!$  end do
+!!$  if(debug) print*,'ibin F1F2_covar(ibin) F1_var(ibin) F2_var(ibin) bin_fsc(ibin) bin_reflex_count'
+!!$  do ibin=0, nbin-1 !to make compatible with python arrays
+!!$
+!!$     F1F2_covar(ibin) = (A1A2_sum(ibin) + B1B2_sum(ibin)) / bin_arr_count(ibin) - &
+!!$          (A1_sum(ibin) / bin_arr_count(ibin) * A2_sum(ibin) / bin_arr_count(ibin) + &
+!!$          B1_sum(ibin) / bin_arr_count(ibin) * B2_sum(ibin) / bin_arr_count(ibin))
+!!$
+!!$     F1_var(ibin) = (A1A1_sum(ibin) + B1B1_sum(ibin))/bin_arr_count(ibin) - &
+!!$          ((A1_sum(ibin)/bin_arr_count(ibin))**2 + (B1_sum(ibin)/bin_arr_count(ibin))**2)
+!!$     F2_var(ibin) = (A2A2_sum(ibin) + B2B2_sum(ibin))/bin_arr_count(ibin) - &
+!!$          ((A2_sum(ibin)/bin_arr_count(ibin))**2 + (B2_sum(ibin)/bin_arr_count(ibin))**2)
+!!$
+!!$     !bin_sgnl_var(ibin) = F1F2_covar(ibin)
+!!$     bin_fsc(ibin) = F1F2_covar(ibin) / (sqrt(F1_var(ibin)) * sqrt(F2_var(ibin)))
+!!$
+!!$     if(debug)then
+!!$        print*,ibin,F1F2_covar(ibin),F1_var(ibin),F2_var(ibin),bin_fsc(ibin),bin_arr_count(ibin)
+!!$     end if
+!!$  end do
+!!$
+!!$  call cpu_time(finish)
+!!$  if(debug) print*, 'time for loop = ', finish-start
+!!$  return
+!!$end subroutine calc_covar_and_fsc_betwn_anytwomaps
+
+
 subroutine calc_covar_and_fsc_betwn_anytwomaps(hf1,hf2,bin_idx,nbin,mode,&
      F1F2_covar,bin_fsc,bin_arr_count,nx,ny,nz)
   implicit none
@@ -1093,7 +1187,7 @@ subroutine calc_covar_and_fsc_betwn_anytwomaps(hf1,hf2,bin_idx,nbin,mode,&
   real*8,   dimension(0:nbin-1) :: F1_var,F2_var,A1_sum,B1_sum,A2_sum,B2_sum,A1A2_sum,B1B2_sum
   real*8,   dimension(0:nbin-1) :: A1A1_sum,B1B1_sum,A2A2_sum,B2B2_sum
   real*8    :: A1,A2,B1,B2
-  integer   :: i,j,k,xmin,xmax,ymin,ymax,zmin,zmax,ibin
+  integer   :: i,j,k,xmin,xmax,ymin,ymax,zmin,zmax,ibin, indx
   real      :: start, finish
   logical   :: debug, make_all_zero 
   !
@@ -1124,27 +1218,24 @@ subroutine calc_covar_and_fsc_betwn_anytwomaps(hf1,hf2,bin_idx,nbin,mode,&
   do i=xmin, xmax
      do j=ymin, ymax
         do k=zmin, 0 !zmax
-           if(bin_idx(i,j,k) < 0 .or. bin_idx(i,j,k) > nbin-1)then
-              cycle
-           else
-              bin_arr_count(bin_idx(i,j,k)) = bin_arr_count(bin_idx(i,j,k)) + 1
-              ! correspondence hf1 : A1 + iB1 ; hf2 = A2 + iB2
-              A1 = real(hf1(i,j,k));  A2 = real(hf2(i,j,k))
-              B1 = aimag(hf1(i,j,k)); B2 = aimag(hf2(i,j,k))
-              A1_sum(bin_idx(i,j,k)) = A1_sum(bin_idx(i,j,k)) + A1
-              A2_sum(bin_idx(i,j,k)) = A2_sum(bin_idx(i,j,k)) + A2
-              B1_sum(bin_idx(i,j,k)) = B1_sum(bin_idx(i,j,k)) + B1
-              B2_sum(bin_idx(i,j,k)) = B2_sum(bin_idx(i,j,k)) + B2
+           indx = bin_idx(k,j,i)
+           if(indx < 0 .or. indx > nbin-1) cycle
 
-              A1A2_sum(bin_idx(i,j,k)) = A1A2_sum(bin_idx(i,j,k)) + A1 * A2
-              B1B2_sum(bin_idx(i,j,k)) = B1B2_sum(bin_idx(i,j,k)) + B1 * B2
+           bin_arr_count(indx) = bin_arr_count(indx) + 1
+           ! correspondence hf1 : A1 + iB1 ; hf2 = A2 + iB2
+           A1 = real(hf1(k,j,i));  A2 = real(hf2(k,j,i))
+           B1 = aimag(hf1(k,j,i)); B2 = aimag(hf2(k,j,i))
+           A1_sum(indx) = A1_sum(indx) + A1
+           A2_sum(indx) = A2_sum(indx) + A2
+           B1_sum(indx) = B1_sum(indx) + B1
+           B2_sum(indx) = B2_sum(indx) + B2
+           A1A2_sum(indx) = A1A2_sum(indx) + A1 * A2
+           B1B2_sum(indx) = B1B2_sum(indx) + B1 * B2
+           A1A1_sum(indx) = A1A1_sum(indx) + A1 * A1
+           B1B1_sum(indx) = B1B1_sum(indx) + B1 * B1
+           A2A2_sum(indx) = A2A2_sum(indx) + A2 * A2
+           B2B2_sum(indx) = B2B2_sum(indx) + B2 * B2
 
-              A1A1_sum(bin_idx(i,j,k)) = A1A1_sum(bin_idx(i,j,k)) + A1 * A1
-              B1B1_sum(bin_idx(i,j,k)) = B1B1_sum(bin_idx(i,j,k)) + B1 * B1
-
-              A2A2_sum(bin_idx(i,j,k)) = A2A2_sum(bin_idx(i,j,k)) + A2 * A2
-              B2B2_sum(bin_idx(i,j,k)) = B2B2_sum(bin_idx(i,j,k)) + B2 * B2
-           end if
         end do
      end do
   end do
@@ -1172,6 +1263,7 @@ subroutine calc_covar_and_fsc_betwn_anytwomaps(hf1,hf2,bin_idx,nbin,mode,&
   if(debug) print*, 'time for loop = ', finish-start
   return
 end subroutine calc_covar_and_fsc_betwn_anytwomaps
+
 
 
 subroutine read_into_grid(bin_idx,bin_fsc,nbin,nx,ny,nz,fsc_weighted_grid)
@@ -1325,17 +1417,39 @@ subroutine get_st(nx,ny,nz,t,st,s1,s2,s3)
   return
 end subroutine get_st
 
+subroutine get_xyz(uc,nx,ny,nz,xyz)
+  implicit none
+  integer,intent(in) :: nx,ny,nz
+  real*8, intent(in) :: uc(6)
+  real*8,dimension(-nz/2:nz/2-1,-ny/2:ny/2-1,-nx/2:nx/2-1,3),intent(out) :: xyz
+  integer :: i,j,k,xmin,xmax,ymin,ymax,zmin,zmax
+  xyz = 0.0d0
+  xmin = int(-nx/2); xmax = -(xmin+1)
+  ymin = int(-ny/2); ymax = -(ymin+1)
+  zmin = int(-nz/2); zmax = -(zmin+1)
+  do i=xmin, xmax
+     do j=ymin, ymax
+        do k=zmin, zmax
+           xyz(k,j,i,1) = (k/nz) * uc(3)
+           xyz(k,j,i,2) = (j/ny) * uc(2)
+           xyz(k,j,i,3) = (i/nx) * uc(1)
+        end do
+     end do
+  end do
+  return  
+end subroutine get_xyz
 
-subroutine fsc_weight_calculation(fsc_weighted_grid,bin_fsc,F1,F2,bin_idx,nbin,mode,nx,ny,nz)
+
+
+subroutine fsc_weight_calculation(fsc_weighted_grid,F1,F2,bin_idx,nbin,mode,nx,ny,nz)
   implicit none
   integer,intent(in) :: nbin,mode,nx,ny,nz
   complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in) :: F1,F2
   integer,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in) :: bin_idx 
   real*8,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out) :: fsc_weighted_grid
-  real*8,dimension(0:nbin-1),intent(out) :: bin_fsc
-  real*8,dimension(0:nbin-1) :: F1F1_sum,F2F2_sum,F1F2_sum,fsc_weight
+  real*8,dimension(0:nbin-1) :: bin_fsc, F1F2_covar
   integer,dimension(0:nbin-1) :: bin_arr_count
-  integer :: i,j,k,n,xmin,xmax,ymin,ymax,zmin,zmax,ibin
+  integer :: i,j,k,indx,xmin,xmax,ymin,ymax,zmin,zmax
   real :: start, finish
   logical :: debug
   !
@@ -1345,58 +1459,22 @@ subroutine fsc_weight_calculation(fsc_weighted_grid,bin_fsc,F1,F2,bin_idx,nbin,m
   xmin = int(-nx/2); xmax = -(xmin+1)
   ymin = int(-ny/2); ymax = -(ymin+1)
   zmin = int(-nz/2); zmax = -(zmin+1)
-  !if(debug) print*, '[',xmin,xmax,'],[', ymin,ymax,'],[',zmin,zmax,']'
   if(debug) print*, '[',xmin,xmax,'],[', ymin,ymax,'],[',zmin,0,']'
 
-  bin_arr_count = 0
-  F1F1_sum = 0.0
-  F2F2_sum = 0.0
-  F1F2_sum = 0.0
   bin_fsc  = 0.0
-  fsc_weight = 0.0
   fsc_weighted_grid = 0.0
 
-  do i=xmin, xmax
-     do j=ymin, ymax
-        do k=zmin, 0 !zmax
-           if(bin_idx(i,j,k) < 0 .or. bin_idx(i,j,k) > nbin-1)then
-              n = n + 1
-              cycle
-           else
-              bin_arr_count(bin_idx(i,j,k)) = bin_arr_count(bin_idx(i,j,k)) + 1
-              F1F1_sum(bin_idx(i,j,k)) = F1F1_sum(bin_idx(i,j,k)) + real(F1(i,j,k) * conjg(F1(i,j,k)))
-              F2F2_sum(bin_idx(i,j,k)) = F2F2_sum(bin_idx(i,j,k)) + real(F2(i,j,k) * conjg(F2(i,j,k)))
-              F1F2_sum(bin_idx(i,j,k)) = F1F2_sum(bin_idx(i,j,k)) + real(F1(i,j,k) * conjg(F2(i,j,k)))
-           end if
-        end do
-     end do
-  end do
-  if(debug) print*,'Number of reflex outside the range: ',n
-  if(debug) print*,'ibin   bin_fsc(F1,F2)   bin_fsc_weight   bin_reflex_count'
-  do ibin=0, nbin-1 !to make compatible with python arrays
-     if(F1F1_sum(ibin) == 0.0 .or. F2F2_sum(ibin) == 0.0 )then
-        bin_fsc(ibin) = 0.0
-        fsc_weight(ibin)    = 0.0
-     else
-        bin_fsc(ibin)       = F1F2_sum(ibin) / (sqrt(F1F1_sum(ibin)) * sqrt(F2F2_sum(ibin)))
-        fsc_weight(ibin)    = -1.0 * bin_fsc(ibin) / (1.0 - bin_fsc(ibin)**2)
-     end if
-     if(debug)then
-        print*,ibin,bin_fsc(ibin),fsc_weight(ibin),bin_arr_count(ibin)
-     end if
-  end do
+  call calc_covar_and_fsc_betwn_anytwomaps(F1,F2,bin_idx,nbin,mode,&
+       F1F2_covar,bin_fsc,bin_arr_count,nx,ny,nz)
 
   do i=xmin, xmax
      do j=ymin, ymax
-        do k=zmin, 0 !zmax
-           if(bin_idx(i,j,k) < 0 .or. bin_idx(i,j,k) > nbin-1)then
-              fsc_weighted_grid(i,j,k) = 0.0
-              cycle
-           else
-              fsc_weighted_grid(i,j,k) = fsc_weight(bin_idx(i,j,k))
-              if(k == zmin .or. j == ymin .or. i == xmin) cycle
-              fsc_weighted_grid(-i,-j,-k) = fsc_weight(bin_idx(i,j,k))
-           end if
+        do k=zmin, 0
+           indx = bin_idx(i,j,k)
+           if(indx < 0 .or. indx > nbin-1) cycle
+           fsc_weighted_grid(i,j,k) = bin_fsc(indx)/(1.0 - bin_fsc(indx)**2)
+           if(k == zmin .or. j == ymin .or. i == xmin) cycle
+           fsc_weighted_grid(-i,-j,-k) = fsc_weighted_grid(i,j,k)
         end do
      end do
   end do
@@ -1743,32 +1821,29 @@ end subroutine tricubic
 
 subroutine mtz2_3d(h,k,l,f,nobs,nx,ny,nz,f3d)
   implicit none
-  integer,                        intent(in)  :: nx,ny,nz,nobs
-  real,      dimension(nobs),     intent(in)  :: h,k,l
-  complex*16, dimension(nobs),     intent(in)  :: f
-
-  complex*16, dimension(-nx/2:(nx-2)/2, -ny/2:(ny-2)/2, -nz/2:(nz-2)/2), intent(out)  :: f3d
-  !complex*8, dimension(nx, ny, nz), intent(out)  :: f3d2
-  !
-  integer :: i, i1, i2, i3
+  integer, intent(in)  :: nx,ny,nz,nobs
+  real, dimension(nobs), intent(in)  :: h,k,l
+  complex*16, dimension(nobs),intent(in)  :: f
+  complex*16, dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out) :: f3d
+  complex*16, dimension(-nx/2:nx/2,-ny/2:ny/2,-nz/2:nz/2) :: f3d2
+  integer :: i,i1,i2,i3
   !
   f3d = dcmplx(0.0d0, 0.0d0)
-
+  f3d2 = dcmplx(0.0d0, 0.0d0)
   do i = 1, nobs
      i1 = int(h(i))
      i2 = int(k(i))
      i3 = int(l(i))
-     f3d(-i3,-i2,-i1)    = f(i) !Changed the axis order to comply with .mrc
-     f3d(i3,i2,i1) = conjg(f(i))
-     !if(i < 200) print*, i1,i2,i3,f3d(i1,i2,i3)     
+     f3d2(-i3,-i2,-i1)    = f(i) !to comply with MRC
+     f3d2(i3,i2,i1) = conjg(f(i))    
   end do
+  f3d = f3d2(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2)
   return
 end subroutine mtz2_3d
 
 subroutine prepare_hkl(hf1,bin_idx,cbin,nx,ny,nz,mode,h,k,l,ampli,phase)
   implicit none
   real*8,    parameter :: PI = 3.141592653589793
-
   integer, intent(in) :: cbin,mode,nx,ny,nz
   complex*16, dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in)  :: hf1
   integer, dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in)  :: bin_idx
@@ -2169,6 +2244,89 @@ subroutine trilinear(RM,F,FRS,ncopies,mode,nx,ny,nz)
 end subroutine trilinear
 
 
+subroutine trilinear_new(RM,uc,F,FRS,highres,nx,ny,nz)
+  implicit none
+  real*8,intent(in):: RM(3,3)
+  real,intent(in) :: uc(6), highres
+  integer,intent(in):: nx,ny,nz
+  complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in):: F
+  complex*16,dimension(-nx/2:nx/2,-ny/2:ny/2,-nz/2:nz/2),intent(out):: FRS
+  complex*16,dimension(-nx/2:nx/2,-ny/2:ny/2,-nz/2:nz/2) :: F2
+  !integer :: x0(3),x1(3)
+  integer :: nxyz(3),nxyzmn(3),nxyzmx(3)
+  !real*8 :: x(3),xd(3),s(3),xdr(3)
+  complex*16 :: c000,c001,c010,c011,c100,c101,c110,c111,c00,c01,c10,c11,c0,c1,cc
+  integer :: h,k,l,i,indx
+  integer :: xmin,xmax,ymin,ymax,zmin,zmax,ic
+  integer :: x01,x02,x03,x11,x12,x13
+  real*8 :: x1,x2,x3,xd1,xd2,xd3,xdr1,xdr2,xdr3
+  real :: a,b,c, resol, denominator, tol, highres_inv
+  real      :: start, finish, st2,end2
+  logical :: cubic
+
+  cubic = .false.
+  tol = 1e-5
+
+  nxyz(1) = nx; nxyz(2) = ny; nxyz(3) =nz
+  nxyzmn(1) = -nx/2; nxyzmn(2) = -ny/2; nxyzmn(3) = -nz/2
+  nxyzmx(1) = (nx-2)/2; nxyzmx(2) = (ny-2)/2; nxyzmx(3) = (nz-2)/2
+
+  xmin = int(-nx/2); xmax = -(xmin+1)
+  ymin = int(-ny/2); ymax = -(ymin+1)
+  zmin = int(-nz/2); zmax = -(zmin+1)
+
+  a = uc(1)
+  b = uc(2)
+  c = uc(3)
+
+  highres_inv = (1.0/highres)**2
+  if((a-b) < tol .and. (a-c) < tol)then
+     denominator = a**2
+     cubic = .true.
+  end if
+
+  call cpu_time(start)
+  do l = zmin, zmax
+     do k = ymin, ymax
+        do h = xmin, 0!xmax
+           if(cubic)then
+              resol = (h**2 + k**2 + l**2)/denominator
+           else
+              resol = ((h/a)**2 + (k/b)**2 + (l/c)**2)
+           end if
+           if(resol > highres_inv) cycle
+           x1 = RM(1,1) * h + RM(2,1) * k + RM(3,1) * l
+           x2 = RM(1,2) * h + RM(2,2) * k + RM(3,2) * l
+           x3 = RM(1,3) * h + RM(2,3) * k + RM(3,3) * l
+           x01 = floor(x1)
+           x02 = floor(x2)
+           x03 = floor(x3)
+           x11 = x01 + 1
+           x12 = x02 + 1
+           x13 = x03 + 1
+           x11 = min(nxyzmx(1),max(nxyzmn(1),x11))
+           x12 = min(nxyzmx(2),max(nxyzmn(2),x12))
+           x13 = min(nxyzmx(3),max(nxyzmn(3),x13))
+           xd1 = x1 - real(x01)
+           xd2 = x2 - real(x02)
+           xd3 = x3 - real(x03)
+           xdr1 = 1.0d0 - xd1
+           xdr2 = 1.0d0 - xd2
+           xdr3 = 1.0d0 - xd3
+           FRS(h,k,l) = ((F(x01,x02,x03)*xdr1 + F(x11,x02,x03)*xd1) * xdr2 &
+                + (F(x01,x12,x03)*xdr1 + F(x11,x12,x03)*xd1) * xd2) * xdr3 &
+                + ((F(x01,x02,x13)*xdr1 + F(x11,x02,x13)*xd1) * xdr2 &
+                + (F(x01,x12,x13)*xdr1 + F(x11,x12,x13)*xd1) * xd2) * xd3
+           FRS(-h,-k,-l) = conjg(FRS(h,k,l))
+        end do
+     end do
+  end do
+  call cpu_time(finish)
+  print*, 'time for loop = ', finish-start
+  return
+end subroutine trilinear_new
+
+
 subroutine trilinear2(F,bin_idx,RM,nbin,ncopies,mode,nx,ny,nz,FRS)
   implicit none
   real*8,intent(in):: RM(3,3)
@@ -2179,7 +2337,7 @@ subroutine trilinear2(F,bin_idx,RM,nbin,ncopies,mode,nx,ny,nz,FRS)
   ! locals
   integer :: x0(3),x1(3)
   integer :: nxyz(3),nxyzmn(3),nxyzmx(3)
-  real*8 :: x(3),xd(3),s(3)
+  real*8 :: x(3),xd(3),s(3),xdr(3)
   complex*16 :: c000,c001,c010,c011,c100,c101,c110,c111,c00,c01,c10,c11,c0,c1,c
   integer :: h,k,l,i,indx
   integer :: xmin,xmax,ymin,ymax,zmin,zmax,ic
@@ -2227,6 +2385,7 @@ subroutine trilinear2(F,bin_idx,RM,nbin,ncopies,mode,nx,ny,nz,FRS)
            do i = 1,3
               x1(i) = min(nxyzmx(i),max(nxyzmn(i),x1(i)))
            enddo
+           xdr = 1.0d0 - xd
            do ic = 1, ncopies
               c000 = F(x0(1),x0(2),x0(3),ic)
               c001 = F(x0(1),x0(2),x1(3),ic)
@@ -2237,15 +2396,22 @@ subroutine trilinear2(F,bin_idx,RM,nbin,ncopies,mode,nx,ny,nz,FRS)
               c110 = F(x1(1),x1(2),x0(3),ic)
               c111 = F(x1(1),x1(2),x1(3),ic)
               ! Interpolation along x direction
-              c00 = c000*(1.0d0-xd(1)) + c100*xd(1)
-              c01 = c001*(1.0d0-xd(1)) + c101*xd(1)
-              c10 = c010*(1.0d0-xd(1)) + c110*xd(1)
-              c11 = c011*(1.0d0-xd(1)) + c111*xd(1)
+              !c00 = c000*(1.0d0-xd(1)) + c100*xd(1)
+              !c01 = c001*(1.0d0-xd(1)) + c101*xd(1)
+              !c10 = c010*(1.0d0-xd(1)) + c110*xd(1)
+              !c11 = c011*(1.0d0-xd(1)) + c111*xd(1)
+              c00 = c000*xdr(1) + c100*xd(1)
+              c01 = c001*xdr(1) + c101*xd(1)
+              c10 = c010*xdr(1) + c110*xd(1)
+              c11 = c011*xdr(1) + c111*xd(1)
               ! Interpolation along y direction
-              c0 = c00*(1.0d0-xd(2)) + c10*xd(2)
-              c1 = c01*(1.0d0-xd(2)) + c11*xd(2)
+              !c0 = c00*(1.0d0-xd(2)) + c10*xd(2)
+              !c1 = c01*(1.0d0-xd(2)) + c11*xd(2)
+              c0 = c00*xdr(2) + c10*xd(2)
+              c1 = c01*xdr(2) + c11*xd(2)
               ! Interpolation along z direction
-              c = c0*(1.0d0-xd(3)) + c1*xd(3)
+              !c = c0*(1.0d0-xd(3)) + c1*xd(3)
+              c = c0*xdr(3) + c1*xd(3)
               FRS(h,k,l,ic) = c
               if((h == xmin).or.(k == ymin).or.(l == zmin)) cycle
               FRS(-h,-k,-l,ic) = conjg(c)
