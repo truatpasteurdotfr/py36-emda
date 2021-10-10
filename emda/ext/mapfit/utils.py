@@ -36,6 +36,9 @@ def create_xyz_grid(uc, nxyz):
     x = np.fft.fftfreq(nxyz[0]) #* uc[0]
     y = np.fft.fftfreq(nxyz[1]) #* uc[1]
     z = np.fft.fftfreq(nxyz[2]) #* uc[2]
+    #x = np.fft.fftfreq(nxyz[0], 1/nxyz[0]) #* uc[0]
+    #y = np.fft.fftfreq(nxyz[1], 1/nxyz[1]) #* uc[1]
+    #z = np.fft.fftfreq(nxyz[2], 1/nxyz[2]) #* uc[2]
     xv, yv, zv = np.meshgrid(x, y, z)
     xyz = [yv, xv, zv]
     for i in range(3):
@@ -50,8 +53,10 @@ def get_xyz_sum(xyz):
         for j in range(3):
             if i == 0:
                 sumxyz = np.sum(xyz[i] * xyz[j])
+                #sumxyz = np.sum(xyz[:,:,:,i] * xyz[:,:,:,j])
             elif i > 0 and j >= i:
                 sumxyz = np.sum(xyz[i] * xyz[j])
+                #sumxyz = np.sum(xyz[:,:,:,i] * xyz[:,:,:,j])
             else:
                 continue
             n = n + 1
@@ -72,6 +77,27 @@ def avg_and_diffmaps(
     res_arr,
     Bf_arr,
 ):
+    # smoothen signals
+    from emda.ext.mapfit.newsignal import get_extended_signal
+    #res_arr, signal, bin_fsc, fobj=None
+    fobj = open('test.txt', '+w')
+    for i, signal in enumerate(sgnl_var):
+        sgnl_var[i] = get_extended_signal(res_arr=res_arr,
+            signal=sgnl_var[i], bin_fsc=hffsc[i], fobj=fobj, fsc_cutoff=0.3)
+    covar[0] = get_extended_signal(res_arr=res_arr,
+            signal=covar[0], bin_fsc=covar[1], fobj=fobj, fsc_cutoff=0.3)
+
+    # test input data
+    print(len(sgnl_var))
+    print(len(totl_var))
+    print(len(covar))
+    cc = covar[0]/np.sqrt(sgnl_var[0] * sgnl_var[1])
+    cc2 = covar[0]/np.sqrt(totl_var[0] * totl_var[1])
+    for i, _ in enumerate(sgnl_var[0]):
+        print(res_arr[i], sgnl_var[0][i], sgnl_var[1][i], covar[0][i], cc[i])
+    print('T')
+    for i, _ in enumerate(totl_var[0]):
+        print(res_arr[i], totl_var[0][i], totl_var[1][i], covar[0][i], cc2[i])
     # average and difference map calculation
     import numpy.ma as ma
 
@@ -264,36 +290,38 @@ def output_maps(
                     data2write = apply_shift(f_map=averagemaps[:, :, :, imap, ibf])
             core.iotools.write_mrc(data2write, filename_mrc, unit_cell, map_origin)
 
-        ## Difference and Biase removed map calculation
-        # nmaps = averagemaps.shape[3]
-        # for m in range(nmaps-1):
-        #    for n in range(m+1,nmaps):
-        #        fname_diff1 = 'diffmap_m'+str(n)+'-m'+str(m)+Bcode
-        #        com = com_lst[n]
-        #        dm1 = apply_shift(averagemaps[:,:,:,n,ibf] - averagemaps[:,:,:,m,ibf],com,center)
-        #        iotools.write_mrc(dm1,
-        #                          fname_diff1+'.mrc',
-        #                          unit_cell,map_origin)
-        #        '''write_3d2mtz_fortran(unit_cell,dm1,fname_diff1+'.mtz')'''
-        #        dm2 = apply_shift(averagemaps[:,:,:,m,ibf] - averagemaps[:,:,:,n,ibf],com,center)
-        #        fname_diff2 = 'diffmap_m'+str(m)+'-m'+str(n)+Bcode
-        #        iotools.write_mrc(dm2,
-        #                          fname_diff2+'.mrc',
-        #                          unit_cell,map_origin)
-        #        '''write_3d2mtz_fortran(unit_cell,dm2,fname_diff2+'.mtz')'''
-        ## 2Fo-Fc type maps
-        # twom2m1 = apply_shift(averagemaps[:,:,:,n,ibf] + dm1, com, center)
-        # fname1_2FoFc = '2m'+str(n)+'-m'+str(m)
-        # iotools.write_mrc(twom2m1,
-        #                  fname1_2FoFc+'.mrc',
-        #                  unit_cell,map_origin)
-        #'''write_3d2mtz_fortran(unit_cell,twom2m1,fname1_2FoFc+'.mtz')'''
-        # twom1m2 = apply_shift(averagemaps[:,:,:,m,ibf] + dm2, com, center)
-        # fname2_2FoFc = '2m'+str(m)+'-m'+str(n)
-        # iotools.write_mrc(twom1m2,
-        #                  fname2_2FoFc+'.mrc',
-        #                  unit_cell,map_origin)
-        #'''write_3d2mtz_fortran(unit_cell,twom1m2,fname2_2FoFc+'.mtz')'''
+        # Difference and Biase removed map calculation
+        nmaps = averagemaps.shape[3]
+        for m in range(nmaps-1):
+           for n in range(m+1,nmaps):
+               fname_diff1 = 'diffmap_m'+str(n)+'-m'+str(m)+Bcode
+               dm1 = apply_shift(averagemaps[:,:,:,n,ibf] - averagemaps[:,:,:,m,ibf])
+               #com = com_lst[n]
+               #dm1 = apply_shift(averagemaps[:,:,:,n,ibf] - averagemaps[:,:,:,m,ibf],com,center)
+               core.iotools.write_mrc(dm1,
+                                 fname_diff1+'.mrc',
+                                 unit_cell,map_origin)
+               '''write_3d2mtz_fortran(unit_cell,dm1,fname_diff1+'.mtz')'''
+               dm2 = apply_shift(averagemaps[:,:,:,m,ibf] - averagemaps[:,:,:,n,ibf])
+               #dm2 = apply_shift(averagemaps[:,:,:,m,ibf] - averagemaps[:,:,:,n,ibf],com,center)
+               fname_diff2 = 'diffmap_m'+str(m)+'-m'+str(n)+Bcode
+               core.iotools.write_mrc(dm2,
+                                 fname_diff2+'.mrc',
+                                 unit_cell,map_origin)
+               '''write_3d2mtz_fortran(unit_cell,dm2,fname_diff2+'.mtz')'''
+        """ # 2Fo-Fc type maps
+         twom2m1 = apply_shift(averagemaps[:,:,:,n,ibf] + dm1, com, center)
+         fname1_2FoFc = '2m'+str(n)+'-m'+str(m)
+         iotools.write_mrc(twom2m1,
+                          fname1_2FoFc+'.mrc',
+                          unit_cell,map_origin)
+        '''write_3d2mtz_fortran(unit_cell,twom2m1,fname1_2FoFc+'.mtz')'''
+         twom1m2 = apply_shift(averagemaps[:,:,:,m,ibf] + dm2, com, center)
+         fname2_2FoFc = '2m'+str(m)+'-m'+str(n)
+         iotools.write_mrc(twom1m2,
+                          fname2_2FoFc+'.mrc',
+                          unit_cell,map_origin)
+        '''write_3d2mtz_fortran(unit_cell,twom1m2,fname2_2FoFc+'.mtz')''' """
     end = timer()
     print("Map output time: ", end - start)
 
