@@ -22,16 +22,25 @@ def calc_fsc_mrc(hf1, hf2, bin_idx, nbin):
 def calculate_modelmap(
     uc, model, dim, resol, lgf=None, maporigin=None
 ):
-    modelmap = em.model2map(
+    print('input params:', model, resol, dim, uc)
+    """ modelmap = em.model2map(
         modelxyz=model,
         dim=dim,
         resol=resol,
         cell=uc,
         ligfile=lgf,
         maporigin=maporigin,
+    ) """
+    modelmap = em.model2map_gm(
+        modelxyz=model,
+        resol=resol,
+        dim=dim,
+        cell=uc,
+        maporigin=maporigin,
     )
+    print('output shape:', modelmap.shape)
     f_model = np.fft.fftshift(np.fft.fftn(modelmap))
-    return f_model
+    return f_model, modelmap
 
 
 def pass_mtz(mtzfile, dim):
@@ -100,8 +109,9 @@ def map_model_fsc(
     model_resol=None,
     lgf=None,
 ):
-    from emda.ext import maskmap_class
+    import os
 
+    fobj = open("mapmodel_validate.txt", "+w")
     fsc_list = []
     if model1_pdb is not None:
         model_list = [modelf_pdb, model1_pdb]
@@ -117,74 +127,27 @@ def map_model_fsc(
         uc, msk, _ = core.iotools.read_map(mask_map)
     else:
         msk = 1
-    """ if mask_map is None:
-        if norm_mask:
-            nm = ext.realsp_local.NormalizedMaps(
-                hf1=np.fft.fftshift(np.fft.fftn(arr1)),
-                hf2=np.fft.fftshift(np.fft.fftn(arr2)),
-                cell=uc,
-            )
-            nm.get_normdata()
-            obj_maskmap = ext.maskmap_class.MaskedMaps()
-            obj_maskmap.generate_mask(nm.normmap1, nm.normmap2)
-            msk = obj_maskmap.mask
-        else:
-            # creating ccmask from half data
-            #obj_maskmap = ext.maskmap_class.MaskedMaps()
-            obj_maskmap = maskmap_class.MaskedMaps()
-            obj_maskmap.generate_mask(arr1, arr2)
-            msk = obj_maskmap.mask
-        core.iotools.write_mrc(msk, "ccmask.mrc", uc) """
     f_hf1 = np.fft.fftshift(np.fft.fftn(arr1 * msk))
     f_hf2 = np.fft.fftshift(np.fft.fftn(arr2 * msk))
     f_ful = (f_hf1 + f_hf2) / 2.0
 
-    # if maps are in MTZ format
-    # if half1_map.endswith((".mtz")):
-    #    if map_size is None:
-    #        print("Need map dimensions.")
-    #        exit()
-    #    dim = map_size
-    #    if len(dim) < 3:
-    #        print("Need three values space delimited")
-    #        exit()
-    #    if len(dim) > 3:
-    #        dim = dim[:3]
-    #    f_hf1 = pass_mtz(half1_map, dim)
-    #    f_hf2 = pass_mtz(half2_map, dim)
-
     nbin, res_arr, bin_idx = core.restools.get_resolution_array(uc, f_hf1)
     bin_fsc, _, _, _, _, _ = core.fsc.halfmaps_fsc_variance(f_hf1, f_hf2, bin_idx, nbin)
     fsc_list.append(bin_fsc)
-    """ # phase randomization
-    full_fsc_t = 2.0*bin_fsc/(bin_fsc + 1.0)
-    hf1_randomized = get_randomized_sf(uc, half1, resol_rand)
-    hf2_randomized = get_randomized_sf(uc, half2, resol_rand)
-    # get phase randomized maps
-    randhalf1 = np.real(np.fft.ifftn(np.fft.ifftshift(hf1_randomized)))
-    randhalf2 = np.real(np.fft.ifftn(np.fft.ifftshift(hf2_randomized)))
-    rbin_fsc, _, _, _, _, _ = core.fsc.halfmaps_fsc_variance(
-        np.fft.fftshift(np.fft.fftn(randhalf1 * mask)),
-        np.fft.fftshift(np.fft.fftn(randhalf2 * mask)),
-        bin_idx,
-        nbin,
-    )
-    full_fsc_n = 2.0 * rbin_fsc / (1.0 + rbin_fsc) """
-    # fullmap_fsc = 2.0*bin_fsc/(bin_fsc + 1.0)
-    # fsc_list.append(fullmap_fsc)
-    if model_resol is None:
+    """ if model_resol is None:
         # determine map resolution using hfmap FSC
         dist = np.sqrt((bin_fsc - 0.143) ** 2)
         map_resol = res_arr[np.argmin(dist)]
     else:
-        map_resol = model_resol
-
+        map_resol = model_resol """
+    map_resol = res_arr[-2] # up to Nyquest
+    print("Modelmap is calcuated upto Nyquist resolution.")
     # Calculate maps from models
     fmodel_list = []
     dim = f_hf1.shape
     for model in model_list:
         if model.endswith((".pdb", ".ent", ".cif")):
-            f_model = calculate_modelmap(
+            f_model, modelmap = calculate_modelmap(
                 uc=uc,
                 model=model,
                 dim=dim,
@@ -195,16 +158,38 @@ def map_model_fsc(
         else:
             raise SystemExit("Accpetable model types: .pdb, .ent, .cif")
         fmodel_list.append(f_model)
+        # output modelmap
+        em.write_mrc(modelmap, 'last_modelmap.mrc', uc, origin)
 
     if len(fmodel_list) == 2:
         # FSC between halfmaps and model1
         for imap in [f_hf1, f_hf2]:
+            print(imap.shape, fmodel_list[1].shape)
             bin_fsc = calc_fsc_mrc(imap, fmodel_list[1], bin_idx, nbin)
             fsc_list.append(bin_fsc)
 
     # FSC between fullmap and modelf
     bin_fsc = calc_fsc_mrc(f_ful, fmodel_list[0], bin_idx, nbin)
     fsc_list.append(bin_fsc)
+    # write out data into txt file
+    fobj.write("halfmap1 file: %s\n" % os.path.abspath(half1_map))
+    fobj.write("halfmap2 file: %s\n" % os.path.abspath(half2_map))
+    fobj.write("model refined against fullmap : %s\n" % os.path.abspath(modelf_pdb))
+    fobj.write("model refined against half1 : %s\n" % os.path.abspath(model1_pdb))
+    fobj.write("\n")
+    fobj.write("***** Unmasked FSC *****\n")
+    fobj.write("\n")
+    fobj.write("bin # \n")
+    fobj.write("resolution (Ang.) \n")
+    fobj.write("FSC half1 vs half2 \n")
+    fobj.write("FSC half1 vs model1 \n")
+    fobj.write("FSC half2 vs model1 \n")
+    fobj.write("FSC fullmap vs model \n")
+    i = -1
+    for i, resol in enumerate(res_arr):
+        fobj.write("{:-3d} {:-6.2f} {:-14.4f} {:-14.4f} {:-14.4f} {:-14.4f}\n".format(
+                i, resol, fsc_list[0][i], fsc_list[1][i], fsc_list[2][i], fsc_list[3][i]
+            ))
     # output plots
     if len(fsc_list) == 4:
         core.plotter.plot_nlines(
@@ -218,6 +203,130 @@ def map_model_fsc(
             fsc_list,
             "allmap_fsc_modelvsmap-2.eps",
             ["hf1-hf2", "half1-model1", "half2-model1", "fullmap-model"],
+        )
+    elif len(fsc_list) == 2:
+        core.plotter.plot_nlines(
+            res_arr, fsc_list, "fsc_modelvsmap.eps", ["hf1-hf2", "fullmap-model"]
+        )
+        core.plotter.plot_nlines2(
+            1 / res_arr, fsc_list, "fsc_modelvsmap-2.eps", ["hf1-hf2", "fullmap-model"]
+        )
+    return fsc_list
+
+
+def map_model_fsc_phaserand(
+    half1_map,
+    half2_map,
+    modelf_pdb,
+    bfac=0.0,
+    lig=True,
+    norm_mask=False,
+    model1_pdb=None,
+    mask_map=None,
+    model_resol=None,
+    lgf=None,
+    phaserand=True
+):
+
+    fobj = open("mapmodel_validate.txt", "+w")
+    fsc_list = []
+    if model1_pdb is not None:
+        model_list = [modelf_pdb, model1_pdb]
+    else:
+        model_list = [modelf_pdb]
+
+    # if maps are in MRC format
+    if half1_map.endswith((".mrc", ".map")):
+        uc, arr1, origin = core.iotools.read_map(half1_map)
+        uc, arr2, _ = core.iotools.read_map(half2_map)
+    # mask taking into account
+    if mask_map is not None:
+        uc, msk, _ = core.iotools.read_map(mask_map)
+    else:
+        # calculate mask from model
+        mask = em.mask_from_atomic_model(mapname=half1_map, 
+                                         modelname=model_list[0], atmrad=5)
+    f_hf1 = np.fft.fftn(arr1)
+    f_hf2 = np.fft.fftn(arr2)
+    f_ful = (f_hf1 + f_hf2) / 2.0
+    nbin, res_arr, bin_idx = core.restools.get_resolution_array(uc, f_hf1)
+
+    # get mask corrected FSC
+    from emda.ext.phase_randomize import phase_randomized_fsc
+    fsc_all, _, resol_phs = phase_randomized_fsc(arr1=arr1, 
+                                    arr2=arr2, 
+                                    mask=msk, 
+                                    bin_idx=bin_idx, 
+                                    res_arr=res_arr, 
+                                    fobj=fobj, 
+                                    resol_rand=None)
+    fsc_list.append(fsc_all[-1])
+    # Calculate maps from models
+    map_resol = res_arr[-2] # up to Nyquest
+    dim = f_hf1.shape
+    modelarr_list = []
+    for model in model_list:
+        if model.endswith((".pdb", ".ent", ".cif")):
+            _, modelarr = calculate_modelmap(
+                uc=uc,
+                model=model,
+                dim=dim,
+                resol=map_resol,
+                lgf=lgf,
+                maporigin=origin,
+            )
+        else:
+            raise SystemExit("Accpetable model types: .pdb, .ent, .cif")
+        modelarr_list.append(modelarr)
+
+    if len(modelarr_list) == 2:
+        # FSC between halfmaps and model1
+        for imap in [arr1, arr2]:
+            fsc_all = phase_randomized_fsc(arr1=imap, 
+                                            arr2=modelarr_list[-1], 
+                                            mask=msk, 
+                                            bin_idx=bin_idx, 
+                                            res_arr=res_arr, 
+                                            fobj=fobj, 
+                                            resol_rand=resol_phs)[0]            
+            fsc_list.append(fsc_all[-1])
+
+    # FSC between fullmap and modelf
+    fsc_all = phase_randomized_fsc(arr1=np.real(np.fft.ifftn(f_ful)), 
+                                    arr2=modelarr_list[0], 
+                                    mask=msk, 
+                                    bin_idx=bin_idx, 
+                                    res_arr=res_arr, 
+                                    fobj=fobj, 
+                                    resol_rand=resol_phs)[0] 
+    fsc_list.append(fsc_all[-1])
+    # output data into text file
+    negative = False
+    cref_arr = np.empty(np.size(res_arr, axis=0), dtype='float')
+    cref_arr.fill(np.nan)
+    fsc_full = 2 * fsc_list[0] / (1.0 + fsc_list[0])
+    import math
+    for i, _ in enumerate(fsc_list[0]):
+        if fsc_list[0][i] > 0.: 
+            if not(negative):
+                cref_arr[i] = math.sqrt(fsc_full[i])
+        else:
+            negative = True
+        print(res_arr[i], fsc_list[0][i], fsc_list[1][i], fsc_list[2][i], fsc_list[3][i], cref_arr[i])
+    fsc_list.append(cref_arr)
+    # output plots
+    if len(fsc_list) == 5:
+        core.plotter.plot_nlines(
+            res_arr,
+            fsc_list,
+            "allmap_fsc_modelvsmap.eps",
+            ["hf1-hf2", "half1-model1", "half2-model1", "fullmap-model", "sqrt(fsc_full)"],
+        )
+        core.plotter.plot_nlines2(
+            1 / res_arr,
+            fsc_list,
+            "allmap_fsc_modelvsmap-2.eps",
+            ["hf1-hf2", "half1-model1", "half2-model1", "fullmap-model", "sqrt(fsc_full)"],
         )
     elif len(fsc_list) == 2:
         core.plotter.plot_nlines(
