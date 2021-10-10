@@ -10,6 +10,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import numpy as np
 from emda import core, ext
 import fcodes_fast
+from emda.config import debug_mode
+
 
 
 def write_mrc2(mapdata, filename, unit_cell, map_origin):
@@ -34,7 +36,7 @@ def write_mrc2(mapdata, filename, unit_cell, map_origin):
     file.close()
 
 
-def map_transform(mapname, t, r, ax, outname="transformed.mrc", mode="real"):
+def map_transform(mapname, t, r, ax, outname="transformed.mrc", mode="real", interp='linear'):
     from emda.ext.mapfit import utils
     from scipy.ndimage.interpolation import shift
 
@@ -57,6 +59,7 @@ def map_transform(mapname, t, r, ax, outname="transformed.mrc", mode="real"):
         )
         print("Applied translation in Angstrom: ", t)
         hf = np.fft.fftshift(np.fft.fftn(arr))
+        #hf = np.fft.fftshift(np.fft.fftn(np.fft.fftshift(arr)))
         cx, cy, cz = hf.shape
         if np.sqrt(np.dot(t, t)) < 1.0e-3:
             st = 1.0
@@ -64,10 +67,15 @@ def map_transform(mapname, t, r, ax, outname="transformed.mrc", mode="real"):
             t = (np.asarray(t)) / uc[:3]
             st, _, _, _ = fcodes_fast.get_st(cx, cy, cz, t)
         print("Applied translation in Angstrom: ", t * uc[:3])
-        transformed_map = np.real(
+        """ transformed_map = np.real(
             np.fft.ifftn(
-                np.fft.ifftshift(utils.get_FRS(uc, rotmat, hf * st)[:, :, :, 0])
+                np.fft.ifftshift(utils.get_FRS(rotmat, hf * st, interp='linear')[:, :, :, 0])
             )
+        ) """
+        transformed_map = np.real(
+            np.fft.ifftshift(#np.fft.ifftn(
+                np.fft.ifftshift(utils.get_FRS(rotmat, hf * st, interp=interp)[:, :, :, 0])
+            )#)
         )
 
     if mode == "real":
@@ -88,7 +96,7 @@ def map_transform(mapname, t, r, ax, outname="transformed.mrc", mode="real"):
         )
         print("Applied translation in Angstrom: ", t)
         nx, ny, nz = arr.shape
-        transformed_map = fcodes_fast.trilinear_map(rotmat, arr, nx, ny, nz)
+        transformed_map = fcodes_fast.trilinear_map(rotmat.transpose(), arr, debug_mode, nx, ny, nz)
         transformed_map = shift(transformed_map, t_frac)
 
     """# using scipy - rotate function
