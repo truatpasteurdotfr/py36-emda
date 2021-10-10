@@ -655,7 +655,7 @@ def halfmap_fsc_ph(half1name, half2name, filename="halffsc.txt", maskname=None):
 
         idx = np.argmin((bin_fsc - 0.8) ** 2)
         resol_rand = res_arr[idx]
-        fsc_list_ph, msk_bincount = phase_randomized_fsc(
+        fsc_list_ph, msk_bincount, _ = phase_randomized_fsc(
             arr1=arr1,
             arr2=arr2,
             mask=mask,
@@ -1242,6 +1242,8 @@ def average_maps(
     """
     from emda.ext.mapfit import mapaverage
 
+    raise SystemExit("Please use 'diffmap' option for now. It calculates likelihood averagemap as well.")
+
     if axr is None:
         axr = [1, 0, 0]
     if tra is None:
@@ -1258,7 +1260,7 @@ def average_maps(
         smax=res,
         fobj=fobj,
         interp=interp,
-        fit=True,
+        fit=False,
     )
 
 
@@ -2005,6 +2007,10 @@ def model2map_gm(modelxyz, resol, dim, cell, maporigin=None, outputpath=None, sh
         asu_data.get_size_for_hkl(min_size=dim))
     griddata_np = (np.array(griddata, copy=False)).transpose()
     modelmap = (np.fft.ifftn(np.conjugate(griddata_np))).real
+    if np.sum(np.asarray(modelmap.shape, 'int') - np.asarray(dim, 'int')) != 0:
+        cpix = [cell[i]/shape for i, shape in enumerate(modelmap.shape)]
+        tpix = [cell[i]/shape for i, shape in enumerate(dim)]
+        modelmap = resample_data(curnt_pix=cpix, targt_pix=tpix, arr=modelmap, targt_dim=dim)
     if shift_to_boxcenter:
         maporigin = None # no origin shift allowed
         modelmap = np.fft.fftshift(modelmap) #bring modelmap to boxcenter
