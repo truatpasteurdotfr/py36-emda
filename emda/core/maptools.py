@@ -7,6 +7,7 @@ Mozilla Public License, version 2.0; see LICENSE.
 """
 
 from __future__ import absolute_import, division, print_function, unicode_literals
+from functools import total_ordering
 
 import numpy as np
 from emda.core import iotools, restools, plotter, fsc
@@ -53,13 +54,20 @@ def estimate_map_resol(hfmap1, hfmap2):
     return map_resol
 
 
-def get_map_power(mapin):
+def get_map_power(mapin, tol=1e-4):
     uc, arr, _ = iotools.read_map(mapin)
+    pixsize = [uc[i]/shape for i, shape in enumerate(arr.shape)]
+    assert abs(pixsize[0] - pixsize[1]) < tol
+    assert abs(pixsize[0] - pixsize[2]) < tol
+    assert abs(pixsize[1] - pixsize[2]) < tol
+    from emda.ext.rebox_map import make_cubic
+    arr = make_cubic(arr=arr)
+    uc[:3] = np.asarray(arr.shape) * pixsize[0]
     hf = np.fft.fftshift(np.fft.fftn(arr))
-    nx, ny, nz = hf.shape
+    nz, ny, nx = hf.shape
     nbin, res_arr, bin_idx = restools.get_resolution_array(uc, hf)
     power_spectrum = fcodes_fast.calc_power_spectrum(
-        hf, bin_idx, nbin, debug_mode, nx, ny, nz
+        hf, bin_idx, nbin, debug_mode, nz, ny, nx
     )
     print("Resolution   bin     Power")
     for i in range(len(res_arr)):
