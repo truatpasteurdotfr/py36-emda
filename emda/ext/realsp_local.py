@@ -128,7 +128,7 @@ class RealspaceLocalCC:
             if model.endswith((".pdb", ".ent", ".cif")):
                 print("Map will be calculated up to " 
                       + str(self.model_resol) + "A")
-                print("Calculating map from model using REFMAC. Please wait...")
+                print("Calculating map from model. Please wait...")
                 model_arr = calculate_modelmap(
                     modelxyz=model, 
                     dim=dim, 
@@ -364,7 +364,7 @@ def mapmodel_rcc(
         dim = [nx, ny, nz]
         if model.endswith((".pdb", ".ent", ".cif")):
             print("map will be calculated up to " + str(resol) + "A")
-            print("Calculating map from model using REFMAC!")
+            print("Calculating map from the model.")
             model_arr = calculate_modelmap(
                 modelxyz=model, 
                 dim=dim, 
