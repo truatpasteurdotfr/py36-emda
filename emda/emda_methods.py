@@ -1980,31 +1980,7 @@ def model2map_gm(modelxyz, resol, dim, cell, maporigin=None, outputpath=None, sh
                            d_min=resol, 
                            source='electron', 
                            mott_bethe=True)
-
-    """ st = gemmi.read_structure(modelxyz)
-    st.spacegroup_hm = "P 1"
-    st.cell.set(cell[0], cell[1], cell[2], 90., 90., 90.)
-    dc = gemmi.DensityCalculatorX()
-    dc.d_min = resol
-    dc.rate = sample_rate = 1.5  # default
-    dc.cutoff = 1.e-5  # default
-    if bfac is None:
-        # code inherited from servalcat. Thanks Keitaro.
-        grid = resol/2/sample_rate
-        b_min = min((cra.atom.b_iso for cra in st[0].all()))
-        b_need = grid**2*8*numpy.pi**2/1.1 # Refmac's way
-        b_add = b_need - b_min
-        blur = max(0, bfac) # negative blur may cause non-positive definite in case of anisotropic Bs
-        #
-    dc.blur = blur
-    dc.addends.subtract_z()
-    dc.set_grid_cell_and_spacegroup(st)
-    dc.put_model_density_on_grid(st[0])
-    grid = gemmi.transform_map_to_f_phi(dc.grid)
-    asu_data = grid.prepare_asu_data(
-        dmin=resol, mott_bethe=True, unblur=dc.blur) """
-    griddata = asu_data.get_f_phi_on_grid(
-        asu_data.get_size_for_hkl(min_size=dim))
+    griddata = asu_data.get_f_phi_on_grid(dim)
     griddata_np = (np.array(griddata, copy=False)).transpose()
     modelmap = (np.fft.ifftn(np.conjugate(griddata_np))).real
     if np.sum(np.asarray(modelmap.shape, 'int') - np.asarray(dim, 'int')) != 0:
