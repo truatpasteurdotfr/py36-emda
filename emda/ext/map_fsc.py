@@ -22,7 +22,7 @@ def calc_fsc_mrc(hf1, hf2, bin_idx, nbin):
 def calculate_modelmap(
     uc, model, dim, resol, lgf=None, maporigin=None
 ):
-    print('input params:', model, resol, dim, uc)
+    #print('input params:', model, resol, dim, uc)
     """ modelmap = em.model2map(
         modelxyz=model,
         dim=dim,
@@ -38,7 +38,7 @@ def calculate_modelmap(
         cell=uc,
         maporigin=maporigin,
     )
-    print('output shape:', modelmap.shape)
+    #print('output shape:', modelmap.shape)
     f_model = np.fft.fftshift(np.fft.fftn(modelmap))
     return f_model, modelmap
 
@@ -196,20 +196,20 @@ def map_model_fsc(
             res_arr,
             fsc_list,
             "allmap_fsc_modelvsmap.eps",
-            ["hf1-hf2", "half1-model1", "half2-model1", "fullmap-model"],
+            ["half1-half2", "half1-model1", "half2-model1", "fullmap-model"],
         )
         core.plotter.plot_nlines2(
             1 / res_arr,
             fsc_list,
             "allmap_fsc_modelvsmap-2.eps",
-            ["hf1-hf2", "half1-model1", "half2-model1", "fullmap-model"],
+            ["half1-half2", "half1-model1", "half2-model1", "fullmap-model"],
         )
     elif len(fsc_list) == 2:
         core.plotter.plot_nlines(
-            res_arr, fsc_list, "fsc_modelvsmap.eps", ["hf1-hf2", "fullmap-model"]
+            res_arr, fsc_list, "fsc_modelvsmap.eps", ["half1-half2", "fullmap-model"]
         )
         core.plotter.plot_nlines2(
-            1 / res_arr, fsc_list, "fsc_modelvsmap-2.eps", ["hf1-hf2", "fullmap-model"]
+            1 / res_arr, fsc_list, "fsc_modelvsmap-2.eps", ["half1-half2", "fullmap-model"]
         )
     return fsc_list
 
