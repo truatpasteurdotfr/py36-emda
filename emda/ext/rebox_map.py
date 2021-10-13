@@ -26,6 +26,22 @@ def get_minimum_bounding_dims(arr1):
     return com, min_dim
 
 
+def make_cubic(arr):
+    nz, ny, nx = arr.shape
+    print(arr.shape)
+    maxdim = np.max(arr.shape)
+    if maxdim % 2 != 0:
+        maxdim += 1
+    #print('maxdim: ', maxdim)
+    dz = (maxdim - nz) // 2
+    dy = (maxdim - ny) // 2
+    dx = (maxdim - nx) // 2
+    #print('dz, dy, dx: ', dz, dy, dx)
+    newarr  = np.zeros((maxdim, maxdim, maxdim), 'float')
+    newarr[dz:dz+nz, dy:dy+ny, dx:dx+nx] = arr
+    return newarr
+
+
 def get_reboxed_cubic_image(arr, mask):
     #arr = arr * mask
     mask = mask * (mask > 1.e-5)
