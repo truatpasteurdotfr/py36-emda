@@ -830,23 +830,40 @@ def output_rotated_maps(emmap1, r_lst, t_lst, modellist=[]):
     nx, ny, nz = f_static.shape
     data2write = np.real(ifftshift(ifftn(ifftshift(f_static))))
     if len(comlist) > 0:
-        print('comlist:', comlist)
+        #print('comlist:', comlist)
         data2write = em.shift_density(data2write, shift=np.subtract(comlist[0], emmap1.box_centr))
+        f_static_before_centering = fftshift(fftn(fftshift(data2write)))
     core.iotools.write_mrc(data2write, "static_map.mrc", cell)
     i = 0
     for fo, t, rotmat in zip(fo_lst[1:], t_lst, r_lst):
         # map output part
+        data2write = np.real(ifftshift(ifftn(ifftshift(fo))))
+        if len(comlist) > 0:
+            data2write = em.shift_density(data2write, shift=np.subtract(comlist[i+1], emmap1.box_centr))  
+            f_moving_before_centering = fftshift(fftn(fftshift(data2write)))  
+        #unaligned FSC
+        fsc_before, _, _ = core.fsc.anytwomaps_fsc_covariance(
+            f_static_before_centering, f_moving_before_centering, bin_idx, nbin)            
         # t in pixel unit
         frt = utils.get_FRS(rotmat, fo, interp="cubic")[:, :, :, 0]
         st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
         frt = frt * st
+        # aligned FSC
+        fsc_after, _, _ = core.fsc.anytwomaps_fsc_covariance(
+            f_static, frt, bin_idx, nbin)
         data2write = np.real(ifftshift(ifftn(ifftshift(frt))))
         if len(comlist) > 0:
             data2write = em.shift_density(data2write, shift=np.subtract(comlist[0], emmap1.box_centr))        
         core.iotools.write_mrc(
             data2write,
-            "{0}_{1}.{2}".format("fitted_map", str(i), "mrc"),
+            "{0}_{1}.{2}".format("fitted_map", str(i+1), "mrc"),
             cell,
+        )
+        core.plotter.plot_nlines(
+            emmap1.res_arr,
+            [fsc_before[:nbin], fsc_after[:nbin]],
+            "{0}_{1}.{2}".format("fsc", str(i+1), "eps"),
+            ["FSC before", "FSC after"],
         )
         # model output part
         # t in Angstrom unit
