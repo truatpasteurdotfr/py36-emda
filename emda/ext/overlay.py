@@ -825,14 +825,14 @@ def output_rotated_maps(emmap1, r_lst, t_lst, modellist=[]):
     maplist = emmap1.map_list
     bin_idx = emmap1.bin_idx
     nbin = emmap1.nbin
-    resample_comdiff_list = emmap1.resample_comdiff_list # already in A
+    resample_comdiff_list = emmap1.resample_comdiff_list # already in Angstroms
     f_static = fo_lst[0]
     nx, ny, nz = f_static.shape
     data2write = np.real(ifftshift(ifftn(ifftshift(f_static))))
     if len(comlist) > 0:
         #print('comlist:', comlist)
         data2write = em.shift_density(data2write, shift=np.subtract(comlist[0], emmap1.box_centr))
-        f_static_before_centering = fftshift(fftn(fftshift(data2write)))
+        f_static = f_static_before_centering = fftshift(fftn(fftshift(data2write)))
     core.iotools.write_mrc(data2write, "static_map.mrc", cell)
     i = 0
     for fo, t, rotmat in zip(fo_lst[1:], t_lst, r_lst):
@@ -840,10 +840,10 @@ def output_rotated_maps(emmap1, r_lst, t_lst, modellist=[]):
         data2write = np.real(ifftshift(ifftn(ifftshift(fo))))
         if len(comlist) > 0:
             data2write = em.shift_density(data2write, shift=np.subtract(comlist[i+1], emmap1.box_centr))  
-            f_moving_before_centering = fftshift(fftn(fftshift(data2write)))  
+            fo = f_moving_before_centering = fftshift(fftn(fftshift(data2write))) 
         #unaligned FSC
         fsc_before, _, _ = core.fsc.anytwomaps_fsc_covariance(
-            f_static_before_centering, f_moving_before_centering, bin_idx, nbin)            
+            f_static, fo, bin_idx, nbin)            
         # t in pixel unit
         frt = utils.get_FRS(rotmat, fo, interp="cubic")[:, :, :, 0]
         st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
