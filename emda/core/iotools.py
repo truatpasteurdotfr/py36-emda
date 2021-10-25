@@ -22,7 +22,6 @@ def test():
 
     print("iotools test ... Passed")
 
-
 def read_map(mapname, fid=None):
     """Reads CCP4 type map (.map) or MRC type map.
 
@@ -43,38 +42,12 @@ def read_map(mapname, fid=None):
 
     try:
         file = mrcfile.open(mapname)
-        order = (file.header.mapc-1, file.header.mapr-1, file.header.maps-1)
+        order = (3-file.header.maps, 3-file.header.mapr, 3-file.header.mapc)
+        #print('axes order: ', order)
         axes_order = "".join(["ZYX"[i] for i in order])
+        print('axes order2: ', axes_order)
         arr = np.asarray(file.data, dtype="float")
         arr = np.moveaxis(a=arr, source=(0,1,2), destination=order)
-        """ if file.header.mapc == 1:
-            if file.header.mapr == 2 and file.header.maps == 3:
-                axes_order = 'ZYX'
-                arr = np.asarray(file.data, dtype="float")
-            elif file.header.mapr == 3 and file.header.maps == 2:
-                axes_order = 'ZXY'
-                arr = np.asarray(file.data, dtype="float")
-                arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-3,-1,-2])                
-        elif file.header.mapc == 2:
-            if file.header.mapr == 1 and file.header.maps == 3:
-                axes_order = 'YZX'
-                arr = np.asarray(file.data, dtype="float")
-                arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-2,-3,-1])                
-            elif file.header.mapr == 3 and file.header.maps == 1:
-                axes_order = 'YXZ'
-                arr = np.asarray(file.data, dtype="float")
-                arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-2,-1,-3])
-        elif file.header.mapc == 3:
-            if file.header.mapr == 1 and file.header.maps == 2:
-                axes_order = 'XZY'
-                arr = np.asarray(file.data, dtype="float")
-                arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-1,-3,-2])
-            elif file.header.mapr == 2 and file.header.maps == 1:
-                axes_order = 'XYZ'
-                arr = np.asarray(file.data, dtype="float")
-                arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-1,-2,-3])
-        else:
-            raise SystemExit("Wrong axes order. Stopping now...") """
         if fid is not None:
             fid.write('Axes order: %s\n' % (axes_order))
         unit_cell = np.zeros(6, dtype='float')
@@ -84,15 +57,85 @@ def read_map(mapname, fid=None):
         unit_cell[0], unit_cell[2] = unit_cell[2], unit_cell[0]
         unit_cell[3:] = float(90)
         origin = [
-                1 * file.header.nzstart,
-                1 * file.header.nystart,
                 1 * file.header.nxstart,
+                1 * file.header.nystart,
+                1 * file.header.nzstart,
             ]
         file.close()
         print(mapname, arr.shape, unit_cell[:3])
         return unit_cell, arr, origin
     except FileNotFoundError as e:
         print(e)
+#def read_map(mapname, fid=None):
+#    """Reads CCP4 type map (.map) or MRC type map.
+#
+#    Arguments:
+#        Inputs:
+#            mapname: string
+#                CCP4/MRC map file name
+#        Outputs:
+#            unit_cell: float, 1D array
+#                Unit cell
+#            arr: float, 3D array
+#                Map values as Numpy array
+#            origin: list
+#                Map origin list
+#     """
+#    import mrcfile
+#    import numpy as np
+#
+#    try:
+#        file = mrcfile.open(mapname)
+#        order = (file.header.mapc-1, file.header.mapr-1, file.header.maps-1)
+#        axes_order = "".join(["ZYX"[i] for i in order])
+#        arr = np.asarray(file.data, dtype="float")
+#        arr = np.moveaxis(a=arr, source=(0,1,2), destination=order)
+#        """ if file.header.mapc == 1:
+#            if file.header.mapr == 2 and file.header.maps == 3:
+#                axes_order = 'ZYX'
+#                arr = np.asarray(file.data, dtype="float")
+#            elif file.header.mapr == 3 and file.header.maps == 2:
+#                axes_order = 'ZXY'
+#                arr = np.asarray(file.data, dtype="float")
+#                arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-3,-1,-2])                
+#        elif file.header.mapc == 2:
+#            if file.header.mapr == 1 and file.header.maps == 3:
+#                axes_order = 'YZX'
+#                arr = np.asarray(file.data, dtype="float")
+#                arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-2,-3,-1])                
+#            elif file.header.mapr == 3 and file.header.maps == 1:
+#                axes_order = 'YXZ'
+#                arr = np.asarray(file.data, dtype="float")
+#                arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-2,-1,-3])
+#        elif file.header.mapc == 3:
+#            if file.header.mapr == 1 and file.header.maps == 2:
+#                axes_order = 'XZY'
+#                arr = np.asarray(file.data, dtype="float")
+#                arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-1,-3,-2])
+#            elif file.header.mapr == 2 and file.header.maps == 1:
+#                axes_order = 'XYZ'
+#                arr = np.asarray(file.data, dtype="float")
+#                arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-1,-2,-3])
+#        else:
+#            raise SystemExit("Wrong axes order. Stopping now...") """
+#        if fid is not None:
+#            fid.write('Axes order: %s\n' % (axes_order))
+#        unit_cell = np.zeros(6, dtype='float')
+#        cell = file.header.cella[['x', 'y', 'z']]
+#        unit_cell[:3] = cell.view(('f4', 3))
+#        # swapping a and c to compatible with ZYX convension
+#        unit_cell[0], unit_cell[2] = unit_cell[2], unit_cell[0]
+#        unit_cell[3:] = float(90)
+#        origin = [
+#                1 * file.header.nzstart,
+#                1 * file.header.nystart,
+#                1 * file.header.nxstart,
+#            ]
+#        file.close()
+#        print(mapname, arr.shape, unit_cell[:3])
+#        return unit_cell, arr, origin
+#    except FileNotFoundError as e:
+#        print(e)
 
 
 def change_axesorder(arr, uc, axes_order, maporig):
@@ -100,27 +143,28 @@ def change_axesorder(arr, uc, axes_order, maporig):
 
     # Change Mmap axes order
     # input arr has ZYX order (EMDA convension)
+    print('Given order: ', axes_order)
     if axes_order == 'ZXY':
         arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-3,-1,-2])
         # cba --> cab
         uc[0], uc[1], uc[2] = uc[0], uc[2], uc[1]
         maporig[0], maporig[1], maporig[2] = maporig[0], maporig[2], maporig[2]
-    if axes_order == 'YZX':
+    elif axes_order == 'YZX':
         arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-2,-3,-1]) 
         # cba --> bca
         uc[0], uc[1], uc[2] = uc[1], uc[0], uc[2]
         maporig[0], maporig[1], maporig[2] = maporig[1], maporig[0], maporig[2]              
-    if axes_order == 'YXZ':
+    elif axes_order == 'YXZ':
         arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-2,-1,-3])
         # cba --> bac
         uc[0], uc[1], uc[2] = uc[1], uc[2], uc[0]
         maporig[0], maporig[1], maporig[2] = maporig[1], maporig[2], maporig[0]
-    if axes_order == 'XZY':
+    elif axes_order == 'XZY':
         arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-1,-3,-2])
         # cba --> acb
         uc[0], uc[1], uc[2] = uc[2], uc[0], uc[1]
         maporig[0], maporig[1], maporig[2] = maporig[2], maporig[0], maporig[1]
-    if axes_order == 'XYZ':
+    elif axes_order == 'XYZ':
         arr = np.moveaxis(a=arr, source=[0,1,2], destination=[-1,-2,-3])
         # cba --> abc
         uc[0], uc[1], uc[2] = uc[2], uc[1], uc[0]
