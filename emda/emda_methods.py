@@ -1927,9 +1927,12 @@ def model2map(
     if maporigin is None:
         maporigin = [0, 0, 0]
     else:
-        shift_z = modelmap.shape[0] - abs(maporigin[2])
-        shift_y = modelmap.shape[1] - abs(maporigin[1])
-        shift_x = modelmap.shape[2] - abs(maporigin[0])
+        #shift_z = modelmap.shape[0] - abs(maporigin[2])
+        #shift_y = modelmap.shape[1] - abs(maporigin[1])
+        #shift_x = modelmap.shape[2] - abs(maporigin[0])
+        shift_z = maporigin[0]
+        shift_y = maporigin[1]
+        shift_x = maporigin[2]
         modelmap = np.roll(
             np.roll(np.roll(modelmap, -shift_z, axis=0), -shift_y, axis=1),
             -shift_x,
@@ -1996,9 +1999,12 @@ def model2map_gm(modelxyz, resol, dim, cell, maporigin=None, outputpath=None, sh
     if maporigin is None:
         maporigin = [0, 0, 0]
     else:
-        shift_z = modelmap.shape[0] - abs(maporigin[2])
-        shift_y = modelmap.shape[1] - abs(maporigin[1])
-        shift_x = modelmap.shape[2] - abs(maporigin[0])
+        #shift_z = modelmap.shape[0] - abs(maporigin[2])
+        #shift_y = modelmap.shape[1] - abs(maporigin[1])
+        #shift_x = modelmap.shape[2] - abs(maporigin[0])
+        shift_z = maporigin[0]
+        shift_y = maporigin[1]
+        shift_x = maporigin[2]
         # print(shift_z, shift_y, shift_x)
         modelmap = np.roll(
             np.roll(np.roll(modelmap, -shift_z, axis=0), -shift_y, axis=1),
