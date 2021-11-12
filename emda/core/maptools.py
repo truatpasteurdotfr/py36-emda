@@ -56,13 +56,15 @@ def estimate_map_resol(hfmap1, hfmap2):
 
 def get_map_power(mapin, tol=1e-4):
     uc, arr, _ = iotools.read_map(mapin)
-    pixsize = [uc[i]/shape for i, shape in enumerate(arr.shape)]
+    """ pixsize = [uc[i]/shape for i, shape in enumerate(arr.shape)]
     assert abs(pixsize[0] - pixsize[1]) < tol
     assert abs(pixsize[0] - pixsize[2]) < tol
     assert abs(pixsize[1] - pixsize[2]) < tol
     from emda.ext.rebox_map import make_cubic
     arr = make_cubic(arr=arr)
-    uc[:3] = np.asarray(arr.shape) * pixsize[0]
+    uc[:3] = np.asarray(arr.shape) * pixsize[0] """
+    from emda.ext.mapfit.utils import set_dim_even
+    arr = set_dim_even(arr)
     hf = np.fft.fftshift(np.fft.fftn(arr))
     nz, ny, nx = hf.shape
     nbin, res_arr, bin_idx = restools.get_resolution_array(uc, hf)
