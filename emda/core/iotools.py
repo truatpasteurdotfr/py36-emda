@@ -496,14 +496,18 @@ def padimage(arr, tdim):
     assert tnx >= nx
     assert tny >= ny
     assert tnz >= nz
-    com1 = np.asarray(em.center_of_mass_density(arr))
+    """ com1 = np.asarray(em.center_of_mass_density(arr))
     com2 = (com1/np.array(arr.shape)) * np.asarray(tdim)
     dx = int(com2[2] - com1[2]) + int(com2[2] - com1[2] > 0.9)
     dy = int(com2[1] - com1[1]) + int(com2[1] - com1[1] > 0.9)
-    dz = int(com2[0] - com1[0]) + int(com2[0] - com1[0] > 0.9)
+    dz = int(com2[0] - com1[0]) + int(com2[0] - com1[0] > 0.9) """
+    dz = (tnz - nz) // 2 + (tnz - nz) % 2
+    dy = (tny - ny) // 2 + (tny - ny) % 2
+    dx = (tnx - nx) // 2 + (tnx - nx) % 2
     print(dz, dy, dx)
     image = np.zeros((tnz, tny, tnx), arr.dtype)
-    image[-(nz + dz):-dz, -(ny + dy):-dy, -(nx + dx):-dx] = arr
+    #image[-(nz + dz):-dz, -(ny + dy):-dy, -(nx + dx):-dx] = arr
+    image[dz:nz+dz, dy:ny+dy, dx:nx+dx] = arr
     return image
 
 def cropimage(arr, tdim):
