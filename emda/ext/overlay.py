@@ -697,9 +697,6 @@ def run_fit(
                 t=t,
                 nbin=emmap1.nbin,
             )
-            print("f1f2_fsc")
-            for res, ifsc in zip(emmap1.res_arr, f1f2_fsc):
-                print(res, ifsc)
             ibin = determine_ibin(f1f2_fsc)
             if ibin % 2 != 0:
                 ibin = ibin - 1
