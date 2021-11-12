@@ -697,6 +697,9 @@ def run_fit(
                 t=t,
                 nbin=emmap1.nbin,
             )
+            print("f1f2_fsc")
+            for res, ifsc in zip(emmap1.res_arr, f1f2_fsc):
+                print(res, ifsc)
             ibin = determine_ibin(f1f2_fsc)
             if ibin % 2 != 0:
                 ibin = ibin - 1
@@ -840,20 +843,26 @@ def output_rotated_maps(emmap1, r_lst, t_lst, modellist=[]):
         data2write = np.real(ifftshift(ifftn(ifftshift(fo))))
         if len(comlist) > 0:
             data2write = em.shift_density(data2write, shift=np.subtract(comlist[i+1], emmap1.box_centr))  
-            fo = f_moving_before_centering = fftshift(fftn(fftshift(data2write))) 
-        #unaligned FSC
-        fsc_before, _, _ = core.fsc.anytwomaps_fsc_covariance(
-            f_static, fo, bin_idx, nbin)            
+            f_moving_before_centering = fftshift(fftn(fftshift(data2write))) 
+            #unaligned FSC
+            fsc_before, _, _ = core.fsc.anytwomaps_fsc_covariance(
+                f_static, f_moving_before_centering, bin_idx, nbin)     
+        else:        
+            #unaligned FSC
+            fsc_before, _, _ = core.fsc.anytwomaps_fsc_covariance(
+                f_static, fo, bin_idx, nbin)            
         # t in pixel unit
         frt = utils.get_FRS(rotmat, fo, interp="cubic")[:, :, :, 0]
         st, _, _, _ = fcodes_fast.get_st(nx, ny, nz, t)
         frt = frt * st
+        data2write = np.real(ifftshift(ifftn(ifftshift(frt))))
+        if len(comlist) > 0:
+            data2write = em.shift_density(data2write, shift=np.subtract(comlist[0], emmap1.box_centr))  
+            frt = fftshift(fftn(fftshift(data2write)))     
         # aligned FSC
         fsc_after, _, _ = core.fsc.anytwomaps_fsc_covariance(
             f_static, frt, bin_idx, nbin)
-        data2write = np.real(ifftshift(ifftn(ifftshift(frt))))
-        if len(comlist) > 0:
-            data2write = em.shift_density(data2write, shift=np.subtract(comlist[0], emmap1.box_centr))        
+
         core.iotools.write_mrc(
             data2write,
             "{0}_{1}.{2}".format("fitted_map", str(i+1), "mrc"),
