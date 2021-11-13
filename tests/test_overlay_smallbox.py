@@ -4,8 +4,8 @@ import numpy as np
 import emda.emda_methods as em
 
 # read maps
-imap1 = "/Users/ranganaw/MRC/REFMAC/emda_users/daron/gro-428-433_cutOut.mrc"
-imap2 = "/Users/ranganaw/MRC/REFMAC/emda_users/daron/sample2fit-density.mrc"
+imap1 = "./gro-428-433_cutOut.mrc"
+imap2 = "./sample2fit-density.mrc"
 uc1, arr1, orig = em.get_data(imap1)
 uc2, arr2, _ = em.get_data(imap2)
 # resample to 100, 100, 100
