@@ -1,4 +1,4 @@
-Electron Microscopy Data Analytical Tool (EMDA)
+Electron Microscopy Data Analytical Toolkit (EMDA)
 ===============================================
 
 EMDA is an importable Python library for Electron Microscopy map and model manipulations written in Python3.
