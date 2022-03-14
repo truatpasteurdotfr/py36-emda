@@ -349,6 +349,19 @@ def remove_unwanted_corners(uc, target_dim):
     cc_mask[dx : dx + cx, dy : dy + cy, dz : dz + cz] = cut_mask
     return cc_mask
 
+def sphere_mask(nx):
+    # Creating a sphere mask
+    box_size = nx
+    box_radius = nx // 2 -1
+    center = [nx//2, nx//2, nx//2]
+    print("boxsize: ", box_size, "boxradius: ", box_radius, "center:", center)
+    radius = box_radius
+    X, Y, Z = np.ogrid[:box_size, :box_size, :box_size]
+    dist_from_center = np.sqrt(
+        (X - center[0]) ** 2 + (Y - center[1]) ** 2 + (Z - center[2]) ** 2
+    )
+    mask = dist_from_center <= radius
+    return mask
 
 def double_the_axes(arr1):
     nx, ny, nz = arr1.shape
@@ -737,3 +750,8 @@ def rm_zyx2xyz(op):
     rm[1, :] = tmp[1, :]
     rm[2, :] = tmp[0, :] 
     return rm
+
+def moving_average(a, n=3) :
+    ret = np.cumsum(a, dtype=float)
+    ret[n:] = ret[n:] - ret[:-n]
+    return ret[n - 1:] / n
