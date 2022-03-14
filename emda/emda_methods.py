@@ -1657,6 +1657,7 @@ def predict_fsc(hf1name, hf2name, nparticles=None, bfac=None, mask=None):
     nbin, res_arr, bin_idx = restools.get_resolution_array(uc, f1)
     if nparticles is not None:
         bfac = None
+        npar = nparticles
         nparticles = 1.0 / np.asarray(nparticles, dtype="float")
         fsc_lst = fsc.predict_fsc(
             hf1=f1,
@@ -1666,12 +1667,12 @@ def predict_fsc(hf1name, hf2name, nparticles=None, bfac=None, mask=None):
             nparticles=nparticles,
             res_arr=res_arr,
         )
-        labels = [str(i) for i in nparticles]
+        labels = ['predicted_'+str(i) for i in npar]
     if bfac is not None:
         fsc_lst = fsc.predict_fsc(
             hf1=f1, hf2=f2, bin_idx=bin_idx, nbin=nbin, bfac=bfac, res_arr=res_arr
         )
-        labels = [str(i) for i in bfac]
+        labels = ['predicted_'+str(i) for i in bfac]
     labels.append("reference")
     plotter.plot_nlines(
         res_arr, fsc_lst, curve_label=labels, mapname="fsc_predicted.eps"
@@ -2216,6 +2217,25 @@ def fetch_data(emdbidlist, alldata=False):
     downmap.main(emdbidlist, alldata=alldata)
 
 
+def symaxis_refine(imap, rotaxis, symorder, imask=None, fitres=None, hfmaps=None):
+    from emda.ext import axis_refinement
+
+    ax_final, t_final = axis_refinement.axis_refine(
+            imap=imap,
+            imask=imask,
+            rotaxis=rotaxis,
+            symorder=symorder,
+            fitres=fitres,
+        )   
+    if hfmaps is not None:
+        axis_refinement.map_output(
+            maplist=hfmaps, 
+            imask=imask, 
+            axis=ax_final, 
+            angle=float(360/symorder), 
+            translation=t_final)
+    return ax_final, t_final
+
 """ def symaxis_refine(maplist, mapoutvar=False, emdbidlist=None, reslist=None):
     from emda.ext import refine_symaxis
 
@@ -2377,7 +2397,7 @@ def symmetry_average_using_ops(imap, ops, outmapname=None):
     return symmetrize_map_using_ops(imap=imap, ops=ops, outmapname=outmapname)
 
 
-def rebox_mapmodel(maplist, masklist, modellist=None):
+def rebox_mapmodel(maplist, masklist, modellist=None, padwidth=None):
     """Reboxes a map by a mask.
 
     This function reboxes a map by a mask into a smaller cube. Size of the box 
@@ -2396,4 +2416,4 @@ def rebox_mapmodel(maplist, masklist, modellist=None):
     """
     from emda.ext.rebox_map import rebox_maps_and_models
 
-    rebox_maps_and_models(maplist=maplist, masklist=masklist, modellist=modellist)
+    rebox_maps_and_models(maplist=maplist, masklist=masklist, modellist=modellist, padwidth=padwidth)
