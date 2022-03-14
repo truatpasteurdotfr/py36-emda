@@ -52,7 +52,8 @@ def read_map(mapname, fid=None):
             fid.write('Axes order: %s\n' % (axes_order))
         unit_cell = np.zeros(6, dtype='float')
         cell = file.header.cella[['x', 'y', 'z']]
-        unit_cell[:3] = cell.view(('f4', 3))
+        unit_cell[:3] = cell.astype([('x', '<f4'), ('y', '<f4'), ('z', '<f4')]).view(('<f4',3))
+        #unit_cell[:3] = cell.view(('f4', 3))
         # swapping a and c to compatible with ZYX convension
         unit_cell[0], unit_cell[2] = unit_cell[2], unit_cell[0]
         unit_cell[3:] = float(90)
