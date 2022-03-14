@@ -72,7 +72,7 @@ class EmmapOverlay:
         from scipy import ndimage
         from scipy.ndimage.interpolation import shift
 
-        cmask = False
+        cmask = True
         fhf_lst = []
         self._check_inputs()
         if self.mask_list is not None:
@@ -287,7 +287,7 @@ class linefit:
 
     def func(self, i):
         tmp = np.insert(self.step * i, 0, 0.0)
-        q = tmp + self.q_prev
+        q = tmp + self.q_init #self.q_prev
         q = q / np.sqrt(np.dot(q, q))
         rotmat = quaternions.get_RM(q)
         ers = get_FRS(rotmat, self.e1, interp="linear")
@@ -575,8 +575,10 @@ class EmFit:
                 self.step = derivatives_rotation(
                     self.e0, self.ert, self.crt, self.w_grid, self.sv, self.q, xyz, xyz_sum)
                 lft = linefit()
+                """ lft.get_linefit_static_data(
+                    [self.e0, self.e1], self.mapobj.cbin_idx, self.mapobj.res_arr, smax_lf) """
                 lft.get_linefit_static_data(
-                    [self.e0, self.e1], self.mapobj.cbin_idx, self.mapobj.res_arr, smax_lf)
+                    [self.e0, self.ert], self.mapobj.cbin_idx, self.mapobj.res_arr, smax_lf)
                 lft.step = self.step
                 lft.q_prev = self.q
                 alpha_r = lft.scalar_opt()
@@ -749,7 +751,11 @@ def run_fit(
         if ibin == 0:
             print("ibin = 0")
             raise SystemExit("Cannot proceed! Stopping now...")
-        e_list = [emmap1.eo_lst[0], ert, frt]
+        nx, ny, nz = emmap1.map_dim
+        wgrid = fcodes_fast.read_into_grid(
+            emmap1.bin_idx, f1f2_fsc, emmap1.nbin, nx, ny, nz)
+        
+        e_list = [emmap1.eo_lst[0]*wgrid, ert*wgrid, frt]
         eout, cBIdx, cbin = cut_resolution_for_linefit(
             e_list, emmap1.bin_idx, emmap1.res_arr, ibin
         )
@@ -802,6 +808,7 @@ def overlay(
             fitres=fitres,
         )
         rotmat = quaternions.get_RM(q_final)
+        print(rotmat)
         rotmat_list.append(rotmat)
         trans_list.append(t)
     # output maps
