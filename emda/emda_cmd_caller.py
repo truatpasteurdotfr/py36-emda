@@ -688,16 +688,20 @@ fetchdata.add_argument("--emd", required=True, nargs="+",
 fetchdata.add_argument("--all", action="store_true",
                        help="Use to download all data (mask, map, halfdata, model)")
 
-""" symaxref = subparsers.add_parser(
-    "symref", description="refine symmetry axis of a group")
-symaxref.add_argument("--map", required=True, nargs="+",
-                      type=str, help="list of maps to find symmetry axes")
-symaxref.add_argument("--emd", required=False, nargs="+",
-                      type=str, help="list of emdbid of maps")
-symaxref.add_argument("--res", required=False, nargs="+",
-                      type=float, help="list of resolution of maps (A)")
-symaxref.add_argument("--mapout", action="store_true",
-                      help="Use to output maps") """
+symaxref = subparsers.add_parser(
+    "axisrefine", description="refine symmetry axis of a map")
+symaxref.add_argument("--map", required=True,
+                      type=str, help="map for axis refinement")
+symaxref.add_argument("--axis", required=True, nargs="+",
+                      type=float, help="enter rotation axis to refine")
+symaxref.add_argument("--symorder", required=True,
+                      type=int, help="enter symmetry order of the axis")                      
+symaxref.add_argument("--res", required=False, default=6.0,
+                      type=float, help="data resolution for the refinement in (A)")
+symaxref.add_argument("--halfmaps", required=False, default=None, nargs="+",
+                      help="refined transformation will be applied on halfmaps")
+symaxref.add_argument("--msk", required=False,
+                      type=str, help="mask to apply on the map")
 
 
 pointg = subparsers.add_parser(
@@ -745,6 +749,8 @@ rebox.add_argument("--msk", required=True, nargs="+",
                     type=str, help="list of mask names for reboxing")
 rebox.add_argument("--mdl", required=False, nargs="+",
                     type=str, default=None, help="list of model names (pdb/cif) for reboxing")
+rebox.add_argument("--padwidth", required=False,
+                    type=int, default=10, help="number of pixel layers to pad")
 
 
 def apply_mask(args):
@@ -1290,11 +1296,16 @@ def fetch_data(args):
     em.fetch_data(args.emd, args.all)
 
 
-""" def symaxis_refinement(args):
+def symaxis_refinement(args):
     from emda import emda_methods as em
 
-    _, _, _, _, _ = em.symaxis_refine(
-        maplist=args.map, emdbidlist=args.emd, mapoutvar=args.mapout, reslist=args.res) """
+    ax_final, t_final = em.symaxis_refine(
+        imap=args.map, 
+        rotaxis=args.axis, 
+        symorder=args.symorder, 
+        fitres=args.res, 
+        hfmaps=args.halfmaps, 
+        imask=args.msk)
 
 
 def pointgroup(args, fobj):
@@ -1333,7 +1344,7 @@ def symmetrize(args, fobj):
 def reboxmap(args):
     from emda import emda_methods as em
 
-    em.rebox_mapmodel(maplist=args.map, masklist=args.msk, modellist=args.mdl)
+    em.rebox_mapmodel(maplist=args.map, masklist=args.msk, modellist=args.mdl, padwidth=args.padwidth)
 
 
 def main(command_line=None):
@@ -1421,8 +1432,8 @@ def main(command_line=None):
         center_of_mass(args)
     if args.command == "fetch":
         fetch_data(args)
-    """ if args.command == "symref":
-        symaxis_refinement(args) """
+    if args.command == "axisrefine":
+        symaxis_refinement(args)
     if args.command == "pointgroup":
         pointgroup(args, f)
     if args.command == "symmetrise":
