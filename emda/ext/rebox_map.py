@@ -42,7 +42,7 @@ def make_cubic(arr):
     return newarr
 
 
-def get_reboxed_cubic_image(arr, mask):
+def get_reboxed_cubic_image(arr, mask, padwidth=10):
     #arr = arr * mask
     mask = mask * (mask > 1.e-5)
     i, j, k = np.nonzero(mask)
@@ -54,21 +54,21 @@ def get_reboxed_cubic_image(arr, mask):
     dim = np.max([dimz, dimy, dimx])
     if dim % 2 != 0:
         dim += 1
-    newarr  = np.zeros((dim+10, dim+10, dim+10), 'float')
-    newmask = np.zeros((dim+10, dim+10, dim+10), 'float')
+    newarr  = np.zeros((dim+padwidth*2, dim+padwidth*2, dim+padwidth*2), 'float')
+    newmask = np.zeros((dim+padwidth*2, dim+padwidth*2, dim+padwidth*2), 'float')
     print((dim - dimz), (dim - dimy), (dim - dimx))
     dz = (dim - dimz) // 2
     dy = (dim - dimy) // 2
     dx = (dim - dimx) // 2
-    dz += 5
-    dy += 5
-    dx += 5
+    dz += padwidth #offset // 2
+    dy += padwidth #offset // 2
+    dx += padwidth #offset // 2
     newarr[dz:dz+dimz, dy:dy+dimy, dx:dx+dimx] = arr[z1:z2, y1:y2, x1:x2]
     newmask[dz:dz+dimz, dy:dy+dimy, dx:dx+dimx] = mask[z1:z2, y1:y2, x1:x2]
     return newarr, newmask
 
 
-def model_rebox(arr, mask, mmcif_file, uc=None):
+def model_rebox(arr, mask, mmcif_file, padwidth, uc=None):
     import gemmi
     import os
     from emda.core.iotools import pdb2mmcif
@@ -113,25 +113,27 @@ def model_rebox(arr, mask, mmcif_file, uc=None):
     dy = (dim - dimy) // 2
     dx = (dim - dimx) // 2
     for n, _ in enumerate(col_x):
-        col_x[n] = str((float(col_x[n]) - cart_x) + (dx + 5) * pixa)
-        col_y[n] = str((float(col_y[n]) - cart_y) + (dy + 5) * pixb)
-        col_z[n] = str((float(col_z[n]) - cart_z) + (dz + 5) * pixc)
+        col_x[n] = str((float(col_x[n]) - cart_x) + (dx + padwidth) * pixa)
+        col_y[n] = str((float(col_y[n]) - cart_y) + (dy + padwidth) * pixb)
+        col_z[n] = str((float(col_z[n]) - cart_z) + (dz + padwidth) * pixc)
     doc.write_file("./tmp.cif")
     st = gemmi.read_structure("./tmp.cif")
-    ca = (dim+10) * pixa
-    cb = (dim+10) * pixb
-    cc = (dim+10) * pixc
+    ca = (dim+padwidth*2) * pixa
+    cb = (dim+padwidth*2) * pixb
+    cc = (dim+padwidth*2) * pixc
     st.cell.set(ca, cb, cc, 90., 90., 90.)
     st.make_mmcif_document().write_file("emda_reboxed_model.cif")
-    os.remove("./out.cif")
-    os.remove("./tmp.cif")
+    if os.path.isfile("out.cif"):
+        os.remove("./out.cif")
+    if os.path.isfile("tmp.cif"):
+        os.remove("./tmp.cif")
 
 
-def reboxmap(arr, uc, mask, outname="reboxedmap.mrc"):
+def reboxmap(arr, uc, mask, padwidth, outname="reboxedmap.mrc"):
     pixs1 = uc[0]/arr.shape[0]
     pixs2 = uc[1]/arr.shape[1]
     pixs3 = uc[2]/arr.shape[2]
-    newarr, newmask = get_reboxed_cubic_image(arr, mask)
+    newarr, newmask = get_reboxed_cubic_image(arr, mask, padwidth)
     dim = newarr.shape[0]
     uc2 = [pixs1*dim, pixs2*dim, pixs3*dim]
     em.write_mrc(newarr, outname, uc2)
@@ -194,31 +196,32 @@ def get_filename_from_path(file_path):
     return os.path.splitext(base)[0]
 
 
-def _rebox(imap, imask, imodel=None):
+def _rebox(imap, imask, padwidth, imodel=None):
     uc, arr, orig = em.get_data(imap)
     _, mask, _ = em.get_data(imask)
     outmapname = get_filename_from_path(imap) + "_emda_reboxed.mrc"
-    newarr, newuc = reboxmap(arr, uc, mask=mask, outname=outmapname)
+    newarr, newuc = reboxmap(arr, uc, mask=mask, outname=outmapname, padwidth=padwidth)
     if imodel is not None:
         outmodelname = get_filename_from_path(imodel) + "_emda_reboxed.cif"
-        model_rebox(arr, mask, mmcif_file=imodel, uc=uc)
+        model_rebox(arr, mask, mmcif_file=imodel, uc=uc, padwidth=padwidth)
     return newarr, newuc
 
 
-def rebox_maps_and_models(maplist, modellist=None, masklist=None):
+def rebox_maps_and_models(maplist, modellist=None, masklist=None, padwidth=None):
     from emda.ext.maskmap_class import mask_from_coordinates
 
+    if padwidth is None: padwidth = 10
     if masklist is not None:
         if modellist is not None:
             assert len(maplist) == len(masklist) == len(modellist)
             # read and rebox
             for imap, imodel, imask in zip(maplist, modellist, masklist):
-                _, _ = _rebox(imap=imap, imask=imask, imodel=imodel)
+                _, _ = _rebox(imap=imap, imask=imask, imodel=imodel, padwidth=padwidth)
         else:
             assert len(maplist) == len(masklist)
             # read and rebox
             for imap, imask in zip(maplist, masklist):
-                _, _ = _rebox(imap=imap, imask=imask)
+                _, _ = _rebox(imap=imap, imask=imask, padwidth=padwidth)
     else:
         if modellist is not None:
             assert len(modellist) == len(maplist)
@@ -226,7 +229,7 @@ def rebox_maps_and_models(maplist, modellist=None, masklist=None):
                 # calculate mask from model each
                 _ = mask_from_coordinates(mapname=imap, modelname=imodel)
                 # rebox
-                _, _ = _rebox(imap=imap, imask='./emda_atomic_mask.mrc')
+                _, _ = _rebox(imap=imap, imask='./emda_atomic_mask.mrc', padwidth=padwidth)
         else:
             print("Either mask or model is needed for reboxing")
             raise SystemExit("Exiting...")
