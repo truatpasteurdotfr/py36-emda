@@ -55,15 +55,21 @@ def rebox_map(arr1):
 def symmetrize_map_known_pg(imap, pg, outmapname=None):
     if outmapname is None:
         outmapname = "emda_sym_averaged_map.mrc"
-    _, _, ops = operators_from_symbol(pg)
+    gpsymbol, _, _, ops = operators_from_symbol(pg)
+    print('Group symbol: ', gpsymbol)
     uc, arr, orig = em.get_data(imap)
     arr2 = double_the_axes(arr)
     f1 = fftshift(fftn(fftshift(arr2)))
     nbin, res_arr, bin_idx = get_resolution_array(uc, f1)
     frs_sum = f1
     print("Symmetrising map...")
-    for op in ops[1:]:
+    for i, op in enumerate(ops[1:]):
+        print("operator: ", op)
         frs = apply_op(f1, op, bin_idx, nbin)
+        imap = rebox_map(ifftshift(np.real(ifftn(ifftshift(frs)))))
+        imapname = "map_{}.mrc".format(i)
+        print(imapname)
+        em.write_mrc(imap, imapname, uc, orig)
         frs_sum += frs
     avg_f = frs_sum / len(ops)
     avgmap = ifftshift(np.real(ifftn(ifftshift(avg_f))))
@@ -82,6 +88,7 @@ def symmetrize_map_using_ops(imap, ops, outmapname=None):
     frs_sum = f1
     print("Symmetrising map...")
     for op in ops:
+        print('operator: ', op)
         frs = apply_op(f1, op, bin_idx, nbin)
         frs_sum += frs
     avg_f = frs_sum / (len(ops) + 1)
