@@ -494,6 +494,8 @@ def overlay(
     interp='linear',
     fitres=4,
 ):
+    #from emda.ext.sym.refine_symaxis import EmmapOverlay
+
     emmap1 = EmmapOverlay(maplist)
     emmap1.load_maps()
     emmap1.calc_fsc_from_maps()
