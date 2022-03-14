@@ -13,18 +13,17 @@ setup(name='emda',
     version=version['__version__'],
     description= 'Electron Microscopy map and model manipulation tools',
     long_description='''\
-        Python library for Electron Microscopy map and model
-        manipulations. To work with MRC/CCP4.MAP and MTZ files. Map to map
-        fitting and average/difference map calculation. Map and map-model validation
-        using 3D correlations.''',
+        Python library for Electron Microscopy Data Analysis (EMDA). 
+        EMDA supports MRC/CCP4.MAP and MTZ files as well as PDB and mmcif files. 
+        EMDA offeres a range of functions for downstream data analysis and
+        model building. Please refer emda.readthedocs.io for more information.''',
     url='https://www2.mrc-lmb.cam.ac.uk/groups/murshudov/content/emda/emda.html',
     author='Rangana Warshamanage, Garib N. Murshudov',
     author_email='ranganaw@mrc-lmb.cam.ac.uk, garib@mrc-lmb.cam.ac.uk',
     license='MPL-2.0',
     packages=setuptools.find_packages(),
-    #packages= ['emda','emda.core','emda.ext','emda.ext.mapfit'],
     ext_modules =[ex1],
-    install_requires=['pandas>=0.23.4','mrcfile','matplotlib','numpy','scipy','gemmi','servalcat'],
+    install_requires=['pandas>=0.23.4','mrcfile','matplotlib','numpy','scipy','gemmi','servalcat', 'proshade'],
     test_suite='emda.tests',
     entry_points={
       'console_scripts': [
