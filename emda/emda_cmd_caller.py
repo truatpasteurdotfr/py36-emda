@@ -531,7 +531,7 @@ diffmap.add_argument(
     required=False,
     default=[1, 0, 0],
     nargs="+",
-    type=int,
+    type=float,
     help="list of rotation axes. default=[1,0,0]",
 )
 
