@@ -752,6 +752,17 @@ rebox.add_argument("--mdl", required=False, nargs="+",
 rebox.add_argument("--padwidth", required=False,
                     type=int, default=10, help="number of pixel layers to pad")
 
+residuecc = subparsers.add_parser(
+    "residuecc", description="calculates per residue correlation")
+residuecc.add_argument("--half1", required=True,
+                    type=str, help="first halfmap (MRC/MAP)")
+residuecc.add_argument("--half2", required=True,
+                    type=str, help="second halfmap (MRC/MAP)")
+residuecc.add_argument("--model", required=True,
+                    type=str, help="atomic model (PDB/CIF)")
+residuecc.add_argument("--resol", required=True,
+                    type=float, help="resolution for correlation calculation")    
+
 
 def apply_mask(args):
     from emda.emda_methods import applymask
@@ -1344,7 +1355,22 @@ def symmetrize(args, fobj):
 def reboxmap(args):
     from emda import emda_methods as em
 
-    em.rebox_mapmodel(maplist=args.map, masklist=args.msk, modellist=args.mdl, padwidth=args.padwidth)
+    em.rebox_mapmodel(
+        maplist=args.map, 
+        masklist=args.msk, 
+        modellist=args.mdl, 
+        padwidth=args.padwidth)
+
+
+def residue_cc(args):
+    from emda import emda_methods as em
+
+    em.correlation_per_residue(
+        halfmap1=args.half1,
+        halfmap2=args.half2,
+        model=args.model,
+        resolution=args.resol
+    )
 
 
 def main(command_line=None):
@@ -1440,7 +1466,8 @@ def main(command_line=None):
         symmetrize(args, f)
     if args.command == "rebox":
         reboxmap(args)
-
+    if args.command == "residuecc":
+        residue_cc(args)
 
 if __name__ == "__main__":
     main()
