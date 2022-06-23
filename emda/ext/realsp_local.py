@@ -167,6 +167,13 @@ class RealspaceLocalCC:
             #self.truemap_model_cc()
             #self.outputmaps(self.truemapmodelcc * cc_mask_binary, "rcc_truemapmodel_smax")
             print("Map-model correlation calculated! Maps were writted!")
+            # calculating residue correlation
+            from emda.ext import atomic_cc
+            atomic_cc.main_helper_for_rcc(
+                uc=uc, 
+                rcc_map=fullmapcc, 
+                rcc_mapmodel=mapmodelcc, 
+                modelname=model)
 
 
 def get_3d_realspcorrelation(half1, half2, kern, mask=None):
