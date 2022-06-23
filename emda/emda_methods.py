@@ -2417,3 +2417,15 @@ def rebox_mapmodel(maplist, masklist, modellist=None, padwidth=None):
     from emda.ext.rebox_map import rebox_maps_and_models
 
     rebox_maps_and_models(maplist=maplist, masklist=masklist, modellist=modellist, padwidth=padwidth)
+
+def correlation_per_residue(halfmap1, halfmap2, model, resolution):
+    """
+    Correlation per atom and per residue
+
+    """
+    import emda.ext.atomic_cc as atomic_cc
+    atomic_cc.main(
+        halfmap1=halfmap1, 
+        halfmap2=halfmap2, 
+        modelname=model, 
+        resolution=resolution)
