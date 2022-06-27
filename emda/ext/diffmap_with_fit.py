@@ -110,7 +110,7 @@ def mapoutput(list_maps, uc, origin, masklist=None):
             rmsd = np.sqrt(np.sum(diff * diff) / np.sum(msk))
             print("rmsd: ", rmsd)   
             fname_dif = "emda_diffmap_m%s.mrc" % (str(i+1))
-            iotools.write_mrc((list_maps[i] / rmsd) * msk, fname_dif, uc, origin)
+            iotools.write_mrc(((list_maps[i] - masked_mean) / rmsd) * msk, fname_dif, uc, origin)
             fname_map = "emda_map%s.mrc" % (str(i+1))
             iotools.write_mrc(list_maps[i+2] * msk, fname_map, uc, origin)
     else:
@@ -201,17 +201,24 @@ def main(maplist, diffmapres=3, ncy=5, fit=False, usecom=False,
         else:
             uc, arr1, origin = em.get_data(maplist[0])
             _, arr2, _ = em.get_data(maplist[1])
+            if masklist is not None and len(masklist) == 2:
+                _, msk1, _ = iotools.read_map(masklist[0])
+                _, msk2, _ = iotools.read_map(masklist[1])
+                results.masklist = [msk1, msk2]
+                print("applying masks on maps..")
+                arr1 = arr1 * msk1
+                arr2 = arr2 * msk2                
             f1 = fftshift(fftn(arr1))
             f2 = fftshift(fftn(arr2))
             diffmap = diffmap_normalisedsf(f1, f2, uc, smax=diffmapres, origin=origin)
             results.diffmap = diffmap
             results.cell = uc
             results.origin = origin
-            if masklist is not None:
-                assert len(maplist) == len(masklist) == 2
-                _, msk1, _ = iotools.read_map(masklist[0])
-                _, msk2, _ = iotools.read_map(masklist[1])
-                results.masklist = [msk1, msk2]
+            #if masklist is not None:
+            #    assert len(maplist) == len(masklist) == 2
+            #    _, msk1, _ = iotools.read_map(masklist[0])
+            #    _, msk2, _ = iotools.read_map(masklist[1])
+            #    results.masklist = [msk1, msk2]
     return results
 
 
