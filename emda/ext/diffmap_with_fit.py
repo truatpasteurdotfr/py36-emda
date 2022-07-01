@@ -110,9 +110,14 @@ def mapoutput(list_maps, uc, origin, masklist=None):
             rmsd = np.sqrt(np.sum(diff * diff) / np.sum(msk))
             print("rmsd: ", rmsd)   
             fname_dif = "emda_diffmap_m%s.mrc" % (str(i+1))
-            iotools.write_mrc(((list_maps[i] - masked_mean) / rmsd) * msk, fname_dif, uc, origin)
+            #iotools.write_mrc(((list_maps[i] - masked_mean) / rmsd) * msk, fname_dif, uc, origin)
+            iotools.write_mrc((list_maps[i] / rmsd) * msk, fname_dif, uc, origin)
             fname_map = "emda_map%s.mrc" % (str(i+1))
-            iotools.write_mrc(list_maps[i+2] * msk, fname_map, uc, origin)
+            masked_mean_map = np.sum(list_maps[i+2] * msk) / np.sum(msk)
+            diff2 = (list_maps[i+2] - masked_mean_map) * msk
+            rmsd2 = np.sqrt(np.sum(diff2 * diff2) / np.sum(msk))
+            #iotools.write_mrc(((list_maps[i+2]- masked_mean_map) / rmsd2) * msk, fname_map, uc, origin)
+            iotools.write_mrc((list_maps[i+2] / rmsd2) * msk, fname_map, uc, origin)
     else:
         for i , _ in enumerate(list_maps):
             if i < 2:
