@@ -429,9 +429,21 @@ def optimize_superposition(emmap1, ncycles=50):
     print("Optimising overlay.....Done")
     return rotmat_list, trans_list
 
-def main(maplist, masklist=None, resol=None):
+""" def main(maplist, masklist=None, resol=None):
     emmap1 = prepare_data(maplist, masklist)
     rm_list, t_list = optimize_superposition(emmap1)
+    minimizer_mapmodel(emmap1=emmap1, resol=resol, rmlist=rm_list, tlist=t_list) """
+
+def main(maplist, fit_optimize=True, masklist=None, resol=None):
+    emmap1 = prepare_data(maplist, masklist)
+    if fit_optimize:
+        rm_list, t_list = optimize_superposition(emmap1)
+    else:
+        rm_list = []
+        t_list = []
+        for _ in range(len(maplist)):
+            rm_list.append(np.identity(3))
+            t_list.append(np.array([0., 0., 0.], 'float'))
     minimizer_mapmodel(emmap1=emmap1, resol=resol, rmlist=rm_list, tlist=t_list)
 
 
