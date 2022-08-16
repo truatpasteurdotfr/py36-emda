@@ -1,5 +1,14 @@
+"""
+Author: "Rangana Warshamanage, Garib N. Murshudov"
+MRC Laboratory of Molecular Biology
+    
+This software is released under the
+Mozilla Public License, version 2.0; see LICENSE.
+"""
+
 # Get CC at atoms
-import sys
+from __future__ import absolute_import, division, print_function, unicode_literals
+import sys, math
 import numpy as np
 import gemmi
 import emda.emda_methods as em
@@ -24,7 +33,8 @@ def get_chains(modelname, xyz_cc_map, xyz_cc_mapmodel, fid, fid2):
     residue_name_list = []
     residue_num_list = []
     chain_ids = []
-    fid2.write("ChainID  Residue  mapCC  mapmodelCC\n")
+    fid.write("ChainID  Residue  Atom  mapCC  CC*  mapmodelCC\n")
+    fid2.write("ChainID  Residue  mapCC  CC*  mapmodelCC\n")
     for chain in st[0]:
         polymer = chain.get_polymer()
         for ires, residue in enumerate(polymer):
@@ -36,18 +46,24 @@ def get_chains(modelname, xyz_cc_map, xyz_cc_mapmodel, fid, fid2):
             for _, atom in enumerate(residue):
                 atm_counter += 1
                 j += 1
-                mapavgcc += xyz_cc_map[atm_counter]
-                mapmodelavgcc += xyz_cc_mapmodel[atm_counter]
-                fid.write("{} {} {} {:-6.2f} {:-6.2f}\n".format(
-                    chain.name, residue.name, atom.name, xyz_cc_map[atm_counter], xyz_cc_mapmodel[atm_counter]))
+                mapCC = xyz_cc_map[atm_counter]
+                CC_str = math.sqrt(mapCC)
+                mapmodelCC = xyz_cc_mapmodel[atm_counter]
+                mapavgcc += mapCC #xyz_cc_map[atm_counter]
+                mapmodelavgcc += mapmodelCC #xyz_cc_mapmodel[atm_counter]
+                fid.write("{} {} {} {:-6.2f} {:-6.2f} {:-6.2f}\n".format(
+                    chain.name, residue.name, atom.name, mapCC, CC_str, mapmodelCC))
             mapavgcc_list.append(mapavgcc/j)
             mapmodelavgcc_list.append(mapmodelavgcc/j)
             print("{} {} {:-6.2f} {:-6.2f}".format(
                 chain.name, residue.name+str(residue.seqid.num), mapavgcc/j, mapmodelavgcc/j))
-            fid.write("{} {} {} {:-6.2f} {:-6.2f}\n".format(
-                "    ", chain.name, residue.name+str(residue.seqid.num), mapavgcc/j, mapmodelavgcc/j))
-            fid2.write("{} {} {:-6.2f} {:-6.2f}\n".format(
-                chain.name, residue.name+str(residue.seqid.num), mapavgcc/j, mapmodelavgcc/j))
+            mapcc_resi = mapavgcc/j
+            ccstr_resi = math.sqrt(mapcc_resi)
+            mapmodelcc_resi = mapmodelavgcc/j
+            fid.write("{} {} {} {:-6.2f} {:-6.2f} {:-6.2f}\n".format(
+                "    ", chain.name, residue.name+str(residue.seqid.num), mapcc_resi, ccstr_resi, mapmodelcc_resi))
+            fid2.write("{} {} {:-6.2f} {:-6.2f} {:-6.2f}\n".format(
+                chain.name, residue.name+str(residue.seqid.num), mapcc_resi, ccstr_resi, mapmodelcc_resi))
             chain_list.append(chain.name)
             residue_name_list.append(residue.name)
             residue_num_list.append(residue.seqid.num)
@@ -358,7 +374,21 @@ def main(halfmap1, halfmap2, modelname, resolution):
 
 def main_helper_for_rcc(uc, rcc_map, rcc_mapmodel, modelname):
     fid = open("EMDA_atomic_cc.txt", "w")
+    fid.write("*** Terms and definitions ***\n")
+    fid.write("-----------------------------\n")
+    fid.write("halfmapCC - Halfmap correlation  values at atomic positions\n")
+    fid.write("mapCC     - Fullmap correlation values at atomic positions\n")
+    fid.write("mapCC = 2 x halfmapCC / (1 + halfmapCC) [Ref: J.Mol.Biol.,333(4) (2003)]\n")
+    fid.write("CC*   = SQRT(mapCC)                     [Ref: JSB, 214(1), (2022)]\n")
+    fid.write("\n")
     fid2 = open("EMDA_residue_cc.txt", "w")
+    fid2.write("*** Terms and definitions ***\n")
+    fid2.write("-----------------------------\n")
+    fid2.write("halfmapCC - Halfmap correlation  values at atomic positions\n")
+    fid2.write("mapCC     - Fullmap correlation values at atomic positions\n")
+    fid2.write("mapCC = 2 x halfmapCC / (1 + halfmapCC) [Ref: J.Mol.Biol.,333(4) (2003)]\n")
+    fid2.write("CC*   = SQRT(mapCC)                     [Ref: JSB, 214(1), (2022)]\n")
+    fid2.write("\n")
     if modelname.endswith((".pdb", ".ent")):
         iotools.pdb2mmcif(modelname)
         modelname = 'out.cif'
