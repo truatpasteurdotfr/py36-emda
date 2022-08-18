@@ -2,6 +2,93 @@ subroutine test()
   print*, 'fcodes test ... Passed'
 end subroutine test
 
+subroutine resolution_2dgrid(uc,mode,maxbin,nx,ny,nbin,res_arr,bin_idx)
+   implicit none
+   integer, intent(in) :: mode, maxbin,nx,ny
+   real, dimension(6),intent(in) :: uc
+   integer,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2),intent(out) :: bin_idx
+   real, dimension(0:maxbin-1),intent(out) :: res_arr
+   integer, intent(out) :: nbin
+   ! locals
+   integer, dimension(2) :: nxy
+   real       :: low_res,high_res,resol,tmp_val,tmp_min,val,start,finish
+   real       :: r(2),s1(2),step(2)
+   integer    :: i,j,n,xymin(2),xymax(2),hk(2),sloc,ibin,mnloc
+   logical    :: debug
+   !
+   debug         = .FALSE.
+   if(mode == 1) debug = .TRUE.
+   call cpu_time(start)
+ 
+   if(debug) print*, 'fcodes_fast...'
+   bin_idx = -100
+   n = 0
+   r = 0.0; s1 = 0.0
+   res_arr = 0.0
+   step = 0.0
+   mnloc = -100
+   xymin = 0; xymax = 0; hk = 0
+ 
+   nxy = (/ nx, ny /)
+ 
+   xymin(1) = int(-nxy(1)/2)
+   xymin(2) = int(-nxy(2)/2)
+   xymax    = -(xymin+1)
+   if(debug) print*, 'xymin = ', xymin
+   if(debug) print*, 'xymax = ', xymax(1), xymax(2), 0
+   if(debug) print*, 'unit cell = ', uc
+   call get_resol(uc,real(xymax(1)),0.0,0.0,r(1))
+   call get_resol(uc,0.0,real(xymax(2)),0.0,r(2))
+   print*,'a-max, b-max = ', r
+   !
+   sloc = minloc(r,1)
+   hk = 0
+   do i = 1, 2
+      if(sloc == i) hk(i) = sloc/sloc
+   end do
+   nbin = 0
+   do i = 2, xymax(sloc)-1
+      step = (i + 0.5) * hk
+      call get_resol(uc,step(1),step(2),0.0,resol)
+      print*, i,step(1),step(2),0.0,resol
+      res_arr(nbin) = resol
+      nbin = nbin + 1
+   end do
+   print*, 'nbin=', nbin
+   high_res = res_arr(nbin-1)
+   call get_resol(uc,0.0,0.0,0.0,low_res)
+ 
+   print*, 'Creating resolution grid. Please wait...'
+ 
+  ! Friedel's Law
+   do i=xymin(1), xymax(1)
+      do j=xymin(2), xymax(2)
+         call get_resol(uc,real(i),real(j),0.0,resol)
+         if(resol < high_res .or. resol > low_res) cycle
+         ! Find the matching bin to resol
+         do ibin = 0, nbin - 1
+            val = sqrt((res_arr(ibin) - resol)**2)
+            if(ibin == 0)then
+               tmp_val = val; tmp_min = val
+               mnloc = ibin 
+            else
+               tmp_val = val
+               if(tmp_val < tmp_min)then
+                  tmp_min = val
+                  mnloc = ibin
+               end if
+            end if
+         end do
+         bin_idx(i,j) = mnloc
+         if(j == xymin(2) .or. i == xymin(1)) cycle
+         bin_idx(-i,-j) = mnloc
+      end do
+   end do
+ 
+   call cpu_time(finish)
+   if(debug) print*, 'time for calculation(s) = ', finish-start
+ end subroutine resolution_2dgrid
+
 subroutine resolution_grid(uc,mode,maxbin,nx,ny,nz,nbin,res_arr,bin_idx,s_grid)
   implicit none
   real*8, parameter :: PI = 3.141592653589793
@@ -3660,8 +3747,13 @@ end do
 ! Estimate scale_d in resolution bins
 do ibin=0, nbin-1
    d_tmp = FoFc_sum(ibin) / FcFc_sum(ibin)
-   if(d_tmp < 0.0) make_all_zero = .TRUE.
-   if(make_all_zero)then
+   !if(d_tmp < 0.0) make_all_zero = .TRUE.
+   !if(make_all_zero)then
+   !   scale_d(ibin) = 0.0
+   !else
+   !   scale_d(ibin) = d_tmp
+   !end if
+   if(d_tmp <= 0.0)then
       scale_d(ibin) = 0.0
    else
       scale_d(ibin) = d_tmp
@@ -3836,6 +3928,117 @@ do l = zmin, zmax
 end do
 return
 end subroutine tricubic_zoom
+
+
+subroutine tricubic_zoom2(scale,F,FRS,mode,nx,ny,nz)
+   implicit none
+   real,intent(in) :: scale
+   integer,intent(in):: nx,ny,nz,mode
+   complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(in):: F
+   complex*16,dimension(-nx/2:(nx-2)/2,-ny/2:(ny-2)/2,-nz/2:(nz-2)/2),intent(out):: FRS
+   integer :: x1(3,-1:2)
+   real*8 :: x(3),xd(3),s(3)
+   real*8 :: ul,ul2
+   real*8 :: vl(4)
+   !real :: high_res,resol
+   integer :: i,j,h,k,l,nmin,ncopies
+   logical :: debug
+   integer :: nxyz(3),nxyzmn(3),nxyzmx(3)
+   integer :: xmin,xmax,ymin,ymax,zmin,zmax,ic
+   complex*16 :: fl(-1:2,-1:2,-1:2),esz(-1:2,-1:2),esyz(-1:2)
+   complex*16 :: esxyz
+   !
+   FRS = dcmplx(0.0d0, 0.0d0)
+   x = 0.0d0
+   xd = 0.0d0
+   fl = dcmplx(0.0d0, 0.0d0)
+   esz = dcmplx(0.0d0, 0.0d0)
+   esyz = dcmplx(0.0d0, 0.0d0)
+   esxyz = dcmplx(0.0d0, 0.0d0)
+   
+   debug = .FALSE.
+   if(mode == 1) debug = .TRUE.
+   !   Body
+   nxyz(1) = nx; nxyz(2) = ny; nxyz(3) =nz
+   nxyzmn(1) = -nx/2; nxyzmn(2) = -ny/2; nxyzmn(3) = -nz/2
+   nxyzmx(1) = (nx-2)/2; nxyzmx(2) = (ny-2)/2; nxyzmx(3) = (nz-2)/2
+   nmin = min(nx,ny,nz)
+   
+   xmin = int(-nx/2); xmax = -(xmin+1)
+   ymin = int(-ny/2); ymax = -(ymin+1)
+   zmin = int(-nz/2); zmax = -(zmin+1)
+   
+   if(debug) write(*,*) nxyz,nxyzmn,nxyzmx
+   
+   do l = zmin, zmax
+      do k = ymin, ymax
+         do h = xmin, 0!xmax
+            s(1) = h
+            s(2) = k
+            s(3) = l
+            !x = matmul(transpose(RM),s)
+            x = scale * s
+            do i = 1, 3
+               x1(i,0) = floor(x(i))
+               xd(i) = x(i) - real(x1(i,0))
+               if(abs(xd(i)).gt.1.0) then
+                  print*, 'Something is wrong ',xd(i)
+                  stop
+               endif
+               x1(i,1)  = x1(i,0) + 1
+               x1(i,2)  = x1(i,0) + 2
+               x1(i,-1) = x1(i,0) - 1
+            end do
+            !
+            !  Careful here: we may get to the outside of the array
+            do i = 1,3
+               do j= -1,2
+                  x1(i,j) = min(nxyzmx(i),max(nxyzmn(i),x1(i,j)))
+               enddo
+            enddo
+            fl(-1:2,-1:2,-1:2) = F(x1(1,-1:2),x1(2,-1:2),x1(3,-1:2))
+   
+            !
+            !  Alternattive implementation
+            !  along z
+            ul = xd(3)
+            ul2 = ul*ul
+            vl(1) = ul*((2.0d0-ul)*ul-1.0d0)
+            vl(2) = ul2*(3.0d0*ul-5.0d0)+2.0d0
+            vl(3) = ul*((4.0d0-3.0d0*ul)*ul+1.0d0)
+            vl(4) = ul2*(ul-1.0d0)
+            vl = 0.5d0*vl
+            do j=-1,2
+               do i=-1,2
+                  esz(i,j) = dot_product(vl,fl(i,j,-1:2))
+               enddo
+            enddo
+            ul = xd(2)
+            ul2 = ul*ul
+            vl(1) = ul*((2.0d0-ul)*ul-1.0d0)
+            vl(2) = ul2*(3.0d0*ul-5.0d0)+2.0d0
+            vl(3) = ul*((4.0d0-3.0d0*ul)*ul+1.0d0)
+            vl(4) = ul2*(ul-1.0d0)
+            vl = 0.5d0*vl
+            do i=-1,2
+               esyz(i) = dot_product(vl,esz(i,-1:2))
+            enddo
+            ul = xd(1)
+            ul2 = ul*ul
+            vl(1) = ul*((2.0d0-ul)*ul-1.0d0)
+            vl(2) = ul2*(3.0d0*ul-5.0d0)+2.0d0
+            vl(3) = ul*((4.0d0-3.0d0*ul)*ul+1.0d0)
+            vl(4) = ul2*(ul-1.0d0)
+            vl = 0.5d0*vl
+            esxyz =  dot_product(vl,esyz(-1:2))
+            FRS(h,k,l) = esxyz
+            if((h == xmin).or.(k == ymin).or.(l == zmin)) cycle
+            FRS(-h,-k,-l) = conjg(esxyz)
+         end do
+      end do
+   end do
+   return
+   end subroutine tricubic_zoom2
 
 subroutine ll_derivatives(Fo,Fc,bin_idx,D,totalvar,mode,nbin,nx,ny,nz,dll,ddll)
 implicit none
