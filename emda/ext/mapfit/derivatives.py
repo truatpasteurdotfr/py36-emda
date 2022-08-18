@@ -159,3 +159,59 @@ def axis_derivatives(e0, e1, w_grid, w2_grid, q, sv, xyz, xyz_sum, vol, dfrs=Non
     step = ddf_val_inv.dot(-df_val)
     return step, step_axis
 
+
+def get_ddfs(mapin, xyz, vol):
+    # Calculating ddFC/dsds using FFT - 2nd derivative
+    nx, ny, nz = mapin.shape
+    ddfs = np.zeros(shape=(nx,ny,nz,3,3),dtype='complex')
+    tp2 = ((2.0 * np.pi)**2) #/ vol
+    #tp2 = ((2.0 * np.pi)**2) / vol
+    for i in range(3):  
+        for j in range(3):
+            if i == 0:
+                ddfs[:,:,:,j,i] = -tp2 * np.fft.fftshift(np.fft.fftn(mapin * xyz[i] * xyz[j]))
+                #ddfs[:,:,:,j,i] = -tp2 * np.fft.fftshift(np.fft.fftn(mapin * xyz[:,:,:,i] * xyz[:,:,:,j]))
+                if j > i:
+                    ddfs[:,:,:,i,j] = ddfs[:,:,:,j,i]
+            elif i > 0 and j >= i:
+                ddfs[:,:,:,j,i] = -tp2 * np.fft.fftshift(np.fft.fftn(mapin * xyz[i] * xyz[j]))
+                #ddfs[:,:,:,j,i] = -tp2 * np.fft.fftshift(np.fft.fftn(mapin * xyz[:,:,:,i] * xyz[:,:,:,j]))
+                if j > i:
+                    ddfs[:,:,:,i,j] = ddfs[:,:,:,j,i]
+            else:
+                continue
+    return ddfs
+
+
+def rotation2nd_derivative(e0, e1, wgrid, sv, q, xyz, vol):
+    from emda.core.quaternions import derivatives_wrt_q
+
+    # this function calculates the exact 2nd derivative
+    nx, ny, nz = e0.shape
+    #vol = nx * ny * nz
+    ddfrs = get_ddfs(np.real(np.fft.ifftn(np.fft.ifftshift(e1))), xyz, vol)
+    dRdq = derivatives_wrt_q(q)
+    ddf = np.zeros((3, 3), dtype="float")
+    for i in range(3):
+        for j in range(3):
+            if i == 0 or (i > 0 and j >= i):
+                b = np.zeros((3, 3), dtype="float")
+                for k in range(3):
+                    for l in range(3):
+                        if k == 0 or (k > 0 and l >= k):
+                            b[k, l] = (
+                                np.sum(
+                                    wgrid * np.real(np.conjugate(e0) 
+                                    * (ddfrs[:,:,:,k,l]
+                                    * sv[k, :, :, :]
+                                    * sv[l, :, :, :]
+                                    * dRdq[i, k, l]
+                                    * dRdq[j, k, l]))
+                                )
+                            )
+                        else:
+                            b[k, l] = b[l, k]
+                ddf[i, j] = np.sum(b)
+            else:
+                ddf[i, j] = ddf[j, i]
+    return ddf
