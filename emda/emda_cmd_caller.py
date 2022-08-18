@@ -258,6 +258,8 @@ realspc.add_argument("--mdl", required=False, help="Input model (cif/pdb)")
 realspc.add_argument("--res", required=False,
                      type=float, help="Resolution (A)")
 realspc.add_argument("--msk", required=False, help="input mask (mrc/map)")
+realspc.add_argument("--bfc", required=False, default=None, 
+                     type=str, help="bfactor to apply on map. default is none")
 realspc.add_argument("--nrm", action="store_true",
                      help="if True use normalized maps")
 realspc.add_argument(
@@ -1016,6 +1018,7 @@ def realsp_corr(args):
         half1map=args.h1,
         half2map=args.h2,
         kernel_size=args.knl,
+        bfactor=args.bfc,
         norm=args.nrm,
         model=args.mdl,
         model_resol=args.res,
