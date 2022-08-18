@@ -12,6 +12,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import numpy as np
 from emda import core
 import emda.emda_methods as em
+import fcodes_fast
 
 class RealspaceLocalCC:
     def __init__(self):
@@ -19,6 +20,7 @@ class RealspaceLocalCC:
         self.hfmap2name = None
         self.maskname = None
         self.uc = None
+        self.bfac = None
         self.origin = None
         self.kern_rad = 5
         self.norm=False
@@ -71,16 +73,13 @@ class RealspaceLocalCC:
     def rcc(self):
         self.check_inputs()
         model = self.model
-        print(
-            "Calculating 3D correlation using half maps. \
-             Please wait..."
-        )
+        print("Calculating 3D correlation. Please wait...")
         uc, arr1, origin = core.iotools.read_map(self.hfmap1name)
         uc, arr2, origin = core.iotools.read_map(self.hfmap2name)
         self.uc, self.origin = uc, origin
         if self.maskname is not None:
             _, cc_mask, _ = core.iotools.read_map(self.maskname)
-            cc_mask_binary = cc_mask > 0.5 # binary mask
+            cc_mask_binary = cc_mask > 0.01 # binary mask
         else:
             cc_mask = 1
             cc_mask_binary = 1
@@ -93,6 +92,8 @@ class RealspaceLocalCC:
             hf1, hf2 = np.fft.fftshift(f_hf1), np.fft.fftshift(f_hf2)
             print("Normalising maps...")
             nm = NormalizedMaps(hf1=hf1, hf2=hf2, cell=uc)
+            if self.bfac is not None:
+                nm.bfac = float(self.bfac)
             nm.get_normdata()
             nbin, bin_idx = nm.nbin, nm.bin_idx
             normfull = nm.normfull
@@ -147,7 +148,9 @@ class RealspaceLocalCC:
                                 modelmap=model_arr, 
                                 fsc_grid_str=nm.fsc_grid_str, 
                                 bin_idx=bin_idx, 
-                                nbin=nbin
+                                nbin=nbin,
+                                bfac=self.bfac,
+                                uc=uc
                             )
                 em.write_mrc(normmodel, "bin_normalized_modelmap.mrc", uc, origin)
                 print("Calculating model-map correlation...\n")
@@ -175,6 +178,16 @@ class RealspaceLocalCC:
                 rcc_mapmodel=mapmodelcc, 
                 modelname=model)
 
+def apply_bfac(f, bv, uc):
+    nx, ny, nz = f.shape
+    bf_arr = [bv]
+    nbf = len(bf_arr)
+    all_mapout = fcodes_fast.apply_bfactor_to_map(
+        f, bf_arr, uc, 0, nx, ny, nz, nbf
+        )
+    f_bv = all_mapout[:, :, :, 0]
+    return f_bv
+
 
 def get_3d_realspcorrelation(half1, half2, kern, mask=None):
     import scipy.signal
@@ -194,7 +207,7 @@ def get_3d_realspcorrelation(half1, half2, kern, mask=None):
     reg_a = np.max(var3_A) / 1000
     reg_b = np.max(var3_B) / 1000
     var3_A = np.where(var3_A < reg_a, reg_a, var3_A)
-    var3_B = np.where(var3_B < reg_b, reg_b, var3_B)
+    var3_B = np.where(var3_B < reg_b, reg_b, var3_B) 
     halfmaps_cc = cov3_AB / np.sqrt(var3_A * var3_B) 
     return halfmaps_cc
 
@@ -457,7 +470,7 @@ def normalized(map, bin_idx=None, nbin=None, uc=None):
     norm_map = np.real(np.fft.ifftn(np.fft.ifftshift(e1))) # not mulpiplying by fsc becoz no noise in the model
     return norm_map """
 
-def normalized_modelmap(modelmap, fsc_grid_str, bin_idx=None, nbin=None, uc=None):
+def normalized_modelmap(modelmap, fsc_grid_str, bin_idx=None, nbin=None, uc=None, bfac=None):
     import fcodes_fast as fc
 
     # normalise in resol bins
@@ -467,7 +480,10 @@ def normalized_modelmap(modelmap, fsc_grid_str, bin_idx=None, nbin=None, uc=None
     f1 = np.fft.fftshift(np.fft.fftn(modelmap))
     nx, ny, nz = f1.shape
     eo = fc.get_normalized_sf(f1, f1, bin_idx, nbin, 0, nx, ny, nz)[0]
-    norm_map = np.real(np.fft.ifftn(np.fft.ifftshift(fsc_grid_str * eo[:, :, :, 0])))
+    e1 = eo[:, :, :, 0]
+    if bfac is not None:
+        e1 = apply_bfac(f=e1, bv=bfac, uc=uc)
+    norm_map = np.real(np.fft.ifftn(np.fft.ifftshift(fsc_grid_str * e1)))
     return norm_map
 
 
@@ -488,6 +504,7 @@ class NormalizedMaps:
         self.e0 = None
         self.e1 = None
         self.e2 = None
+        self.bfac = None
         self.normmap1 = None
         self.normmap2 = None
         self.normfull = None
@@ -526,6 +543,11 @@ class NormalizedMaps:
         fsc_full_grid = fc.read_into_grid(self.bin_idx, fsc_ful, self.nbin, nx, ny, nz)
         fsc_grid_str = np.sqrt(fsc_full_grid)
         self.fsc_grid_str = fsc_grid_str
+        if self.bfac is not None:
+            self.e0 = apply_bfac(f=self.e0, bv=float(self.bfac), uc=self.cell)
+            self.e1 = apply_bfac(f=self.e1, bv=float(self.bfac), uc=self.cell)
+            self.e2 = apply_bfac(f=self.e2, bv=float(self.bfac), uc=self.cell)
+        # apply bfactor
         self.normmap1 = np.real(np.fft.ifftn(np.fft.ifftshift(self.e1 * fsc_grid_str)))
         self.normmap2 = np.real(np.fft.ifftn(np.fft.ifftshift(self.e2 * fsc_grid_str)))
         self.normfull = np.real(np.fft.ifftn(np.fft.ifftshift(self.e0 * fsc_grid_str)))
