@@ -25,24 +25,24 @@ def bestmap_1dfsc(f1, f2, bin_idx, nbin, res_arr=None, B=None):
     import pandas
 
     cx, cy, cz = f1.shape
-    fsc, var_n, var_s, vat_t, _, eo = fsc.halfmaps_fsc_variance(f1, f2, bin_idx, nbin)
+    binfsc, var_n, var_s, vat_t, _, eo = fsc.halfmaps_fsc_variance(f1, f2, bin_idx, nbin)
     if res_arr is not None:
-        data = np.column_stack((res_arr, var_n, var_s, fsc))
+        data = np.column_stack((res_arr, var_n, var_s, binfsc))
     else:
         idx_arr = np.arange(nbin, dtype='int')
-        data = np.column_stack((idx_arr, var_n, var_s, fsc))
+        data = np.column_stack((idx_arr, var_n, var_s, binfsc))
     columns = ['resol/indx', 'var_n', 'var_s', 'FSC_half']
     df = pandas.DataFrame(data=data, columns=columns)
     iotools.output_to_table(df)
-    fsc = 2 * fsc / (1 + fsc)
+    binfsc = 2 * binfsc / (1 + binfsc)
 
     if B is None:
-        fsc_grid = fcodes_fast.read_into_grid(bin_idx, fsc, nbin, cx, cy, cz)
+        fsc_grid = fcodes_fast.read_into_grid(bin_idx, binfsc, nbin, cx, cy, cz)
         fsc_grid_filtered = np.where(fsc_grid < 0.0, 0.0, fsc_grid)
         return np.sqrt(fsc_grid_filtered) * eo
     else:
         k2 = np.exp(-B/res_arr**2/2)
-        fac = np.sqrt(k2)*np.sqrt(np.where(fsc<0, 0, fsc))/(1+(k2-1)*fsc)
+        fac = np.sqrt(k2)*np.sqrt(np.where(binfsc<0, 0, binfsc))/(1+(k2-1)*binfsc)
         fac_grid = fcodes_fast.read_into_grid(bin_idx, fac, nbin, cx, cy, cz)
         return fac_grid * eo 
 
