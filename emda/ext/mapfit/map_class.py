@@ -834,8 +834,9 @@ class EmmapAverage:
                         "Mask file: %s\n" % os.path.abspath(self.mask_list[i // 2])
                     )
                     fobj.write("Resampling mask...\n")
+                    curnt_pix_size = [uc[i]/shape for i, shape in enumerate(mask.shape)]
                     mask = core.iotools.resample2staticmap(
-                        target_pix_size, target_dim, uc, mask, fobj=fobj
+                        curnt_pix=curnt_pix_size, targt_pix=target_pix_size, targt_dim=target_dim, arr=mask
                     )
                     fobj.write("Input files (moving map):\n")
                     fobj.write("%s\n" % os.path.abspath(self.hfmap_list[i]))
@@ -848,8 +849,11 @@ class EmmapAverage:
                         )
                     for arr in [arr1, arr2]:
                         fobj.write("Resampling halfmaps...\n")
-                        arr = core.iotools.resample2staticmap(
+                        """ arr = core.iotools.resample2staticmap(
                             target_pix_size, target_dim, uc, arr, fobj=fobj
+                        ) """
+                        arr = core.iotools.resample2staticmap(
+                            curnt_pix=curnt_pix_size, targt_pix=target_pix_size, targt_dim=target_dim, arr=arr
                         )
                         assert mask.shape == arr.shape
                         arr_mask = arr * mask
@@ -888,7 +892,37 @@ class EmmapAverage:
 
         if self.mask_list is None:
             print("Yet to implement")
-            exit()
+            #exit()
+            print('Masks are not used in the calculation!')
+            for i in range(0,len(self.hfmap_list),2):
+                uc,arr1,origin = core.iotools.read_map(self.hfmap_list[i])
+                uc,arr2,origin = core.iotools.read_map(self.hfmap_list[i+1])
+                if i == 0:
+                    map_origin = origin
+                    uc_target = uc
+                    target_dim = arr1.shape
+                    target_pix_size = [uc[i]/shape for i, shape in enumerate(arr1.shape)]
+                    corner_mask = utils.remove_unwanted_corners(uc, target_dim)
+                    nz, ny, nx = arr1.shape
+                    maxbin = np.amax(np.array([nx//2,ny//2,nz//2]))
+                    resol_grid, self.s_grid, _ = fcodes_fast.resolution_grid_full(uc,0.0,1,maxbin,nx,ny,nz)
+                    for arr in [arr1, arr2]:
+                        fhf_lst.append(fftshift(fftn(fftshift(arr * corner_mask)))) 
+                else:
+                    for arr in [arr1, arr2]:
+                        fobj.write("Resampling halfmaps...\n")
+                        curnt_pix_size = [uc[i]/shape for i, shape in enumerate(arr.shape)]
+                        arr = core.iotools.resample2staticmap(
+                            curnt_pix=curnt_pix_size, targt_pix=target_pix_size, targt_dim=target_dim, arr=arr
+                        )
+                        fhf_lst.append(fftshift(fftn(fftshift(arr * corner_mask))))                                                       
+            self.map_origin     = map_origin
+            self.map_unit_cell  = uc_target
+            self.map_dim        = target_dim 
+            self.fhf_lst        = fhf_lst 
+            self.unmask_fhf_lst = fhf_lst 
+            self.phrand_fhf_lst = phrand_fhf_lst
+
         """if self.mask_list is None: 
             print('Correlation based masks will be generated and used for fitting!')
             from emda import maskmap_class
