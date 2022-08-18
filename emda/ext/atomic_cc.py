@@ -47,7 +47,11 @@ def get_chains(modelname, xyz_cc_map, xyz_cc_mapmodel, fid, fid2):
                 atm_counter += 1
                 j += 1
                 mapCC = xyz_cc_map[atm_counter]
-                CC_str = math.sqrt(mapCC)
+                if mapCC < 0.:
+                    print('mapCC: ', mapCC)
+                    CC_str = 0.
+                else:
+                    CC_str = math.sqrt(mapCC)
                 mapmodelCC = xyz_cc_mapmodel[atm_counter]
                 mapavgcc += mapCC #xyz_cc_map[atm_counter]
                 mapmodelavgcc += mapmodelCC #xyz_cc_mapmodel[atm_counter]
@@ -265,9 +269,9 @@ def plot_ncc(
         ax1.set_ylim([-0.1, 1.2])
         ax1.title.set_text("Chain " + chainids[i])
         ax1.grid(True, color='grey', linestyle='dotted', linewidth=1)
-        ax1.legend((line1, line2, ), ('Halfmap', 'Map-model'), loc='center left', bbox_to_anchor=(1, 0.5))
+        ax1.legend((line1, line2, ), ('Fullmap', 'Map-model'), loc='center left', bbox_to_anchor=(1, 0.5))
         textstr = '\n'.join(('Average CC:',
-                            'Halfmap = %.2f' % (avg_mapcc, ),
+                            'Fullmap = %.2f' % (avg_mapcc, ),
                             'Map-model = %.2f' % (avg_mapmodelcc, )))
         ax1.text(minnum, 0.0, textstr, bbox=dict(facecolor='green', alpha=0.2))
         custom_lines = [Line2D([0], [0], color='red', alpha=0.5, lw=4),
