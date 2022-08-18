@@ -672,6 +672,8 @@ magref.add_argument("--msk",
                     nargs="+",
                     type=str,
                     help="list of masks to apply on maps[.mrc/.map]")
+magref.add_argument("--fit",action="store_true", 
+                    help="if used the fit will be optimized")
 
 centerofmass = subparsers.add_parser("com", description="center of mass")
 centerofmass.add_argument("--map", 
@@ -1291,7 +1293,8 @@ def magnification(args):
     em.mapmagnification(maplist=args.map, 
                         rmap=args.ref, 
                         masklist=args.msk, 
-                        resol=args.res)
+                        resol=args.res,
+                        fit_optimize=args.fit)
 
 
 def center_of_mass(args):
