@@ -1269,6 +1269,7 @@ def realsp_correlation(
     half2map,
     kernel_size=5,
     norm=False,
+    bfactor=None,
     model=None,
     model_resol=None,
     mask_map=None,
@@ -1287,6 +1288,7 @@ def realsp_correlation(
             norm: bool, optional
                 If True, correlation will be carried out on normalized maps.
                 Default is False.
+            bfactor: overall bfactor to apply on the map. default is None
             model: string, optional
                 An argument for model based map calculation using REFMAC.
                 Name of model file (cif/pdb). If present, map-model local
@@ -1319,6 +1321,7 @@ def realsp_correlation(
     rcc.hfmap1name = half1map
     rcc.hfmap2name = half2map
     rcc.kern_rad = kernel_size
+    rcc.bfac = bfactor
     rcc.model = model
     rcc.model_resol = model_resol
     rcc.maskname = mask_map
@@ -1628,10 +1631,10 @@ def bestmap(hf1name, hf2name, outfile, mode=1, knl=5, mask=None, B=None):
         _, msk, _ = read_map(mask)
     uc, arr1, origin = iotools.read_map(hf1name)
     uc, arr2, origin = iotools.read_map(hf2name)
-    if mask:
-        print("mask is not included in FSC calculation")
-    f1 = np.fft.fftshift(np.fft.fftn(arr1))  # * msk))
-    f2 = np.fft.fftshift(np.fft.fftn(arr2))  # * msk))
+    #if mask:
+    #    print("mask is not included in FSC calculation")
+    f1 = np.fft.fftshift(np.fft.fftn(arr1 * msk))
+    f2 = np.fft.fftshift(np.fft.fftn(arr2 * msk))
     if mode == 1:
         nbin, res_arr, bin_idx = restools.get_resolution_array(uc, f1)
         f_map = bestmap.bestmap(
@@ -2037,7 +2040,7 @@ def compositemap(maps, masks):
     composite.main(mapslist=maps, masklist=masks)
 
 
-def mapmagnification(maplist, rmap, resol=4.0, masklist=None):
+def mapmagnification(maplist, rmap, resol=4.0, fit_optimize=True, masklist=None):
     """Refine magnification of a set of maps relative to a reference map
 
     This method refines the magnification of a set of maps relative to
@@ -2047,13 +2050,15 @@ def mapmagnification(maplist, rmap, resol=4.0, masklist=None):
         maplist (string): List of maps whose magnifications are to be refined
         rmap (string): Name of the reference map
         masklist (string, optional): List of mask maps to apply on the maps.
+            reference mask shoulbe given first in the list.
         resol (float, optional): Data resolution to use in the magnification refinement.
                        This cutoff is used for all maps. Default to 4 A.
+        fit_optimize (bool, optional): if True the fit will be optimized. dafault to True
     """
     from emda.ext import magnification
 
     maplist.insert(0, rmap)
-    magnification.main(maplist=maplist, masklist=masklist, resol=resol)
+    magnification.main(maplist=maplist, masklist=masklist, resol=resol, fit_optimize=fit_optimize)
 
 
 def set_dim_even(x):
