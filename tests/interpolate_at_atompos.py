@@ -1,11 +1,11 @@
-# Test code to get atomic correlation values by interpolation
-# To use as a tool for local correlation example 2 in the tutorial
-# 13.08.2021
+# EMDA testcode to get atomic correlation values by interpolation
+# Author: Rangana Warshamange [ranganaw@mrc-lmb.cam.ac.uk]
+# v1 - 13.08.2021; v2 - 29.08.2022
 
-import sys
 import numpy as np
 import gemmi
 import emda.emda_methods as em
+import argparse
 
 
 def interpolate_cc(data):
@@ -17,87 +17,95 @@ def interpolate_cc(data):
     return RegularGridInterpolator(
         (linx, liny, linz), data, method="nearest")
 
-    
-def get_chains(modelname, cc_interpolator, pixsize):
+def get_chains(modelname, ligand_id, pixsize):
     st = gemmi.read_structure(modelname)
-    atomic_cc_list = []
-    atom_name_list = []
-    bval_list = []
+    ligdic = {}
     for chain in st[0]:
         for residue in chain:
             for atom in residue:
-                if chain.name == 'C' and residue.name == 'EIC':
+                if chain.name == 'A' and residue.name == ligand_id:
                     x = float(atom.pos.x) / pixsize
                     y = float(atom.pos.y) / pixsize
                     z = float(atom.pos.z) / pixsize
-                    bval_list.append(float(atom.b_iso))
-                    atomic_cc = cc_interpolator((z, y, x))
-                    atomic_cc_list.append(atomic_cc)
-                    atom_name_list.append(atom.name)
-                    print(chain.name, residue.seqid.num, residue.name, atom.name, atomic_cc)
-    return atomic_cc_list, atom_name_list, bval_list
+                    ligdic[atom.name] = [x, y, z]
+    return ligdic
 
-
-def plot_cc(cclist, atom_name_list, biso_list):
-    import numpy as np
+def plot_all(cc_list, lbls, ligand):
     import matplotlib
     matplotlib.use(matplotlib.get_backend())
     from matplotlib import pyplot as plt
-    from collections import deque
-    from matplotlib.ticker import FormatStrFormatter
-
     fig = plt.figure(figsize=(8, 4))
     ax1 = fig.add_subplot(111)
-
-    map_cc = np.roll(np.asarray(cclist[0], dtype='float'), 2)
-    mapmodel_cc = np.roll(np.asarray(cclist[1], dtype='float'), 2)
-    atomic_biso = np.roll(np.asarray(biso_list, dtype='float'), 2)
-    atom_name_list_np = np.roll(np.asarray(atom_name_list), 2)
-    items = deque(atom_name_list)
-    cref = np.sqrt(map_cc)
-    ax1.plot(mapmodel_cc, label='$CC_{map,model}$', marker='o', color='orange')
-    ax1.plot(cref, label='$\sqrt{CC_{full}}$', marker='o', color='blue')
-
-    ax2 = ax1.twinx()
-    ax2.plot(atomic_biso, label="atomic Bs", marker='o', color='grey', alpha=0.5)
-    
-    x = np.arange(len(atom_name_list))
-    y = np.array([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0], dtype='float')
-    yvals = np.array(["0.0", " ", "0.2", " ", "0.4", " ", "0.6", " ", "0.8", " ", "1.0"])
-    print(items.rotate(2))
-    plt.xticks(x, atom_name_list_np)
+    color_list = ['blue', 'green', 'red', 'orange', 'purple', 'yellow', 'magenta']
+    lbls = ['CC_wt-mel', 'CC_wt-pent', 'CC_mel-pent']
+    for cc, lbl, col in zip(cc_list, lbls, color_list):
+        ax1.plot(cc, marker='o', color=col, label=lbl)
+    x_ticks = np.arange(0, len(cc)+1, 5)
+    xminor_ticks = np.arange(0, len(cc)+1, 1)
+    y_ticks = np.arange(0, 1.1, 0.1)
+    ax1.set_xticks(x_ticks)
+    ax1.set_xticks(xminor_ticks, minor=True)
+    ax1.set_yticks(y_ticks)
+    ax1.grid(which='both')
+    ax1.grid(which='minor', alpha=0.2)
+    ax1.grid(which='major', alpha=0.5)
     ax1.set_xlabel("Atom label", fontweight='bold')
     ax1.set_ylabel("Correlation", fontweight='bold')
-    ax1.set(yticks=y, yticklabels=yvals)
-    ax1.spines['top'].set_visible(False)
-    ax1.spines['right'].set_visible(False)
-    ax1.legend(loc=3)
-    ax1.grid(True, alpha=0.3, linestyle='--')
-    # properties of ax2
-    ax2.set_ylabel("Atomic B values", fontweight='bold')
-    ax2.legend(loc=7)
-    #
-    plt.title("Atomic correlation values of linoleic acid", fontweight='bold')
-    plt.savefig("atomic_cc.png", format="png", dpi=300)
+    plt.legend()
+    plt.title('Atomic CC of ligand %s' %ligand)
+    plotname = "atomic_cc_%s.png" %ligand
+    plt.savefig(plotname, format="png", dpi=300)
     plt.show()
+
+def vec2string(vec):
+    return " ".join(("% .3f"%x for x in vec))
+
+def list2string(lis):
+    return " ".join(("%s"%x for x in lis))
+
 
 
 if __name__=="__main__":
-    map_rcc, mapmodel_rcc, modelname = sys.argv[1:]
+    parser = argparse.ArgumentParser(description='Atomic CC values')
+    parser.add_argument('--maplist', metavar='', required=True, type=str, nargs='+',
+                        help='list of maps for')
+    parser.add_argument('--labels', metavar='', required=False, type=str, nargs='+',
+                        help='list of labels for data')
+    parser.add_argument('--model', metavar='', required=True, type=str,
+                        help='model name pdb/cif')
+    parser.add_argument('--ligand', metavar='', required=True, type=str,
+                        help='ligand-id')  
+    args = parser.parse_args() 
 
-    rcc_map_list = [map_rcc, mapmodel_rcc]
-    # read the correlation maps
     cc_list = []
-    for i, imapcc in enumerate(rcc_map_list):
-        print(imapcc)
-        uc, rcc, orig = em.get_data(imapcc)
-        pixsize = uc[0] / rcc.shape[0]
-        cc_interpolator = interpolate_cc(data=rcc)
+    for i, imap in enumerate(args.maplist):
+        temp = []
+        uc, ccarr, orig = em.get_data(imap)
         if i == 0:
-            cc, atom_name_list, biso_list = get_chains(modelname, cc_interpolator, pixsize)
-            cc_list.append(cc)
-        else:
-            cc_list.append(get_chains(modelname, cc_interpolator, pixsize)[0])
+            cell = uc
+            pixsize = cell[0] / ccarr.shape[0]
+            ligdic = get_chains(modelname=args.model, 
+                                ligand_id=args.ligand, pixsize=pixsize)
+        cc_interpolator = interpolate_cc(data=ccarr)
+        for item in ligdic.items():
+            temp.append(cc_interpolator(tuple(reversed(item[1]))))
+        cc_list.append(temp)
 
-    # plot various cc values
-    plot_cc(cc_list, atom_name_list, biso_list)
+    if args.labels is None :
+        labels = ['ccmap_%i'%i for i in range(len(args.maplist))]
+    else:
+        labels = args.labels
+    filename = '%s-emda_ligandCC.txt'%args.ligand
+    fid = open(filename, "w")
+    print("\n**** Atomic CC values for Ligand %s ****\n" % args.ligand)
+    print('Atm#  AtmID ', list2string(labels))
+    fid.write("**** Atomic CC values for Ligand %s ****\n" % args.ligand)
+    fid.write('Atm#  AtmID  %s\n' %list2string(labels))
+    for i, item in enumerate(ligdic.items()):
+        print(
+            "%i  %s  %s" %(i, item[0], vec2string([cc_list[j][i] for j in range(len(cc_list))]))
+        )
+        fid.write(
+            "%i  %s  %s\n" %(i, item[0], vec2string([cc_list[j][i] for j in range(len(cc_list))]))
+        )
+    plot_all(cc_list, labels, args.ligand)
