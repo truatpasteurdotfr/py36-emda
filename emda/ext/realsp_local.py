@@ -13,6 +13,7 @@ import numpy as np
 from emda import core
 import emda.emda_methods as em
 import fcodes_fast
+import traceback
 
 class RealspaceLocalCC:
     def __init__(self):
@@ -361,8 +362,7 @@ def mapmodel_rcc(
 ):
     try:
         print(
-            "Calculating 3D correlation between map and model. \
-            Please wait..."
+            "Calculating 3D correlation between map and model. Please wait..."
         )
         uc, arr1, origin = core.iotools.read_map(fullmap)
         nx, ny, nz = arr1.shape
@@ -429,6 +429,7 @@ def mapmodel_rcc(
         print("Map-model correlation calculated! Maps were written!")
     except:
         print('Input error!')
+        print(traceback.format_exc())
 
 
 def normalized(map, bin_idx=None, nbin=None, uc=None):
