@@ -196,9 +196,9 @@ def fetch_all_data(emdid):
         writename_list.append("emd_%s_mask.map" % (emdid))
     if half1id is not None:
         readname_list.append("EMD-%s/other/%s" % (emdid, half1id))
-        writename_list.append("emd_%s_half1.map" % (emdid))
+        writename_list.append("emd_%s_half_map_1.map" % (emdid))
         readname_list.append("EMD-%s/other/%s" % (emdid, half2id))
-        writename_list.append("emd_%s_half2.map" % (emdid))
+        writename_list.append("emd_%s_half_map_2.map" % (emdid))
 
     ftplink = (
         "ftp://ftp.ebi.ac.uk/pub/databases/emdb/structures/"
