@@ -224,7 +224,7 @@ resample_d.add_argument(
     required=True,
     #default=None,
     nargs="+",
-    type=np.int,
+    type=int,
     help="target map dimensions. e.g. 100 100 100 ",
 )
 resample_d.add_argument(
@@ -603,7 +603,7 @@ model2map.add_argument("--mdl", required=True, help="input atomic model")
 model2map.add_argument("--res", required=True,
                        type=float, help="Resolution (A)")
 model2map.add_argument("--dim", required=True, nargs="+",
-                       type=np.int, help="map dim ")
+                       type=int, help="map dim ")
 model2map.add_argument(
     "--cel", required=True, nargs="+", type=np.float, help="cell parameters "
 )
