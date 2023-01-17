@@ -59,7 +59,7 @@ def plot_nlines_log(
             ax1.plot(bin_arr, np.log10(data), label=label, linewidth=2)
         else:
             ax1.plot(bin_arr, np.log10(data), label=curve_label[icurve], linewidth=2)
-    pos = np.array(ax1.get_xticks(), dtype=np.int)
+    pos = np.array(ax1.get_xticks(), dtype=int)
     n_bins = res_arr.shape[0]
     pos[pos < 0] = 0
     pos[pos >= n_bins] = n_bins - 1
@@ -85,7 +85,7 @@ def plot_line(mapname, res_arr, arr):
     xmin = np.min(bin_arr)
     xmax = np.max(bin_arr)
     # plt.plot((xmin, xmax), (0.143, 0.143), 'k--')
-    pos = np.array(ax1.get_xticks(), dtype=np.int)
+    pos = np.array(ax1.get_xticks(), dtype=int)
     n_bins = res_arr.shape[0]
     pos[pos < 0] = 0
     pos[pos >= n_bins] = n_bins - 1
@@ -122,7 +122,7 @@ def plot_nlines(
         (xmin, xmax), (float(fscline), float(fscline)), color="gray", linestyle=":"
     )
     plt.plot((xmin, xmax), (0.0, 0.0), color="black", linestyle=":")
-    pos = np.array(ax1.get_xticks(), dtype=np.int)
+    pos = np.array(ax1.get_xticks(), dtype=int)
     n_bins = res_arr.shape[0]
     pos[pos < 0] = 0
     pos[pos >= n_bins] = n_bins - 1
@@ -161,7 +161,7 @@ def plot_nlines2(
     xmax = np.max(bin_arr)
     plt.plot((xmin, xmax), (0.5, 0.5), "k--")
 
-    pos = np.array(ax1.get_xticks(), dtype=np.int)
+    pos = np.array(ax1.get_xticks(), dtype=int)
     n_bins = res_arr.shape[0]
     pos[pos < 0] = 0
     pos[pos >= n_bins] = n_bins - 1
