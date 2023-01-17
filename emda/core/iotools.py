@@ -773,5 +773,5 @@ def model_transform_gm(mmcif_file, rotmat=None, trans=None, outfilename=None, ma
     mat33 = gemmi.Mat33(rotmat)
     trans = com - mat33.multiply(com) + t
     tr = gemmi.Transform(mat33, trans)
-    st[0].transform(tr)
+    st[0].transform_pos_and_adp(tr)
     st.make_mmcif_document().write_file(outfilename)
