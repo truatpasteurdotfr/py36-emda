@@ -39,7 +39,7 @@ subroutine resolution_2dgrid(uc,mode,maxbin,nx,ny,nbin,res_arr,bin_idx)
    if(debug) print*, 'unit cell = ', uc
    call get_resol(uc,real(xymax(1)),0.0,0.0,r(1))
    call get_resol(uc,0.0,real(xymax(2)),0.0,r(2))
-   print*,'a-max, b-max = ', r
+   f(debug) print*,'a-max, b-max = ', r
    !
    sloc = minloc(r,1)
    hk = 0
@@ -50,15 +50,15 @@ subroutine resolution_2dgrid(uc,mode,maxbin,nx,ny,nbin,res_arr,bin_idx)
    do i = 2, xymax(sloc)-1
       step = (i + 0.5) * hk
       call get_resol(uc,step(1),step(2),0.0,resol)
-      print*, i,step(1),step(2),0.0,resol
+      f(debug) print*, i,step(1),step(2),0.0,resol
       res_arr(nbin) = resol
       nbin = nbin + 1
    end do
-   print*, 'nbin=', nbin
+   f(debug) print*, 'nbin=', nbin
    high_res = res_arr(nbin-1)
    call get_resol(uc,0.0,0.0,0.0,low_res)
  
-   print*, 'Creating resolution grid. Please wait...'
+   f(debug) print*, 'Creating resolution grid. Please wait...'
  
   ! Friedel's Law
    do i=xymin(1), xymax(1)
@@ -67,7 +67,7 @@ subroutine resolution_2dgrid(uc,mode,maxbin,nx,ny,nbin,res_arr,bin_idx)
          if(resol < high_res .or. resol > low_res) cycle
          ! Find the matching bin to resol
          do ibin = 0, nbin - 1
-            val = sqrt((res_arr(ibin) - resol)**2)
+            val = abs((res_arr(ibin) - resol))
             if(ibin == 0)then
                tmp_val = val; tmp_min = val
                mnloc = ibin 
@@ -227,13 +227,13 @@ subroutine resolution_grid_from_given_resarr(uc,res_arr,mode,nbin,nx,ny,nz,bin_i
    xyzmin(3) = int(-nxyz(3)/2)
    xyzmax    = -(xyzmin+1)
    !
-   print*, 'nbin=', nbin
+   if(debug) print*, 'nbin=', nbin
    high_res = res_arr(nbin-1)
    !call get_reciprocal_basis(uc, ucstar)
    call get_resol(uc,0.0,0.0,0.0,low_res)
    !call get_resol2(ucstar,0.0,0.0,0.0,low_res)
-   print*,"Low res=",low_res,"High res=",high_res ,'A'
-   print*, 'Creating resolution grid. Please wait...'
+   if(debug) print*,"Low res=",low_res,"High res=",high_res ,'A'
+   if(debug) print*, 'Creating resolution grid. Please wait...'
    ! Friedel's Law
    do i=xyzmin(1), xyzmax(1)
       do j=xyzmin(2), xyzmax(2)
@@ -247,7 +247,7 @@ subroutine resolution_grid_from_given_resarr(uc,res_arr,mode,nbin,nx,ny,nz,bin_i
             if(resol < high_res .or. resol > low_res) cycle
             ! Find the matching bin to resol
             do ibin = 0, nbin - 1
-               val = sqrt((res_arr(ibin) - resol)**2)
+               val = abs((res_arr(ibin) - resol))
                if(ibin == 0)then
                   tmp_val = val; tmp_min = val
                   mnloc = ibin 
