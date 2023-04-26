@@ -145,16 +145,16 @@ subroutine resolution_grid(uc,mode,maxbin,nx,ny,nz,nbin,res_arr,bin_idx,s_grid)
      call get_resol(uc,step(1),step(2),step(3),resol)
      if(debug) print*, i,step(1),step(2),step(3),resol
      !print*, i,step(1),step(2),step(3),resol
-     print*, i,resol
+     if(debug) print*, i,resol
      res_arr(i) = resol
      nbin = i + 1
   end do
-  print*, 'nbin=', nbin
+  if(debug) print*, 'nbin=', nbin
   high_res = res_arr(nbin-1)
   call get_resol(uc,0.0,0.0,0.0,low_res)
-  !print*,"Low res=",low_res,"High res=",high_res ,'A'
+  if(debug) print*,"Low res=",low_res,"High res=",high_res ,'A'
 
-  print*, 'Creating resolution grid. Please wait...'
+  if(debug) print*, 'Creating resolution grid. Please wait...'
 
   ! Friedel's Law
   do i=xyzmin(1), xyzmax(1)
@@ -175,7 +175,7 @@ subroutine resolution_grid(uc,mode,maxbin,nx,ny,nz,nbin,res_arr,bin_idx,s_grid)
 !!$           bin_idx(-i,-j,-k) = mnloc
            ! Find the matching bin to resol
            do ibin = 0, nbin - 1
-              val = sqrt((res_arr(ibin) - resol)**2)
+              val = abs((res_arr(ibin) - resol))
               if(ibin == 0)then
                  tmp_val = val; tmp_min = val
                  mnloc = ibin 
@@ -327,17 +327,17 @@ subroutine resol_grid_em(uc,mode,maxbin,nx,ny,nz,nbin,res_arr,bin_idx,s_grid)
      call get_resol(uc,step(1),step(2),step(3),resol)
      if(debug) print*, i,step(1),step(2),step(3),resol
      !print*, i,step(1),step(2),step(3),resol
-     print*, i,resol
+     if(debug) print*, i,resol
      res_arr(i) = resol
      bin_arr(i) = i + 2.5
      nbin = i + 1
   end do
-  print*, 'nbin=', nbin
+  if(debug) print*, 'nbin=', nbin
   high_res = res_arr(nbin-1)
   call get_resol(uc,0.0,0.0,0.0,low_res)
-  !print*,"Low res=",low_res,"High res=",high_res ,'A'
+  if(debug) print*,"Low res=",low_res,"High res=",high_res ,'A'
 
-  print*, 'Creating resolution grid. Please wait...'
+  if(debug) print*, 'Creating resolution grid. Please wait...'
 
   ! Friedel's Law
   do i=xyzmin(1), xyzmax(1)
@@ -397,8 +397,8 @@ subroutine resolution_grid_full(uc,highres,mode,maxbin,nx,ny,nz,resol_grid,s_gri
   if(debug) print*, 'xyzmax = ', xyzmax
   if(debug) print*, 'unit cell = ', uc
 
-  print*, 'Creating resolution grid. Please wait...'
-  print*, 'High resolution cutoff: ', highres, 'A'
+  if(debug) print*, 'Creating resolution grid. Please wait...'
+  if(debug) print*, 'High resolution cutoff: ', highres, 'A'
 
   do i=xyzmin(1), xyzmax(1)
      do j=xyzmin(2), xyzmax(2)
