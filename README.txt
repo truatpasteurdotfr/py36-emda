@@ -1,4 +1,4 @@
-EMDA version 1.1.3
+EMDA version 1.1.6
 ===================
 
 EMDA is an importable Python library for Electron Microscopy map and model manipulations written in Python3.
@@ -28,7 +28,7 @@ All dependencies will be automatically checked and installed, if necessary durin
 EMDA installation.
 
 
-Installing EMDA version 1.1.3 
+Installing EMDA version 1.1.6 
 ===============================
 
 For installation you may need administrator permissions, 
@@ -48,14 +48,20 @@ After installation, you may check the installation by typing
 License
 =======
 
-EMDA-1.1.2 comes under Mozilla Public License Version 2.0 licence.
+EMDA-1.1.6 comes under Mozilla Public License Version 2.0 licence.
 Please look at LICENSE.txt for more details.
 
 
 Citations
 =========
 
-Please contact authors: ranganaw@mrc-lmb.cam.ac.uk,
+Journal of Structural Biology 214 (2022) 107826
+
+
+Queries
+=======
+
+ranganaw@mrc-lmb.cam.ac.uk,
 garib@mrc-lmb.cam.ac.uk
 
 
@@ -64,5 +70,5 @@ Acknowledgments
 
 Wellcome Trust- Validation tools for Cryo EM grant (208398/Z/17/Z)
 
-This README file was last time modified on 02.09.2020
+This README file was last time modified on 02.08.2023
 
