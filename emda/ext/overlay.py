@@ -634,9 +634,10 @@ def get_ibin(bin_fsc, cutoff):
     return ibin
 
 
-def determine_ibin(bin_fsc, cutoff=0.15):
+def determine_ibin(bin_fsc, cutoff=0.05):
     bin_fsc = filter_fsc(bin_fsc)
-    ibin = get_ibin(bin_fsc, cutoff)        
+    ibin = get_ibin(bin_fsc, cutoff)    
+    print("ibin= ", ibin)    
     i = 0
     while ibin < 5:
         cutoff -= 0.01
