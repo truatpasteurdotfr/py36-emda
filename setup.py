@@ -23,7 +23,7 @@ setup(name='emda',
     license='MPL-2.0',
     packages=setuptools.find_packages(),
     ext_modules =[ex1],
-    install_requires=['pandas>=0.23.4','mrcfile','matplotlib','numpy','scipy','gemmi==0.5.4','servalcat', 'proshade'],
+    install_requires=['pandas>=0.23.4','mrcfile','matplotlib','numpy','scipy','gemmi==0.5.4','servalcat'],
     test_suite='emda.tests',
     entry_points={
       'console_scripts': [
