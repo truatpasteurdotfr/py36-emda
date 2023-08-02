@@ -39,7 +39,7 @@ subroutine resolution_2dgrid(uc,mode,maxbin,nx,ny,nbin,res_arr,bin_idx)
    if(debug) print*, 'unit cell = ', uc
    call get_resol(uc,real(xymax(1)),0.0,0.0,r(1))
    call get_resol(uc,0.0,real(xymax(2)),0.0,r(2))
-   f(debug) print*,'a-max, b-max = ', r
+   if(debug) print*,'a-max, b-max = ', r
    !
    sloc = minloc(r,1)
    hk = 0
@@ -50,15 +50,15 @@ subroutine resolution_2dgrid(uc,mode,maxbin,nx,ny,nbin,res_arr,bin_idx)
    do i = 2, xymax(sloc)-1
       step = (i + 0.5) * hk
       call get_resol(uc,step(1),step(2),0.0,resol)
-      f(debug) print*, i,step(1),step(2),0.0,resol
+      if(debug) print*, i,step(1),step(2),0.0,resol
       res_arr(nbin) = resol
       nbin = nbin + 1
    end do
-   f(debug) print*, 'nbin=', nbin
+   if(debug) print*, 'nbin=', nbin
    high_res = res_arr(nbin-1)
    call get_resol(uc,0.0,0.0,0.0,low_res)
  
-   f(debug) print*, 'Creating resolution grid. Please wait...'
+   if(debug) print*, 'Creating resolution grid. Please wait...'
  
   ! Friedel's Law
    do i=xymin(1), xymax(1)
