@@ -234,7 +234,7 @@ resample_d.add_argument(
     required=False,
     default=None,
     nargs="+",
-    type=np.float,
+    type=float,
     help="target cell. e.g. a b c 90 90 90",
 )
 resample_d.add_argument(
@@ -476,10 +476,16 @@ diffmap = subparsers.add_parser(
     "diffmap", description="Calculate the difference map"
 )
 diffmap.add_argument(
-    "--map", required=True, nargs="+", type=str, help="maplist to diffmap"
+    "--firstmap", required=True, type=str, help="firstmap for difference calculation"
 )
 diffmap.add_argument(
-    "--msk", required=False, default=None, nargs="+", type=str, help="masklist for maps"
+    "--secondmap", required=True, type=str, help="secondmap for difference calculation"
+)
+diffmap.add_argument(
+    "--firstmask", required=False, default=None, type=str, help="mask for firstmap"
+)
+diffmap.add_argument(
+    "--secondmask", required=False, default=None, type=str, help="mask for secondmap"
 )
 diffmap.add_argument(
     "--res",
@@ -623,7 +629,7 @@ model2map.add_argument("--res", required=True,
 model2map.add_argument("--dim", required=True, nargs="+",
                        type=int, help="map dim ")
 model2map.add_argument(
-    "--cel", required=True, nargs="+", type=np.float, help="cell parameters "
+    "--cel", required=True, nargs="+", type=float, help="cell parameters "
 )
 model2map.add_argument(
     "--lgf", required=False, default=None, type=str, help="ligand description file"
@@ -1151,11 +1157,14 @@ def half_to_full(args):
 def diff_map(args):
     from emda.emda_methods import difference_map
 
-    difference_map(maplist=args.map, masklist=args.msk,
+    maplist = [args.firstmap, args.secondmap]
+    masklist = [args.firstmask, args.secondmask]
+
+    difference_map(maplist=maplist, masklist=masklist,
                    diffmapres=args.res, mode=args.mod, ncy=args.ncy,
                    fit=args.fit, usehalfmaps=args.usehalfmaps, 
                    usecom=args.nocom, fitres=args.fitres, rot=args.rot,
-                   axr=args.axr, trans=args.tra, )
+                   axr=args.axr, trans=args.tra)
 
 
 def scale_map(args):
