@@ -1535,6 +1535,7 @@ def difference_map(maplist, diffmapres=3.0, ncy=100, mode="norm", fit=False,
         Inputs:
             maplist: string
                 List of map names to calculate difference maps.
+                e.g.: [firstmap.mrc secondmap.mrc]
                 If combined with fit parameter, firstmap in the list
                 will be taken as static/reference map. If this list
                 contains coordinate file (PDB/CIF), give it in the second place.

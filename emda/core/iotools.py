@@ -651,8 +651,8 @@ def read_atomsf(atm, fpath=None):
             if line.startswith(atm):
                 found = True
                 break
-    A = np.zeros(5, dtype=np.float)
-    B = np.zeros(5, dtype=np.float)
+    A = np.zeros(5, dtype=float)
+    B = np.zeros(5, dtype=float)
     if found:
         ier = 0
         f = open(fpath)
@@ -664,9 +664,9 @@ def read_atomsf(atm, fpath=None):
                 A[i] = all_lines[num + i].split()[-1]
                 B[i] = 0.0
             elif i == 1:
-                A[1:] = np.asarray(all_lines[num + i].split(), dtype=np.float)
+                A[1:] = np.asarray(all_lines[num + i].split(), dtype=float)
             elif i == 2:
-                B[1:] = np.asarray(all_lines[num + i].split(), dtype=np.float)
+                B[1:] = np.asarray(all_lines[num + i].split(), dtype=float)
         f.close()
     else:
         ier = 1

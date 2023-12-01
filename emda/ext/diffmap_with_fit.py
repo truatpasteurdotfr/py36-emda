@@ -85,26 +85,37 @@ def calculate_diffmap(emmap1, f_list, resol):
 
 
 def mapoutput(list_maps, uc, origin, masklist=None):
-    if masklist is None: 
-        masklist = []
-    if len(masklist) > 0:
-        """ for i, msk in enumerate(masklist):
-            if i < 2:
-                # calculate rmsd
-                masked_mean = np.sum(list_maps[i] * msk) / np.sum(msk)
-                diff = (list_maps[i] - masked_mean) * msk
-                rmsd = np.sqrt(np.sum(diff * diff) / np.sum(msk))
-                print("rmsd: ", rmsd)
-                print("rmsd of diffmap" + str(i) + " :" + str(rmsd))
-                #
-            fname_dif = "emda_diffmap_m%s.mrc" % (str(i+1))
-            iotools.write_mrc(list_maps[i] * msk, fname_dif, uc, origin)
-            fname_map = "emda_map%s.mrc" % (str(i+1))
-            iotools.write_mrc(list_maps[i+2] * msk, fname_map, uc, origin)  """ 
+    if all(mask is not None for mask in masklist):
         from emda.ext.utils import binarize_mask
+
+        # combined mask
         msk = binarize_mask(mask=masklist[0]) * binarize_mask(mask=masklist[1])
+
         # calculate rmsd
-        for i, _ in enumerate(masklist):
+        sum_mask = np.sum(msk)
+        mean_for_masked_diffmap_m1m2 = np.sum(list_maps[0] * msk) / sum_mask
+        mean_for_masked_diffmap_m2m1 = np.sum(list_maps[1] * msk) / sum_mask
+        mean_for_masked_nem1 = np.sum(list_maps[2] * msk) / sum_mask
+        mean_for_masked_nem2 = np.sum(list_maps[3] * msk) / sum_mask
+
+        dev_from_masked_mean_diffmap_m1m2 = (list_maps[0] - mean_for_masked_diffmap_m1m2) * msk
+        dev_from_masked_mean_diffmap_m2m1 = (list_maps[1] - mean_for_masked_diffmap_m2m1) * msk
+        dev_from_masked_mean_nem1 = (list_maps[2] - mean_for_masked_nem1) * msk
+        dev_from_masked_mean_nem2 = (list_maps[3] - mean_for_masked_nem2) * msk
+
+        rmsd_diffmap_m1m2 = np.sqrt(np.sum(dev_from_masked_mean_diffmap_m1m2 * dev_from_masked_mean_diffmap_m1m2) / sum_mask)
+        rmsd_diffmap_m2m1 = np.sqrt(np.sum(dev_from_masked_mean_diffmap_m2m1 * dev_from_masked_mean_diffmap_m2m1) / sum_mask)
+        rmsd_nem1 = np.sqrt(np.sum(dev_from_masked_mean_nem1 * dev_from_masked_mean_nem1) / sum_mask)
+        rmsd_nem2 = np.sqrt(np.sum(dev_from_masked_mean_nem2 * dev_from_masked_mean_nem2) / sum_mask)
+
+        # output maps
+        iotools.write_mrc((list_maps[0] / rmsd_diffmap_m1m2) * msk, 'emda_diffmap_m1-m2.mrc', uc, origin)
+        iotools.write_mrc((list_maps[1] / rmsd_diffmap_m2m1) * msk, 'emda_diffmap_m2-m1.mrc', uc, origin)
+        iotools.write_mrc((list_maps[2] / rmsd_nem1) * msk, 'emda_map1.mrc', uc, origin)
+        iotools.write_mrc((list_maps[3] / rmsd_nem2) * msk, 'emda_map2.mrc', uc, origin)
+
+
+        """ for i, _ in enumerate(masklist):
             masked_mean = np.sum(list_maps[i] * msk) / np.sum(msk)
             diff = (list_maps[i] - masked_mean) * msk
             rmsd = np.sqrt(np.sum(diff * diff) / np.sum(msk))
@@ -117,15 +128,20 @@ def mapoutput(list_maps, uc, origin, masklist=None):
             diff2 = (list_maps[i+2] - masked_mean_map) * msk
             rmsd2 = np.sqrt(np.sum(diff2 * diff2) / np.sum(msk))
             #iotools.write_mrc(((list_maps[i+2]- masked_mean_map) / rmsd2) * msk, fname_map, uc, origin)
-            iotools.write_mrc((list_maps[i+2] / rmsd2) * msk, fname_map, uc, origin)
+            iotools.write_mrc((list_maps[i+2] / rmsd2) * msk, fname_map, uc, origin) """
     else:
-        for i , _ in enumerate(list_maps):
+        iotools.write_mrc(list_maps[0], 'emda_diffmap_m1-m2.mrc', uc, origin)
+        iotools.write_mrc(list_maps[1], 'emda_diffmap_m2-m1.mrc', uc, origin)
+        iotools.write_mrc(list_maps[2], 'emda_map1.mrc', uc, origin)
+        iotools.write_mrc(list_maps[3], 'emda_map2.mrc', uc, origin)
+
+        """ for i , _ in enumerate(list_maps):
             if i < 2:
                 fname_dif = "emda_diffmap_m%s.mrc" % (str(i+1))
                 iotools.write_mrc(list_maps[i], fname_dif, uc, origin)
             else:
                 fname_map = "emda_map%s.mrc" % (str(i-1))
-                iotools.write_mrc(list_maps[i], fname_map, uc, origin)
+                iotools.write_mrc(list_maps[i], fname_map, uc, origin) """
 
 
 class MapOut:
@@ -206,24 +222,21 @@ def main(maplist, diffmapres=3, ncy=5, fit=False, usecom=False,
         else:
             uc, arr1, origin = em.get_data(maplist[0])
             _, arr2, _ = em.get_data(maplist[1])
-            if masklist is not None and len(masklist) == 2:
+            if all(mask is not None for mask in masklist):
                 _, msk1, _ = iotools.read_map(masklist[0])
                 _, msk2, _ = iotools.read_map(masklist[1])
                 results.masklist = [msk1, msk2]
                 print("applying masks on maps..")
                 arr1 = arr1 * msk1
-                arr2 = arr2 * msk2                
+                arr2 = arr2 * msk2
+            else:
+                results.masklist = masklist             
             f1 = fftshift(fftn(arr1))
             f2 = fftshift(fftn(arr2))
             diffmap = diffmap_normalisedsf(f1, f2, uc, smax=diffmapres, origin=origin)
             results.diffmap = diffmap
             results.cell = uc
             results.origin = origin
-            #if masklist is not None:
-            #    assert len(maplist) == len(masklist) == 2
-            #    _, msk1, _ = iotools.read_map(masklist[0])
-            #    _, msk2, _ = iotools.read_map(masklist[1])
-            #    results.masklist = [msk1, msk2]
     return results
 
 
