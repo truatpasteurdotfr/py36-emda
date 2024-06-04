@@ -1,4 +1,4 @@
-#logbook of manual installation:
+# logbook of manual installation:
 -    enable your conda environment
 -    create a emda environment (thus aoid breaking everything that you have been using so far)
 -    activate this new environment
