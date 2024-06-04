@@ -1,0 +1,47 @@
+# https://gitlab.pasteur.fr/InDeep/InDeep.git
+BootStrap: docker
+From: docker.io/continuumio/miniconda3
+
+%post
+# update LTS
+apt-get update && \
+DEBIAN_FRONTEND=noninteractive apt-get -y upgrade && \
+DEBIAN_FRONTEND=noninteractive apt-get -y install gfortran && \
+DEBIAN_FRONTEND=noninteractive apt-get -y autoremove
+
+# update conda
+conda update -y conda && \
+conda update -y --all && \
+
+# EMDA
+cd /opt && \
+git clone https://github.com/truatpasteurdotfr/py36-emda.git && \
+cd py36-emda/conda.d && \
+#conda env create -n py36-emda --file  20240604-1600-py36-emda-conda-env-export.yml
+#fails with missing numpy (in setup.py)
+#
+conda create --name py36-emda --file 20240604-1600-py36-emda-conda-list--explicit.yml
+eval "$(conda shell.bash hook)"
+conda activate py36-emda
+grep -v emda pip-freese.txt > requirements.txt
+pip install -r requirements.txt
+pip install -r pip-freese.txt
+
+# cleanup
+conda clean --all --yes
+python -m pip cache purge
+
+%environment
+# do not use ~/.local python
+PYTHONNOUSERSITE=1 
+export PYTHONNOUSERSITE
+export CONDA_ROOT=/opt/conda
+
+%runscript
+#!/bin/bash
+PYTHONNOUSERSITE=1
+export PYTHONNOUSERSITE
+export CONDA_ROOT=/opt/conda
+eval "$(${CONDA_ROOT}/bin/conda shell.bash hook)"
+conda activate py36-emda
+"$@"
